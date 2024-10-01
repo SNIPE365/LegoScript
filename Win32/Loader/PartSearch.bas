@@ -1,7 +1,7 @@
 '#cmdline "-gen gcc -O 1"
 
-#include once "Modules\PartPaths.bas"
 #include once "crt.bi"
+#include once "Include\PartPaths.bas"
 
 #define DebugLoading
 
@@ -160,8 +160,8 @@ sub LoadPartNames()
       if g_pPartsNames then deallocate(g_pPartsNames)
       g_pPartsNames = allocate(uPartNamesSize)
       
-      for N as long = 1 to ubound(g_pzPaths)
-         var sPath = *g_pzPaths(N) & "\"
+      for N as long = 1 to ubound(g_sPathList)
+         var sPath = g_sPathList(N) & "\"
          if instr(sPath,"\p\") then exit for 'exits when subparts/primatives start   
          var sName = dir( sPath & "*.dat")
          
