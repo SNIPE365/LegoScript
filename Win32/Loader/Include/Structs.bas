@@ -20,6 +20,15 @@ desktop\ldcad\ldraw\parts
 
 'dim shared as string sFilenames
 'redim shared as long aDatFiles()
+enum SubpartType
+   spUnknown
+   spStud
+   spClutch
+   spAxle
+   spAxlehole 
+   spPin
+   spPinhole
+end enum
 
 type LineType1Struct          'line type 1
    as single fX,fY,fZ,fA,fB,fC,fD,fE,fF,fG,fH,fI
@@ -37,6 +46,24 @@ end type
 type LineType5Struct          'line type 5
    as single fX1,fY1,fZ1,fX2,fY2,fZ2,fX3,fY3,fZ3,fX4,fY4,fZ4
 end type
+
+type StudInfo
+   as single fX,fY,fZ
+end type
+type ClutchInfo as StudInfo
+type AliasInfo as StudInfo
+type AxleInfo as StudInfo
+
+type PartInfo
+   iStudCnt   as byte
+   iClutchCnt as byte
+   iAliasCnt  as byte
+   iAxleCnt   as byte
+   pStuds    as StudInfo ptr
+   pClutches as ClutchInfo ptr
+   pAliases  as AliasInfo ptr   
+   pAxles    as AxleInfo ptr
+end type   
 
 type PartStruct
    bType      as ubyte   'type ID (line/primitves   
@@ -56,8 +83,10 @@ type PartStruct
    end union   
 end type
 
-type DATFile  
+type DATFile
   iPartCount      as long                  'number of parts in this file
+  'this info is filled dynamically based on studs/clutches etc... (also including the shadow info)
+  tInfo           as PartInfo
   dim as PartStruct tParts( (1 shl 25)-1 ) 'maximum number of parts (dynamic)
 end type
 type ModelList

@@ -21,8 +21,11 @@ sub PushAndMultMatrix( pIn as const single ptr )
       puts("MATRIX STACK OVERFLOW!!!!")
       sleep : system
    end if
+         
+   'var pOut = cast(Matrix4x4 ptr,@tMatrixStack(g_CurrentMatrix))
+   '*pOut = *cast(Matrix4x4 ptr,pIn)
+   
    var pOut = cast(single ptr,@tMatrixStack(g_CurrentMatrix))
-      
    for row as long = 0 to 3
       for col as long = 0 to 3
          pOut[row+col*4] = _            
@@ -31,7 +34,7 @@ sub PushAndMultMatrix( pIn as const single ptr )
             pCur[row + 2 * 4] * piN[2 + col * 4] + _
             pCur[row + 3 * 4] * piN[3 + col * 4]
       next col
-   next row
+   next row   
    
 end sub
 sub PopMatrix()

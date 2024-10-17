@@ -6,6 +6,31 @@
    #define DebugPrimIdent
 #endif   
 
+function GetSubPartType( sPartName as string , bDebug as boolean = false ) as long
+   'all duplos studs/clutches are hollow
+   var sL = lcase(sPartName)
+   var iPos = instr(sL,"stud")   
+   if instr(sL,"stud") then
+      if sL[iPos+4] = asc(".") then 
+         'stud3(2x hei) stud4(hollow) stud5 stud8(duplo)
+         select case sl[iPos+3]
+         case asc("3"),asc("4"),asc("5"),asc("8")
+            if bDebug then printf(!"%s\n",sPartName,"spClutch")
+            return spClutch
+         end select
+      end if       
+      if instr(sL,"4od.") orelse instr(sL,"4a.") orelse instr(sL,"3a.") then
+         'stud3a stud4od (hollow) stud4a (hollow)
+         if bDebug then printf(!"%s\n",sPartName,"spClutch")
+         return spClutch
+      end if
+      'stud stud2 stud2a(hollow) stud7(duplo)
+      if bDebug then printf(!"%s\n",sPartName,"spStud")
+      return spStud
+   end if
+   return spUnknown
+end function
+
 sub RenderModel( pPart as DATFile ptr , iBorders as long , uCurrentColor as ulong = &h70605040 , uCurrentEdge as ulong = 0 DebugPrimParm )
    if uCurrentColor = &h70605040 then uCurrentColor = g_Colours(c_Blue) : uCurrentEdge = g_EdgeColours(c_Blue)
    
@@ -43,7 +68,8 @@ sub RenderModel( pPart as DATFile ptr , iBorders as long , uCurrentColor as ulon
             '   if .bType<>2 and .bType<>5 then continue for
             'end if
             select case .bType
-            case 1               
+            case 1                  
+               'continue for
                'uEdge = rgb(rnd*255,rnd*255,rnd*255)
                uEdge = ((uColor and &hFEFEFE) shr 1) or (uColor and &hFF000000)
                'g_EdgeColours(.wColour)
@@ -51,6 +77,7 @@ sub RenderModel( pPart as DATFile ptr , iBorders as long , uCurrentColor as ulon
                with T1
                   var pSubPart = g_tModels(.lModelIndex).pModel
                   var sName = *cptr(zstring ptr,strptr(g_sFilenames)+g_tModels(.lModelIndex).iFilenameOffset+6)
+                                                      
                   #ifdef DebugPrimitive
                   Puts _
                      " fX:" & .fX & " fY:" & .fY & " fZ:" & .fZ & _
@@ -67,10 +94,17 @@ sub RenderModel( pPart as DATFile ptr , iBorders as long , uCurrentColor as ulon
                     .fC*cScale , .fF*cScale , .fI*cScale , 0 , _
                     .fX*cScale , .fY*cScale , .fZ*cScale , 1 }                                      
                   PushAndMultMatrix( @fMatrix(0) ) 
-                  'glPushMatrix() : glMultMatrixf( @fMatrix(0) )
+                  
+                  if iBorders=0 then
+                     select case GetSubPartType( sName )
+                     case spStud : uColor = &hFF4488FF                        
+                     case spClutch : uColor = &hFF1122FF
+                     end select
+                  end if
+                  
                   RenderModel( pSubPart , iBorders , uColor , uEdge DebugPrimIdent )
-                  PopMatrix() 
-                  'glPopMatrix()
+                  PopMatrix()
+                  
                end with               
             case 2               
                if iBorders=0 then continue for
@@ -148,13 +182,13 @@ sub RenderModel( pPart as DATFile ptr , iBorders as long , uCurrentColor as ulon
                   glEnd
                end with
             case 5
-               continue for
+               'continue for
                if iBorders=0 then continue for
                var T5 = ._5               
                MultiplyMatrixVector( @T5.fX1 ) 
                MultiplyMatrixVector( @T5.fX2 )               
                SetLineNormal( *cptr( typeof(._2) ptr , @T5 ) ) 'just need the line
-               with ._5
+               with T5
                   #ifdef DebugPrimitive
                      puts _
                         " fX1:" & .fX1 & " fY1:" & .fY1 & " fZ1:" & .fZ1 & _
@@ -163,8 +197,8 @@ sub RenderModel( pPart as DATFile ptr , iBorders as long , uCurrentColor as ulon
                         " fXB:" & .fX4 & " fYB:" & .fY4 & " fZB:" & .fZ4
                   #endif
                   
-                  glColor4ubv( cast(ubyte ptr,@uEdge) )
-                  'glColor3f( 0 , 1 , 0 )
+                  'glColor4ubv( cast(ubyte ptr,@uEdge) )
+                  glColor4f( 0 , 1 , 0 , .33 )
                   
                   glBegin GL_LINES                  
                   glVertex3f .fX1*cScale , .FY1*cScale , .fZ1*cScale
@@ -185,7 +219,11 @@ type PartSize
    as single zMin , zMax
 end type   
 
-sub SizeModel( pPart as DATFile ptr , tSize as PartSize )
+static shared as long g_TotalLines , g_TotalOptis , g_TotalTrigs , g_TotalQuads
+
+sub SizeModel( pPart as DATFile ptr , tSize as PartSize , pRoot as DATFile ptr = NULL )
+   
+   if pRoot = NULL then pRoot = pPart
    
    #macro CheckZ( _Var ) 
       if .fX##_Var > tSize.xMax then tSize.xMax = .fX##_Var 
@@ -202,49 +240,74 @@ sub SizeModel( pPart as DATFile ptr , tSize as PartSize )
       for N as long = 0 to .iPartCount-1         
          with .tParts(N)            
             select case .bType
-            case 1               
+            case 1                 
+               'continue for
                with ._1
                   var pSubPart = g_tModels(.lModelIndex).pModel
+                  var sName = *cptr(zstring ptr,strptr(g_sFilenames)+g_tModels(.lModelIndex).iFilenameOffset+6)
                   dim as single fMatrix(15) = { _
                     .fA*cScale , .fD*cScale , .fG*cScale , 0 , _
                     .fB*cScale , .fE*cScale , .fH*cScale , 0 , _
                     .fC*cScale , .fF*cScale , .fI*cScale , 0 , _
                     .fX*cScale , .fY*cScale , .fZ*cScale , 1 }                                      
                   PushAndMultMatrix( @fMatrix(0) )                   
-                  SizeModel( pSubPart , tSize )
+                  
+                  select case GetSubPartType( sName , false )
+                  case spStud                        
+                     with tMatrixStack(g_CurrentMatrix)
+                        printf(!"Stud X=%1.1f Y=%1.1f Z=%1.1f\n",.m(12),.m(13),.m(14))
+                     end with
+                  case spClutch 
+                     rem nothing yet
+                  end select
+                  
+                  SizeModel( pSubPart , tSize , pRoot )
                   PopMatrix()                  
                end with               
-            case 2
-               var T2 = ._2               
+            case 2               
+               var T2 = ._2 
+               'if bMain then T2.fY1 += 4 : T2.fY2 += 4
                MultiplyMatrixVector( @T2.fX1 )
                MultiplyMatrixVector( @T2.fX2 )
-                              
+               
+               g_TotalLines += 1
+               
                with T2                  
                   CheckZ(1) 
                   CheckZ(2)
                end with
-            case 3
-               var T3 = ._3               
+            case 3               
+               var T3 = ._3   
+               'if bMain then T3.fY1 += 4 : T3.fY2 += 4 : T3.fY3 += 4
                MultiplyMatrixVector( @T3.fX1 ) 
                MultiplyMatrixVector( @T3.fX2 )
                MultiplyMatrixVector( @T3.fX3 )               
+               
+               g_TotalTrigs += 1
+               
                with T3                  
                   CheckZ(1) 
                   CheckZ(2)
                   CheckZ(3)
                end with
             case 4               
-               var T4 = ._4               
+               var T4 = ._4
+               'if bMain then T4.fY1 += 4 : T4.fY2 += 4 : T4.fY3 += 4 : T4.fY4 += 4
                MultiplyMatrixVector( @T4.fX1 ) 
                MultiplyMatrixVector( @T4.fX2 )
                MultiplyMatrixVector( @T4.fX3 )
                MultiplyMatrixVector( @T4.fX4 )
+               
+               g_TotalQuads += 1
+               
                with T4                  
                   CheckZ(1) 
                   CheckZ(2)
                   CheckZ(3) 
                   CheckZ(4)                  
                end with            
+            case 5
+               g_TotalOptis += 1
             end select
          end with
       next N

@@ -107,6 +107,7 @@ function ReadFloat( pFile as ubyte ptr , byref fFloat as single ) as long
    fFloat = (iResu+iDecimal/iDecMask)*iSign
    return iRead
 end function
+#define ReadLine ReadFilename
 function ReadFilename( pFile as ubyte ptr , byref sString as string ) as long
    dim as long iRead, iSize
    var pzStart = cptr( zstring ptr , pFile )
@@ -147,8 +148,7 @@ function ReadToken( pFile as ubyte ptr , byref sString as string ) as long
    pzStart[iSize] = bPrevious 'restore previous character
    return iRead
 end function
-
-function LoadFile( sFile as string , byref sFileContents as string ) as boolean
+function LoadFile( sFile as string , byref sFileContents as string , bAddPathToSearch as boolean = true ) as boolean
    
    #ifdef DebugLoading
       print "Loading '"+sFile+"' ";      
@@ -156,7 +156,7 @@ function LoadFile( sFile as string , byref sFileContents as string ) as boolean
    #ifdef g_sLog
    g_sLog += "Loading '"+sFile+"' "
    #endif
-   scope 'extract file path and set as one of the search folders
+   if bAddPathToSearch then 'extract file path and set as one of the search folders
       var iPathLen = instrrev(sFile,"\") , iPathLen2 = instrrev(sFile,"/")
       if iPathLen2 > iPathLen then iPathLen = iPathLen2
       if iPathLen then
@@ -164,7 +164,7 @@ function LoadFile( sFile as string , byref sFileContents as string ) as boolean
       else
          g_sPathList(0) = ""
       end if
-   end scope
+   end if
    
    var f = freefile()
    if open(sFile for input as #f) then
@@ -195,6 +195,18 @@ end function
 function FindFile( sFile as string ) as long
    for I as long = 0 to ubound(g_sPathList)               
       var sFullPathFile = g_sPathList(I)
+      if sFile[0] <> asc("\") then sFullPathFile += "\"
+      sFullPathFile += sFile
+      'print sFullPathFile
+      if FileExists( sFullPathFile ) then
+         sFile = sFullPathFile : return TRUE         
+      end if
+   next I
+   return FALSE
+end function
+function FindShadowFile( sFile as string ) as long
+   for I as long = 0 to ubound(g_sShadowPathList)               
+      var sFullPathFile = g_sShadowPathList(I)
       if sFile[0] <> asc("\") then sFullPathFile += "\"
       sFullPathFile += sFile
       'print sFullPathFile

@@ -65,7 +65,7 @@ sub InitOpenGL()
    
    glEnable(GL_LINE_SMOOTH)
    'glEnable(GL_POLYGON_SMOOTH)
-   glEnable(GL_MULTISAMPLE)
+   'glEnable(GL_MULTISAMPLE)
    'glEnable(GL_SAMPLE_COVERAGE)
    'fnglSampleCoverage(0.5, GL_FALSE)
    glLineWidth(1.25)

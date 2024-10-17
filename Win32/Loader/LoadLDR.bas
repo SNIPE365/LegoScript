@@ -26,13 +26,14 @@ g_sFilesToLoad = chr(0)
 
 #include "Modules\ParserFunctions.bas"
 
-function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex as long = -1 , iLoadDependencies as byte = 1 ) as DATFile ptr   
+sub LoadShadow( pPart as DATFile ptr , sFromFile as string )   
+   
    #macro CheckError(_s , _separator... )
       #if len( #_separator )
         if iResu>0 andalso pFile[iResu] <> asc(_separator) then iResu = -1
       #endif
       if iResu<=0 then
-         print _s " error reading '"+sFilename+"' at line " & iLineNum
+         puts _s " error reading '"+sFilename+"' at line " & iLineNum
          sleep : system         
          iFailed = 1 : exit do
       end if
@@ -43,7 +44,116 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
          case 0                    : exit do 'last line of file so we're done SUCCESS
          case asc("\r"),9,asc(" ") 'skipping spaces/tabs/CR
          case else
-            print " expect end of line in '"+sFilename+"' at line " & iLineNum
+            puts " expect end of line in '"+sFilename+"' at line " & iLineNum
+            iFailed = 1 : exit do
+         end select
+         pFile += 1         
+       wend
+       iLineNum += 1 : pFile += 1 : continue do 'now it point to the being of next line
+   #endmacro
+   #macro NextLine()
+      while *pFile <> asc(!"\n") andalso *pfile : pFile += 1 : wend
+      if *pFile=0 then exit do 'last line of file so we're done SUCCESS
+      iLineNum += 1 : pFile += 1 'now it point to the being of next line
+   #endmacro
+   
+   var iPos = instrrev(sFromFile,"\") , iPos2 = instrrev(sFromFile,"/")
+   if iPos2 > iPos then iPos = iPos2      
+   var sShadowFile = mid(sFromFile,iPos+1)
+   #define sFilename sShadowFile
+   if FindShadowFile( sShadowFile ) then         
+      printf(!"[%s] have shadow\n",sShadowFile)
+   else
+      'printf(!"[%s] does NOT have shadow\n",sShadowFile)
+      exit sub
+   end if     
+   
+   dim as string sContent
+   if LoadFile( sShadowFile , sContent , false ) then
+      dim as ubyte ptr pFile = strptr(sContent)
+      dim as long iType = any , iResu = any ', iColour = any
+      dim as long iFailed=0 , iLineNum = 1
+      do
+         'at this point we should assume we are at the begin of a line so we get a line type
+         iResu = ReadInt( pFile , iType )
+         if iResu=0 then 'empty line
+            NextLine() : continue do 'so let's get the next one         
+         end if
+         CheckError( "Syntax" ) 'failed to read the line type integer?
+         pFile += iResu 'advancing to the next component
+      
+         'all types except comments/meta (0) have color as second parameter, so let's read it
+         if iType<>0 then
+            puts "ERROR: only comments are expect in shadow files, in '"+sFilename+"' at line " & iLineNum         
+            NextLine() : continue do
+            'iFailed = 1 : exit do         
+         end if      
+         
+         #macro NextFloat( _var , _description , _separator... )            
+            iResu = ReadFloat( pFile , _var )
+            'print _description & " = " & _var
+            CheckError( "ERROR: Expected " _description " parameter" , _separator ) 'failed to read the line type float?
+            pFile += iResu
+         #endmacro
+                     
+         rem select case iType 'which line type is it?      
+         rem case 0 'ignore if comment OR empty line and advance to next line        
+            dim as string sType
+            iResu = ReadToken( pFile , sType )            
+            pFile += iResu
+                        
+            'ignore all non !LDCAD comments
+            if ucase(sType) <> "!LDCAD" then 
+               NextLine() : continue do
+            end if                        
+            iResu = ReadToken( pFile , sType )
+            pFile += iResu
+            printf("<'%s'> ",sType)
+            
+            'https://www.melkert.net/LDCad/tech/meta
+            '[scale<vec3>] [ID<string>] [grid<annoying>]
+            
+            select case ucase(sType)
+            case "SNAP_CLEAR" '0 !LDCAD SNAP_CLEAR [id<string>=axleHole] 
+            case "SNAP_INCL"  '0 !LDCAD SNAP_INCL [ref<string>=connhole.dat] [pos<vec3>=-50 10 0] [ori<mat3>=0 -1 0 0 0 -1 1 0 0] [grid=C 1 C 3 20 20] // 
+            case "SNAP_CYL"   '0 !LDCAD SNAP_CYL [id=connhole] [gender=F] [caps=none] [secs=R 8 2 R 6 16 R 8 2] [center=true] [slide=true] [pos=0 0 0] [ori=1 0 0 0 1 0 0 0 1]
+               puts("SNAP!")
+            case "SNAP_CLP"   '0 !LDCAD SNAP_CLP [radius=4] [length=8] [pos=0 0 0] [ori=1 0 0 0 1 0 0 0 1] [center=true]
+            case "SNAP_FGR"   '0 !LDCAD SNAP_FGR [group=lckHng] [genderOfs=M] [seq=4.5 8 4.5] [radius=6] [center=true] [pos=-30 10 0] [ori=1 0 0 0 0 1 0 -1 0]
+            case "SNAP_GEN"   '0 !LDCAD SNAP_GEN [group=nxtc] [gender=M] [pos=0 -1.5 1.5] [ori=1 0 0 0 0 1 0 -1 0] [bounding=box 12.5 16.5 8]
+            case "SNAP_SPH"   '0 !LDCAD SNAP_SPH [gender=M] [radius=4]
+            end select
+            
+            pFile += ReadLine( pFile , sType )                        
+            printf(!"'%s'\n",sType)            
+            NextLine() : continue do
+         rem end select
+      loop
+      if iFailed then
+         printf("ERROR: Failed to load shadow file '%s'\n",sFilename)
+      end if
+   end if
+
+end sub   
+
+function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex as long = -1 , iLoadDependencies as byte = 1 ) as DATFile ptr   
+   #macro CheckError(_s , _separator... )
+      #if len( #_separator )
+        if iResu>0 andalso pFile[iResu] <> asc(_separator) then iResu = -1
+      #endif
+      if iResu<=0 then
+         puts _s " error reading '"+sFilename+"' at line " & iLineNum
+         sleep : system         
+         iFailed = 1 : exit do
+      end if
+   #endmacro
+   #macro CheckEndOfLine()
+      while *pFile <> asc(!"\n")
+         select case *pFile
+         case 0                    : exit do 'last line of file so we're done SUCCESS
+         case asc("\r"),9,asc(" ") 'skipping spaces/tabs/CR
+         case else
+            puts " expect end of line in '"+sFilename+"' at line " & iLineNum
             iFailed = 1 : exit do
          end select
          pFile += 1         
@@ -57,7 +167,7 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
    #endmacro
 
    #define PartsToBytes(_N) (offsetof(DATFile,tParts(0))+(_N)*sizeof(PartStruct))
-
+      
    dim as long iLastPart=0 , iLimitParts=-1 , iFailed=0, iLineNum = 1
    dim as long iType = any , iColour = any , iResu = any   
    dim as DATFile ptr pT = NULL 'pointer to the file structure in memory
@@ -77,15 +187,16 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
    do
       if iLastPart > iLimitParts then 'allocate more entries if necessary
          iLimitParts += 4096 'we increase the allocation every N parts         
-         var pNew = reallocate( pT , PartsToBytes(iLimitParts+1) )
+         var pNew = cptr(DATFile ptr , reallocate( pT , PartsToBytes(iLimitParts+1) ))
          if pNew=NULL then 
-            print "Failed to allocate memory to load file"
+            puts "Failed to allocate memory to load file"
             iFailed = 1 : exit do 'gives up
          end if
          if pT=NULL then 'first allocation
             pT = pNew
             iFilenameOffset = len(g_sFilenames)
             g_sFilenames += chr(255)+mkl(iModelIndex)+chr(0)+lcase(sFilename)+chr(0)
+            clear pNew->tInfo , 0 , sizeof(pNew->tInfo)
          end if
          pT = pNew
       end if
@@ -277,11 +388,13 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
          'check if it's the end of line before continuing
          CheckEndOfLine()
       case else
-         print "Unknown line"
+         puts "Unknown line"
          NextLine() : continue do
       end select
    loop
    
+   'Load Shadow Library information for this part
+   LoadShadow( pT , sFilename )   
    
    'g_sFilesToLoad
    RecursionLevel -= 1
