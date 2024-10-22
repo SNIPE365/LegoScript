@@ -1,3 +1,7 @@
+#ifndef __Main
+  #error " Don't compile this one"
+#endif  
+
 #ifndef NULL
 const NULL = 0
 #endif

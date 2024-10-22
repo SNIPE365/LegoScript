@@ -1,4 +1,6 @@
-'#cmdline "-gen gcc -O 1"
+#ifndef __Main
+  #error " Don't compile this one"
+#endif  
 
 #include once "crt.bi"
 #include once "Include\PartPaths.bas"
@@ -20,7 +22,6 @@
    _Do(Helper     , 11 ) 
    _Do(Hidden     , 15 ) 'last one for generically hide the parts
 #endmacro  
-
 
 enum PartFlags
    #define DeclarePartFlag( _Name , _Bit ) wIs##_Name = 1 shl (_Bit)

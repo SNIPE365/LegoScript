@@ -1,3 +1,7 @@
+#ifndef __Main
+  #error " Don't compile this one"
+#endif  
+
 sub SetLineNormal( byref tLine as LineType2Struct )
    with tLine
       '// Compute direction vector of the line

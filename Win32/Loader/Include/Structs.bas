@@ -1,3 +1,7 @@
+#ifndef __Main
+  #error " Don't compile this one"
+#endif  
+
 #ifndef NULL
   const NULL = cast(any ptr,0)
 #endif
@@ -47,22 +51,72 @@ type LineType5Struct          'line type 5
    as single fX1,fY1,fZ1,fX2,fY2,fZ2,fX3,fY3,fZ3,fX4,fY4,fZ4
 end type
 
+#if 0
 type StudInfo
    as single fX,fY,fZ
 end type
 type ClutchInfo as StudInfo
 type AliasInfo as StudInfo
 type AxleInfo as StudInfo
+#endif
 
-type PartInfo
-   iStudCnt   as byte
-   iClutchCnt as byte
-   iAliasCnt  as byte
-   iAxleCnt   as byte
-   pStuds    as StudInfo ptr
-   pClutches as ClutchInfo ptr
-   pAliases  as AliasInfo ptr   
-   pAxles    as AxleInfo ptr
+enum ShadowScale
+   ss_None
+   ss_YOnly
+   ss_ROnly
+   ss_YandR
+end enum   
+enum ShadowCaps
+   sc_None 'The shape is open ended. e.g. a male axle or female beam hole.
+   sc_One  'The shape has one closed ending, which one depends on the gender. For male shapes it will be A (bottom) and for female shapes it will be B (top).
+   sc_Two  'The shape is closed (blocked) at both sides. e.g. the male bar of a minifig suitcase handle.
+   sc_A    'A: The bottom is closed / blocked. e.g. a stud.
+   sc_B    'B: The top is closed / blocked. e.g. an anti stud.
+end enum   
+type ShadowGrid
+   as byte  Xcnt,Zcnt   'negative values means CENTERED
+   as ubyte Xstep,Zstep
+end type   
+enum ShadowSecShape '
+   sss_Round    ' R: Round.
+   sss_Axle     ' A: Axle.
+   sss_Square   ' S: Square.
+   sss_FlexPrev '_L: Flexible radius wise extension to the previous block's specs. This will be needed for e.g. the tip of an technic connector pin. Although it is slightly larger it allows for (temporary) compression while sliding the pin inside e.g. a beam hole.
+   sss_FlexNext 'L_: Same as _L but as an extension to the next section instead of the previous one.
+end enum   
+type ShadowSec
+   bshape  as byte 'ShadowSecShape
+   bRadius as byte
+   bLength as byte 
+   bResv_  as byte
+end type
+enum ShadowInfoType
+   sit_Invalid
+   sit_Include
+   sit_Cylinder
+end enum   
+type ShadowStruct
+   bType     as ubyte     'ShadowInfoType 
+   union
+      bFlags     as ubyte
+      type
+         bFlagMirror :1 as ubyte '0=None  , 1=Color Mirror
+         bFlagMale   :1 as ubyte '0=Female, 1=Male
+         bFlagCenter :1 as ubyte 
+         bFlagSlide  :1 as ubyte
+      end type
+   end union
+   bScale    as ubyte      'ShadowScale
+   bCaps     as ubyte      'ShadowCaps
+   fPosX     as single     'X position
+   fPosY     as single     'Y position
+   fPosZ     as single     'Y position
+   fOri(9-1) as single     '3x3 matrix (orientation)
+   tGrid     as ShadowGrid 'caps are replicated based on a grid
+   tSecs(3)  as ShadowSec  'max 4 secs
+   'sRef     as long       'filename offset for reference shadow file (!! check where to union !!)
+   'ID        as string
+   'Group     as string
 end type   
 
 type PartStruct
@@ -86,8 +140,9 @@ end type
 type DATFile
   iPartCount      as long                  'number of parts in this file
   'this info is filled dynamically based on studs/clutches etc... (also including the shadow info)
-  tInfo           as PartInfo
-  dim as PartStruct tParts( (1 shl 25)-1 ) 'maximum number of parts (dynamic)
+  iShadowCount    as long                  'number of entries in the shadow dynamic array
+  paShadow        as ShadowStruct ptr
+  as PartStruct tParts( (1 shl 25)-1 ) 'maximum number of parts (dynamic)
 end type
 type ModelList
    iFilenameOffset as long                 'offset for the file name string

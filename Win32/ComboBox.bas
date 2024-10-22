@@ -2,6 +2,8 @@
 #include "fbgfx.bi"
 #include "fbthread.bi"
 
+#define __Main
+
 'kill exepath+"\PartCache.bin"
 #include "Loader\PartSearch.bas"
 

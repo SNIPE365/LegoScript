@@ -1,3 +1,7 @@
+#ifndef __Main
+  #error " Don't compile this one"
+#endif  
+
 type Matrix4x4
    m(15) as single
 end type   

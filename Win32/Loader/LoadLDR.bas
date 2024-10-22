@@ -1,3 +1,7 @@
+#ifndef __Main
+  #error " Don't compile this one"
+#endif  
+
 #cmdline "-gen gcc -O 3"
 #include "crt.bi"
 #include "vbcompat.bi"
@@ -32,7 +36,7 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string )
       #if len( #_separator )
         if iResu>0 andalso pFile[iResu] <> asc(_separator) then iResu = -1
       #endif
-      if iResu<=0 then
+      if iResu<0 then
          puts _s " error reading '"+sFilename+"' at line " & iLineNum
          sleep : system         
          iFailed = 1 : exit do
@@ -82,18 +86,17 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string )
          CheckError( "Syntax" ) 'failed to read the line type integer?
          pFile += iResu 'advancing to the next component
       
-         'all types except comments/meta (0) have color as second parameter, so let's read it
+         'only comments are expected
          if iType<>0 then
             puts "ERROR: only comments are expect in shadow files, in '"+sFilename+"' at line " & iLineNum         
             NextLine() : continue do
             'iFailed = 1 : exit do         
          end if      
          
-         #macro NextFloat( _var , _description , _separator... )            
-            iResu = ReadFloat( pFile , _var )
-            'print _description & " = " & _var
-            CheckError( "ERROR: Expected " _description " parameter" , _separator ) 'failed to read the line type float?
-            pFile += iResu
+         #macro GetFloat( _ptr , _var , _description , _separator... )            
+            iResu = ReadFloat( _ptr , _var )            
+            CheckError( "ERROR: Expected " _description " parameter" ) 'failed to read the line type float?
+            _ptr += iResu
          #endmacro
                      
          rem select case iType 'which line type is it?      
@@ -117,7 +120,147 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string )
             case "SNAP_CLEAR" '0 !LDCAD SNAP_CLEAR [id<string>=axleHole] 
             case "SNAP_INCL"  '0 !LDCAD SNAP_INCL [ref<string>=connhole.dat] [pos<vec3>=-50 10 0] [ori<mat3>=0 -1 0 0 0 -1 1 0 0] [grid=C 1 C 3 20 20] // 
             case "SNAP_CYL"   '0 !LDCAD SNAP_CYL [id=connhole] [gender=F] [caps=none] [secs=R 8 2 R 6 16 R 8 2] [center=true] [slide=true] [pos=0 0 0] [ori=1 0 0 0 1 0 0 0 1]
-               puts("SNAP!")
+               #if 0 
+                  'puts("SNAP!")
+                  'Property   Type 	      Default    Description
+                  'ID         string 	  	           Optional identifier which can be used in clear metas to optionally drop this meta's information in higher level parts using it.
+                  'group 	   string 	  	           optional group identifier. Can be used to limit potential matches to only snap info having the same group string. Can be used to prevent unwanted matches when very complicated shapes are involved e.g. click rotation holes etc.
+                  'pos        vector 	  	           Position of this shape.
+                  'ori        3x3 matrix             Orientation of this shape.
+                  'scale 	   enum        none 	     Defines how scaled references to the master (official) part should be handled information inheritance wise. Must be one of the following:
+                  '                      	           none: If scaling is detected this information will not be inherited by the higher level part.
+                  '                      	           YOnly: The information will only be inherited if scaling is limited to the Y-axis, if X and or Z is scaled the info will not be inherited.
+                  '                      	           ROnly: The information will only be inherited if scaling is limited to the cylinder's radius (usually x and z) given its done symmetrical. If the info is scaled in any other way it will not be inherited.
+                  '                      	           YandR: The information will only be inherited if YOnly or ROnly rules apply.
+                  'mirror     enum        cor        Defines how mirrored references to the master (official) part should be handled information inheritance wise. Must be one of the following:
+                  '                      	           none: If mirroring is detected this information will not be inherited by the higher level part.
+                  '                      	           cor: If mirroring is detected the snap information will be corrected by flipping one of the radius axis'.
+                  'gender     enum        male       Sets the gender of the cylinder shape M for male (pen) and F for female (hole).
+                  'secs       mixed array            Describes the shape of the hole (along the neg Y-axis) or pen by a sequence of shape variants, radius's and lengths. The info must be given in blocks of: shapeVariant radius length where shapeVariant must be one of the following:
+                  '                      	             R: Round.
+                  '                      	             A: Axle.
+                  '                      	             S: Square.
+                  '                      	             _L: Flexible radius wise extension to the previous block's specs. This will be needed for e.g. the tip of an technic connector pin. Although it is slightly larger it allows for (temporary) compression while sliding the pin inside e.g. a beam hole.
+                  '                      	             L_: Same as _L but as an extension to the next section instead of the previous one.
+                  '                          	           For example a plain stud can be described using a single block: R 8 4 while a technic beam hole needs three: R 8 2 R 6 16 R 8 2.
+                  'caps       enum        one        Defines the ends of the shape, must be one of the following:
+                  '                      	             none: The shape is open ended. e.g. a male axle or female beam hole.
+                  '                      	             one: The shape has one closed ending, which one depends on the gender. For male shapes it will be A (bottom) and for female shapes it will be B (top).
+                  '                      	             two: The shape is closed (blocked) at both sides. e.g. the male bar of a minifig suitcase handle.
+                  '                      	             A: The bottom is closed / blocked. e.g. a stud.
+                  '                      	             B: The top is closed / blocked. e.g. an anti stud.
+                  'grid       mixed array            Defines a grid pattern to use for multiple placement of this cylindrical shape. The grid uses the orientation stated in the ori parameter. As all snap info is Y-axis orientated only the X and Z grid stepping values need to be given like so:
+                  '                                  Xcnt Zcnt Xstep Zstep for example: 4 8 20 20 which could be used to make a 4x8 grid of e.g. studs.
+                  '                                  Optionally each count value can be preceded by a C character indicating the grid should be centered on that axis. If no C is given the axis will add to the pos parameter. For example to center the 4x8 grid around it's pos parameter use: C 4 C 8 20 20
+                  'center     boolean     false      Indicates if this cylinder shape should be centered at its position or not.
+                  'slide      boolean     false      Indicates if this cylinder shape should be considered 'smooth' enough to make sliding of matching parts possible. If ether part of a matched pair of snap info metas has the slide option set to true the user will be able to slide them together. If not it will just 'snap'.
+                  '                      	           Be careful while setting this option as it can cause unwanted sliding of e.g. a stud inside an anti stud. In practice it is best to limit the slide=true value to things you know will slide most of the time (e.g. clips, bush and gear parts etc).
+               #endif
+               ReadLine( pFile , sType )                        
+               printf(!"<%s>\n",sType)
+               dim as string sName,sParms
+               pPart->iShadowCount += 1
+               dim as ShadowStruct ptr pNew = realloc( pPart->paShadow ,  sizeof(ShadowStruct)*pPart->iShadowCount )
+               if pNew = 0 then
+                  iResu=-1
+                  CheckError("Out of memory")
+               end if
+               pPart->paShadow = pNew
+               pNew += (pPart->iShadowCount-1)
+               clear *pNew , 0 , sizeof(ShadowStruct)
+               pNew->bType       = sit_Cylinder 
+               pNew->bFlagMirror = true 'defaults
+               do
+                  #define cvl2(_s) (cvl(_s "  ") and &hFFFFFF)
+                  #define cvl3(_s) cvl(_s " ")
+                  var iResu = ReadBracketOption( pFile , sName , sParms )
+                  CheckError( "Syntax" )
+                  pFile += iResu : if len(sName)=0 then exit do
+                  printf(!">> name='%s' parms='%s'\n",sName,sParms)
+                  select case *cptr(ulong ptr,strptr(sName)) or &h20202020 'lcase(sName)
+                  case cvl("gender") 'F' or 'M'
+                     select case sParms[0] or &h20
+                     case asc("f"): pNew->bFlagMale = false
+                     case asc("m"): pNew->bFlagMale = true
+                     case else
+                        iResu = -1
+                        CheckError("Invalid Gender")
+                     end select
+                  case cvl("secs")
+                  case cvl("caps") '"none" , "one" , "two" , "A" , "B"
+                     select case *cptr(ushort ptr,strptr(sParms)) or &h2020 'lcase(sName)
+                     case cvshort("none"): pNew->bCaps = sc_None
+                     case cvshort("one") : pNew->bCaps = sc_One
+                     case cvshort("two") : pNew->bCaps = sc_Two
+                     case cvshort("a ")  : pNew->bCaps = sc_A
+                     case cvshort("b ")  : pNew->bCaps = sc_B
+                     case else
+                        iResu = -1
+                        CheckError("Invalid caps")
+                     end select
+                  case cvl3("pos") 
+                     var pPos = @(pNew->fPosX) , pParm = cast(ubyte ptr,strptr(sParms))
+                     for N as long = 0 to (3-1) 'position vector
+                        GetFloat( pParm , *pPos , "Position" )
+                        printf("<%f>",*pPos)
+                        pPos += 1
+                     next N
+                     puts("")
+                  case cvl("grid")                     
+                  case cvl3("ori")
+                     var pOri = @(pNew->fOri(0)) , pParm = cast(ubyte ptr,strptr(sParms))
+                     for N as long = 0 to (9-1) 'Orientation 3x3 matrix
+                        GetFloat( pParm , *pOri , "Orientation" )
+                        printf("<%f>",*pOri)
+                        pOri += 1
+                     next N
+                     puts("")
+                  case cvl("center") 'T'rue or 'F'alse
+                     select case sParms[0] or &h20
+                     case asc("f"): pNew->bFlagCenter = false
+                     case asc("t"): pNew->bFlagCenter = true
+                     case else
+                        iResu = -1
+                        CheckError("Invalid Cender")
+                     end select
+                  case cvl("slide")  'T'rue or 'F'alse
+                     select case sParms[0] or &h20
+                     case asc("f"): pNew->bFlagSlide = false
+                     case asc("t"): pNew->bFlagSlide = true
+                     case else
+                        iResu = -1
+                        CheckError("Invalid Cender")
+                     end select
+                  case cvl("scale")  '"none" , "YOnly" , "ROnly" , "YandR" 
+                     select case *cptr(ulong ptr,strptr(sParms)) or &h20202020 'lcase(sName)
+                     case cvl("none")  : pNew->bScale = ss_None
+                     case cvl("yOnly") : pNew->bScale = ss_YOnly
+                     case cvl("rOnly") : pNew->bScale = ss_ROnly
+                     case cvl("yandr") : pNew->bScale = ss_YandR
+                     case else
+                        iResu = -1
+                        CheckError("Invalid Scale")
+                     end select
+                  case cvl("mirror") '"none" or "cor"
+                     select case *cptr(ulong ptr,strptr(sParms)) or &h20202020 'lcase(sName)
+                     case cvl("none")  : pNew->bFlagMirror = false
+                     case cvl3("cor")  : pNew->bFlagMirror = true                     
+                     case else
+                        iResu = -1
+                        CheckError("Invalid Mirror")
+                     end select
+                  case cvl("group")
+                  case else
+                     'special case for 2 letters
+                     select case (*cptr(ulong ptr,strptr(sName)) or &h20202020) and &hFFFFFF
+                     case cvl2("id")
+                     case else
+                        iResu=-1
+                        CheckError("Syntax")
+                     end select
+                  end select                    
+               loop                  
+               NextLine() : continue do               
             case "SNAP_CLP"   '0 !LDCAD SNAP_CLP [radius=4] [length=8] [pos=0 0 0] [ori=1 0 0 0 1 0 0 0 1] [center=true]
             case "SNAP_FGR"   '0 !LDCAD SNAP_FGR [group=lckHng] [genderOfs=M] [seq=4.5 8 4.5] [radius=6] [center=true] [pos=-30 10 0] [ori=1 0 0 0 0 1 0 -1 0]
             case "SNAP_GEN"   '0 !LDCAD SNAP_GEN [group=nxtc] [gender=M] [pos=0 -1.5 1.5] [ori=1 0 0 0 0 1 0 -1 0] [bounding=box 12.5 16.5 8]
@@ -196,7 +339,9 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
             pT = pNew
             iFilenameOffset = len(g_sFilenames)
             g_sFilenames += chr(255)+mkl(iModelIndex)+chr(0)+lcase(sFilename)+chr(0)
-            clear pNew->tInfo , 0 , sizeof(pNew->tInfo)
+            pNew->iShadowCount = 0
+            pNew->paShadow = NULL
+            'clear pNew->tInfo , 0 , sizeof(pNew->tInfo)
          end if
          pT = pNew
       end if

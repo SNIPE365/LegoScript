@@ -1,3 +1,8 @@
+#ifndef __Main
+  #error " Don't compile this one"
+#endif  
+
+
 'Function to compute the cross product of two vectors
 function dot_product(pU as single ptr, pV as single ptr) as single
     return pU[0]*pV[0] + pU[1]*pV[1] + pU[2]*pV[2]

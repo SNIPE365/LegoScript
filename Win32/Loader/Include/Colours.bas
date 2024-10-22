@@ -1,3 +1,7 @@
+#ifndef __Main
+  #error " Don't compile this one"
+#endif  
+
 #if 0
 #macro ForEachColor( _Do )
 	_Do(Black                          , 0     , &h1B2A34 )

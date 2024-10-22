@@ -1,3 +1,5 @@
+#define __Main
+
 #include "LoadLDR.bas"
 
 #include "Include\Colours.bas"
@@ -35,7 +37,7 @@ var sPath = environ("userprofile")+"\Desktop\LDCAD\"
 'var sFile = sPath+"\LDraw\parts\3011.dat"
 'var sFile = sPath+"\LDraw\parts\3001.dat"
 'var sFile = sPath+"\LDraw\parts\s\3001s01.dat"
-'var sFile = sPath+"\LDraw\parts\4070.dat"
+var sFile = sPath+"\LDraw\parts\4070.dat"
 'var sFile = sPath+"\LDraw\parts\78329.dat"
 'var sFile = sPath+"\LDraw\parts\2711.dat"
 'var sFile = sPath+"\LDraw\parts\32124.dat" (axle holes)
@@ -44,7 +46,7 @@ var sPath = environ("userprofile")+"\Desktop\LDCAD\"
 'var sFile = sPath+"\LDraw\parts\48092.dat"
 'var sFile = "stud.dat"
 'var sFile = "18651.dat"
-var sFile = "3703.dat"
+''var sFile = "3703.dat"
 'var sFile = "connhole.dat"
 'var sFile = "C:\Users\greg\Desktop\LDCAD\examples\5510.mpd"
 

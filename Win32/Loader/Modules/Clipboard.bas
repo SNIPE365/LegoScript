@@ -1,3 +1,7 @@
+#ifndef __Main
+  #error " Don't compile this one"
+#endif  
+
 #include once "windows.bi"
 
 declare function SetClipboard(MYSTRING as string) as integer

@@ -1,3 +1,7 @@
+#ifndef __Main
+  #error " Don't compile this one"
+#endif  
+
 function ReadHex( pFile as ubyte ptr , byref iInt as long ) as long
    dim as long iResu = 0, iRead, iHasDigits=0   
    do      
@@ -216,3 +220,61 @@ function FindShadowFile( sFile as string ) as long
    next I
    return FALSE
 end function
+function ReadBracketOption( pFile as ubyte ptr , sName as string , sParms as string ) as long
+   dim as long iRead=0, iSize=0
+   dim as zstring ptr pzName=0, pzParms=0
+   dim as byte bOpen, bSpace
+   dim as ubyte bPrevious = any
+   do
+      select case pFile[iRead]
+      case asc(" "),9 'spaces may be ignored
+         if bOpen then 'we're reading the name/parms
+            if iSize=0 then 'ignore leading spaces/tabs
+               iSize -= 1 : if pzParms=0 then pzName += 1 else pzParms += 1
+            else
+               bSpace += 1 : iSize -= 1 'ignore ending spaces in name
+            end if
+         end if
+      case asc("[")   'name/parms pairs are inside a single bracket
+         if bOpen then return -1 'syntax error (recursive brackets not allowed)
+         pzName = pFile+iRead+1 : bOpen = 1 
+         iSize = -1 : bSpace = 0
+      case asc("=")   'delimiter from name/parms
+         if bOpen=0 then return -1 'syntax error (unexpected character out of place)
+         if pzParms then return -1 'syntax error (can't have = as part of parameters)
+         bPrevious = (*pzName)[iSize]
+         (*pzName)[iSize] = 0 'set as string terminator for the zstring
+         sName = *pzName 'creating the return string from the zstring
+         (*pzName)[iSize] = bPrevious 'restore previous character
+         pzParms = pFile+iRead+1 'now reading parameters
+         iSize=-1 : bSpace = 0 'reset size/spaces
+      case asc("]")   'end of name/parms pair
+         if pzName=0 or pzParms=0 then return -1 'syntax error (name or parms not found)
+         if bOpen=0 then return -1 'syntax error (close bracket without opening)
+         'printf(!"!%i|%i!\n",iSize)
+         bPrevious = (*pzParms)[iSize]
+         (*pzParms)[iSize] = 0 'set as string terminator for the zstring
+         sParms = *pzParms 'creating the return string from the zstring
+         (*pzParms)[iSize] = bPrevious 'restore previous character
+         iRead += 1 : exit do
+      case asc(!"\r"),asc(!"\n"),0 'end of line/file
+         if bOpen then return -1 'if inside brackets then it was premature, so... syntax error
+         sName = "" 'if no more parms then name is empty
+         exit do
+      case else 'every other character
+         if bSpace then
+            if pzParms=0 then 
+               return -1 'syntax error (space in middle of name)
+            else
+               iSize += bSpace 'account ignored spaces
+            end if
+            bSpace = 0
+         end if         
+         if bOpen=0 then return -1 'syntax error (characters only inside brackets)
+      end select
+      iRead += 1 : iSize += 1
+   loop   
+   'success
+   return iRead
+end function
+

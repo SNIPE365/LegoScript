@@ -1,3 +1,7 @@
+#ifndef __Main
+  #error " Don't compile this one"
+#endif  
+
 '#define GL_GLEXT_PROTOTYPES
 
 #include once "GL/gl.bi"

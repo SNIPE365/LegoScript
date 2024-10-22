@@ -1,11 +1,16 @@
+#ifndef __Main
+  #error " Don't compile this one"
+#endif  
+
 #ifdef DebugPrimitive
    #define DebugPrimParm  , sIdent as string = ""
    #define DebugPrimIdent , "   "+sIdent
 #else
    #define DebugPrimParm
    #define DebugPrimIdent
-#endif   
+#endif
 
+'Get SubPartType (based on the name !shouldnt be used we should trust the shadow library!)
 function GetSubPartType( sPartName as string , bDebug as boolean = false ) as long
    'all duplos studs/clutches are hollow
    var sL = lcase(sPartName)
@@ -252,6 +257,7 @@ sub SizeModel( pPart as DATFile ptr , tSize as PartSize , pRoot as DATFile ptr =
                     .fX*cScale , .fY*cScale , .fZ*cScale , 1 }                                      
                   PushAndMultMatrix( @fMatrix(0) )                   
                   
+                  #if 0
                   select case GetSubPartType( sName , false )
                   case spStud                        
                      with tMatrixStack(g_CurrentMatrix)
@@ -260,6 +266,7 @@ sub SizeModel( pPart as DATFile ptr , tSize as PartSize , pRoot as DATFile ptr =
                   case spClutch 
                      rem nothing yet
                   end select
+                  #endif
                   
                   SizeModel( pSubPart , tSize , pRoot )
                   PopMatrix()                  
