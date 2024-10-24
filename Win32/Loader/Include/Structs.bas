@@ -24,16 +24,6 @@ desktop\ldcad\ldraw\parts
 
 'dim shared as string sFilenames
 'redim shared as long aDatFiles()
-enum SubpartType
-   spUnknown
-   spStud
-   spClutch
-   spAxle
-   spAxlehole 
-   spPin
-   spPinhole
-end enum
-
 type LineType1Struct          'line type 1
    as single fX,fY,fZ,fA,fB,fC,fD,fE,fF,fG,fH,fI
    as ulong  lModelIndex
@@ -60,6 +50,17 @@ type AliasInfo as StudInfo
 type AxleInfo as StudInfo
 #endif
 
+const cShadowMaxSecs = 8
+
+enum SubpartType
+   spUnknown
+   spStud
+   spClutch
+   spAxle
+   spAxlehole 
+   spPin
+   spPinhole   
+end enum
 enum ShadowScale
    ss_None
    ss_YOnly
@@ -78,6 +79,7 @@ type ShadowGrid
    as ubyte Xstep,Zstep
 end type   
 enum ShadowSecShape '
+   sss_Invalid
    sss_Round    ' R: Round.
    sss_Axle     ' A: Axle.
    sss_Square   ' S: Square.
@@ -85,10 +87,9 @@ enum ShadowSecShape '
    sss_FlexNext 'L_: Same as _L but as an extension to the next section instead of the previous one.
 end enum   
 type ShadowSec
-   bshape  as byte 'ShadowSecShape
-   bRadius as byte
-   bLength as byte 
-   bResv_  as byte
+   bshape     as byte 'ShadowSecShape
+   bLength    as byte 
+   wFixRadius as short   
 end type
 enum ShadowInfoType
    sit_Invalid
@@ -96,14 +97,17 @@ enum ShadowInfoType
    sit_Cylinder
 end enum   
 type ShadowStruct
-   bType     as ubyte     'ShadowInfoType 
+   bType:3    as ubyte     'ShadowInfoType 
+   bSecCnt:3  as ubyte     'Number of secs in tSecs()
+   bRecurse:2 as ubyte     'Recursion level (0 to 3) is enough?
    union
       bFlags     as ubyte
       type
-         bFlagMirror :1 as ubyte '0=None  , 1=Color Mirror
-         bFlagMale   :1 as ubyte '0=Female, 1=Male
-         bFlagCenter :1 as ubyte 
-         bFlagSlide  :1 as ubyte
+         bFlagMirror  :1 as ubyte '0=None  , 1=Color Mirror
+         bFlagMale    :1 as ubyte '0=Female, 1=Male
+         bFlagCenter  :1 as ubyte 
+         bFlagSlide   :1 as ubyte
+         bFlagHasGrid :1 as ubyte
       end type
    end union
    bScale    as ubyte      'ShadowScale
@@ -113,8 +117,7 @@ type ShadowStruct
    fPosZ     as single     'Y position
    fOri(9-1) as single     '3x3 matrix (orientation)
    tGrid     as ShadowGrid 'caps are replicated based on a grid
-   tSecs(3)  as ShadowSec  'max 4 secs
-   'sRef     as long       'filename offset for reference shadow file (!! check where to union !!)
+   tSecs(cShadowMaxSecs-1)  as ShadowSec  'max 8 secs
    'ID        as string
    'Group     as string
 end type   

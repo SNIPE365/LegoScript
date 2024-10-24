@@ -37,7 +37,7 @@ var sPath = environ("userprofile")+"\Desktop\LDCAD\"
 'var sFile = sPath+"\LDraw\parts\3011.dat"
 'var sFile = sPath+"\LDraw\parts\3001.dat"
 'var sFile = sPath+"\LDraw\parts\s\3001s01.dat"
-var sFile = sPath+"\LDraw\parts\4070.dat"
+''var sFile = sPath+"\LDraw\parts\4070.dat"
 'var sFile = sPath+"\LDraw\parts\78329.dat"
 'var sFile = sPath+"\LDraw\parts\2711.dat"
 'var sFile = sPath+"\LDraw\parts\32124.dat" (axle holes)
@@ -46,7 +46,14 @@ var sFile = sPath+"\LDraw\parts\4070.dat"
 'var sFile = sPath+"\LDraw\parts\48092.dat"
 'var sFile = "stud.dat"
 'var sFile = "18651.dat"
-''var sFile = "3703.dat"
+'var sFile = "3703.dat"
+'var sFile = "3003.dat" 'Shadow: SNAP_INCL
+'var sFile = "3004.dat" 'Shadow: SNAP_INCL
+'var sFile = "4531.dat" 'Shadow: SNAP_*
+'var sFile = "3673.dat" 'Shadow: SNAP_CLEAR
+'var sFile = "3002.dat"
+var sFile ="3001.dat"     'FINE
+
 'var sFile = "connhole.dat"
 'var sFile = "C:\Users\greg\Desktop\LDCAD\examples\5510.mpd"
 
@@ -209,7 +216,14 @@ with tSz
       g_TotalLines*2+g_TotalOptis*2+g_TotalTrigs*3+g_TotalQuads*4 _
    )
    
-end with   
+end with
+
+dim as PartSnap tSnap
+SnapModel( pModel , tSnap )
+with tSnap
+   printf(!"Studs=%i Clutchs=%i Aliases=%i Axles=%i Pins=%i\n", _
+   .lStudCnt , .lClutchCnt , .lAliasCnt , .lAxleCnt , .lPinHoleCnt )
+end with
 
 dim as double dRot = timer
 dim as boolean bBoundingBox

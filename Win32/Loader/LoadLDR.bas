@@ -30,7 +30,7 @@ g_sFilesToLoad = chr(0)
 
 #include "Modules\ParserFunctions.bas"
 
-sub LoadShadow( pPart as DATFile ptr , sFromFile as string )   
+sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long = 0)   
    
    #macro CheckError(_s , _separator... )
       #if len( #_separator )
@@ -66,8 +66,15 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string )
    var sShadowFile = mid(sFromFile,iPos+1)
    #define sFilename sShadowFile
    if FindShadowFile( sShadowFile ) then         
-      printf(!"[%s] have shadow\n",sShadowFile)
+      if bRecursion=0 then
+         printf(!"[%s] have shadow\n",sShadowFile)
+      else
+         printf(!"[%s] included shadow\n",sFromFile)
+      end if
    else
+      if bRecursion then
+         printf(!"[%s] was referenced in a shadow file, but was not found\n",sShadowFile)
+      end if
       'printf(!"[%s] does NOT have shadow\n",sShadowFile)
       exit sub
    end if     
@@ -98,6 +105,11 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string )
             CheckError( "ERROR: Expected " _description " parameter" ) 'failed to read the line type float?
             _ptr += iResu
          #endmacro
+         #macro GetInt( _ptr , _var , _description , _separator... )            
+            iResu = ReadInt( _ptr , _var )            
+            CheckError( "ERROR: Expected " _description " parameter" ) 'failed to read the line type int?
+            _ptr += iResu
+         #endmacro         
                      
          rem select case iType 'which line type is it?      
          rem case 0 'ignore if comment OR empty line and advance to next line        
@@ -111,14 +123,125 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string )
             end if                        
             iResu = ReadToken( pFile , sType )
             pFile += iResu
-            printf("<'%s'> ",sType)
-            
+                        
             'https://www.melkert.net/LDCad/tech/meta
             '[scale<vec3>] [ID<string>] [grid<annoying>]
             
             select case ucase(sType)
-            case "SNAP_CLEAR" '0 !LDCAD SNAP_CLEAR [id<string>=axleHole] 
+            case "SNAP_CLEAR" '0 !LDCAD SNAP_CLEAR [id<string>=axleHole]
             case "SNAP_INCL"  '0 !LDCAD SNAP_INCL [ref<string>=connhole.dat] [pos<vec3>=-50 10 0] [ori<mat3>=0 -1 0 0 0 -1 1 0 0] [grid=C 1 C 3 20 20] // 
+               'printf(!"<%s>\n",sType)
+               if bRecursion=3 then
+                  iResu=-1
+                  CheckError("Shadow include Recursion limit reached")
+               end if
+               ReadLine( pFile , sType )
+               dim as string sName,sParms
+               pPart->iShadowCount += 1
+               dim as ShadowStruct ptr pNew = realloc( pPart->paShadow ,  sizeof(ShadowStruct)*pPart->iShadowCount )
+               if pNew = 0 then
+                  iResu=-1
+                  CheckError("Out of memory")
+               end if
+               pPart->paShadow = pNew
+               pNew += (pPart->iShadowCount-1)
+               clear *pNew , 0 , sizeof(ShadowStruct)
+               pNew->bType       = sit_Include
+               pNew->bRecurse    = bRecursion
+               dim as string sRefFile
+               do
+                  #define cvl2(_s) (cvl(_s "  ") and &hFFFFFF)
+                  #define cvl3(_s) cvl(_s " ")
+                  var iResu = ReadBracketOption( pFile , sName , sParms )
+                  CheckError( "Syntax" )
+                  pFile += iResu : if len(sName)=0 then exit do
+                  'printf(!">>> name='%s' parms='%s'\n",sName,sParms)
+                  select case *cptr(ulong ptr,strptr(sName)) or &h20202020 'lcase(sName)
+                  case cvl3("ref")
+                     if len(sRefFile) then
+                        iResu=-1
+                        CheckError("duplicated reference")
+                     end if
+                     var pParm = cast(ubyte ptr,strptr(sParms))
+                     iResu = ReadToken( pParm , sRefFile )                        
+                     if iResu <= 0 then 
+                        iResu=-1
+                        CheckError("null reference")
+                     end if
+                  case cvl3("pos")   'X Y Z
+                     var pPos = @(pNew->fPosX) , pParm = cast(ubyte ptr,strptr(sParms))
+                     for N as long = 0 to (3-1) 'position vector
+                        GetFloat( pParm , *pPos , "Position" )
+                        'printf("<%f>",*pPos)
+                        pPos += 1
+                     next N
+                     'puts("")
+                  case cvl("grid")   '['C'] CntX ['C'] CntY StepX stepZ
+                     var pParm = cast(ubyte ptr,strptr(sParms))
+                     dim as long   lCntX=any , lCntZ=any
+                     dim as single fStepX=any, fStepZ=any
+                     #macro ChkToken()
+                        While *pParm = asc(" ") orelse *pParm = 9 : pParm += 1 : wend
+                        if ((*pParm and (not &h20)) <> asc("C")) andalso ((*pParm < asc("0")) orelse (*pParm > asc("9"))) then
+                           iResu = -1
+                           CheckError( "grid syntax" )
+                        end if
+                     #endmacro
+                     ChkToken()
+                     if (*pParm and (not &h20))=asc("C") then
+                        pParm += 1
+                        GetInt( pParm , lCntX , "grid X Count" )                         
+                        lCntX = -lCntX
+                     else
+                        GetInt( pParm , lCntX , "grid X count" )
+                     end if
+                     if lCntX = 0 then
+                        iResu = -1
+                        CheckError( "invalid grid X count" )
+                     end if
+                     ChkToken()
+                     if (*pParm and (not &h20))=asc("C") then
+                        pParm += 1
+                        GetInt( pParm , lCntZ , "grid Z count" )                         
+                        lCntZ = -lCntZ
+                     else
+                        GetInt( pParm , lCntZ , "grid Z count" )
+                     end if  
+                     if lCntX = 0 then
+                        iResu = -1
+                        CheckError( "invalid grid Z count" )
+                     end if
+                     GetFloat( pParm , fStepX , "grid step X" )
+                     if (cint(fStepX)*100) <> cint(fStepX*100) then printf(!"Warning: float grid step X (%f)\n", fStepX)
+                     GetFloat( pParm , fStepZ , "grid step Z" )
+                     if (cint(fStepZ)*100) <> cint(fStepZ*100) then printf(!"Warning: float grid step Z (%f)\n", fStepZ)
+                     'printf(!"Grid: %ix%i step %g,%g\n",lCntX,lCntZ,fStepX,fStepZ)
+                     pNew->bFlagHasGrid = true
+                     with pNew->tGrid
+                        .Xcnt  = lCntX  : .Zcnt  = lCntZ
+                        .Xstep = fStepX : .Zstep = fStepZ
+                     end with
+                  case cvl3("ori")   'Mat3x3
+                     var pOri = @(pNew->fOri(0)) , pParm = cast(ubyte ptr,strptr(sParms))
+                     for N as long = 0 to (9-1) 'Orientation 3x3 matrix
+                        GetFloat( pParm , *pOri , "Orientation" )
+                        'printf("<%f>",*pOri)
+                        pOri += 1
+                     next N
+                     'puts("")
+                  
+                  case else
+                     iResu=-1
+                     CheckError("shadow Include parm")
+                  end select
+               loop
+               if len(sRefFile)=0 then
+                  iResu=-1
+                  CheckError("include without reference")
+               end if
+               LoadShadow( pPart , sRefFile , bRecursion+1 )               
+               NextLine() : continue do
+               
             case "SNAP_CYL"   '0 !LDCAD SNAP_CYL [id=connhole] [gender=F] [caps=none] [secs=R 8 2 R 6 16 R 8 2] [center=true] [slide=true] [pos=0 0 0] [ori=1 0 0 0 1 0 0 0 1]
                #if 0 
                   'puts("SNAP!")
@@ -156,8 +279,8 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string )
                   'slide      boolean     false      Indicates if this cylinder shape should be considered 'smooth' enough to make sliding of matching parts possible. If ether part of a matched pair of snap info metas has the slide option set to true the user will be able to slide them together. If not it will just 'snap'.
                   '                      	           Be careful while setting this option as it can cause unwanted sliding of e.g. a stud inside an anti stud. In practice it is best to limit the slide=true value to things you know will slide most of the time (e.g. clips, bush and gear parts etc).
                #endif
-               ReadLine( pFile , sType )                        
-               printf(!"<%s>\n",sType)
+               ReadLine( pFile , sType )
+               ''printf(!"<%s>\n",sType)
                dim as string sName,sParms
                pPart->iShadowCount += 1
                dim as ShadowStruct ptr pNew = realloc( pPart->paShadow ,  sizeof(ShadowStruct)*pPart->iShadowCount )
@@ -169,6 +292,7 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string )
                pNew += (pPart->iShadowCount-1)
                clear *pNew , 0 , sizeof(ShadowStruct)
                pNew->bType       = sit_Cylinder 
+               pNew->bRecurse    = bRecursion
                pNew->bFlagMirror = true 'defaults
                do
                   #define cvl2(_s) (cvl(_s "  ") and &hFFFFFF)
@@ -186,8 +310,62 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string )
                         iResu = -1
                         CheckError("Invalid Gender")
                      end select
-                  case cvl("secs")
-                  case cvl("caps") '"none" , "one" , "two" , "A" , "B"
+                  case cvl("secs")   'shapeVariant radius length
+                     'Describes the shape of the hole (along the neg Y-axis) or pen by a sequence of shape variants, 
+                     'radius's and lengths. The info must be given in blocks of: 
+                     '  shapeVariant radius length 
+                     'where shapeVariant must be one of the following:
+                     '  R: Round.
+                     '  A: Axle.
+                     '  S: Square.
+                     '  _L: Flexible radius wise extension to the previous block's specs. 
+                     '      This will be needed for e.g. the tip of an technic connector pin. 
+                     '      Although it is slightly larger it allows for (temporary) compression
+                     '      while sliding the pin inside e.g. a beam hole.
+                     '  L_: Same as _L but as an extension to the next section instead of the previous one.
+                     'For example a plain stud can be described using a single block: R 8 4 
+                     'while a technic beam hole needs three: R 8 2 R 6 16 R 8 2.
+                     var pParm = cast(ubyte ptr,strptr(sParms))
+                     dim sShape as string
+                     dim as long iSecs=0, iShapeID=any
+                     dim as single fRad=any , fLen=any                     
+                     do
+                        iResu = ReadToken( pParm , sShape )                        
+                        if iResu <= 0 then exit do
+                        if iSecs >= cShadowMaxSecs then
+                           iResu = -1
+                           CheckError( "Too many secs" )
+                        end if
+                        pParm += iResu
+                        var iShape = *cptr(ushort ptr,strptr(sShape)) and (not &h2020)
+                        select case iShape
+                        case     asc("R") : iShapeID=sss_Round
+                        case     asc("A") : iShapeID=sss_Axle
+                        case     asc("S") : iShapeID=sss_Square
+                        case cvshort("_L"): iShapeID=sss_FlexPrev
+                        case cvshort("L_"): iShapeID=sss_FlexNext
+                        case else
+                           iResu = -1
+                           CheckError( "Invalid sec shape" )
+                        end select
+                        GetFloat( pParm , fRad , "Radius" )
+                        if (cint(fRad*100)*100) <> cint(fRad*100*100) then printf(!"Warning: innacurate fixed Radius (%f)\n", fRad)
+                        GetFloat( pParm , fLen , "Length" )
+                        if (cint(fLen)*100) <> cint(fLen*100) then printf(!"Warning: float Length (%f)\n", fLen)
+                        'printf(!"Shape:(%i)'%s' Rad:%g Len:%g\n",iShapeID,sShape,fRad,fLen)
+                        with pNew->tSecs(iSecs)
+                           .bshape  = iShapeID
+                           .wFixRadius = fRad*100
+                           .bLength = fLen                           
+                        end with
+                        iSecs += 1
+                     loop
+                     if iSecs=0 then
+                        iResu = -1
+                        CheckError( "sec syntax" )
+                     end if 
+                     pNew->bSecCnt = iSecs
+                  case cvl("caps")   '"none" , "one" , "two" , "A" , "B"
                      select case *cptr(ushort ptr,strptr(sParms)) or &h2020 'lcase(sName)
                      case cvshort("none"): pNew->bCaps = sc_None
                      case cvshort("one") : pNew->bCaps = sc_One
@@ -198,23 +376,67 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string )
                         iResu = -1
                         CheckError("Invalid caps")
                      end select
-                  case cvl3("pos") 
+                  case cvl3("pos")   'X Y Z
                      var pPos = @(pNew->fPosX) , pParm = cast(ubyte ptr,strptr(sParms))
                      for N as long = 0 to (3-1) 'position vector
                         GetFloat( pParm , *pPos , "Position" )
-                        printf("<%f>",*pPos)
+                        'printf("<%f>",*pPos)
                         pPos += 1
                      next N
-                     puts("")
-                  case cvl("grid")                     
-                  case cvl3("ori")
+                     'puts("")
+                  case cvl("grid")   '['C'] CntX ['C'] CntY StepX stepZ
+                     var pParm = cast(ubyte ptr,strptr(sParms))
+                     dim as long   lCntX=any , lCntZ=any
+                     dim as single fStepX=any, fStepZ=any
+                     #macro ChkToken()
+                        While *pParm = asc(" ") orelse *pParm = 9 : pParm += 1 : wend
+                        if ((*pParm and (not &h20)) <> asc("C")) andalso ((*pParm < asc("0")) orelse (*pParm > asc("9"))) then
+                           iResu = -1
+                           CheckError( "grid syntax" )
+                        end if
+                     #endmacro
+                     ChkToken()
+                     if (*pParm and (not &h20))=asc("C") then
+                        pParm += 1
+                        GetInt( pParm , lCntX , "grid X Count" )                         
+                        lCntX = -lCntX
+                     else
+                        GetInt( pParm , lCntX , "grid X count" )
+                     end if
+                     if lCntX = 0 then
+                        iResu = -1
+                        CheckError( "invalid grid X count" )
+                     end if
+                     ChkToken()
+                     if (*pParm and (not &h20))=asc("C") then
+                        pParm += 1
+                        GetInt( pParm , lCntZ , "grid Z count" )                         
+                        lCntZ = -lCntZ
+                     else
+                        GetInt( pParm , lCntZ , "grid Z count" )
+                     end if  
+                     if lCntX = 0 then
+                        iResu = -1
+                        CheckError( "invalid grid Z count" )
+                     end if
+                     GetFloat( pParm , fStepX , "grid step X" )
+                     if (cint(fStepX)*100) <> cint(fStepX*100) then printf(!"Warning: float grid step X (%f)\n", fStepX)
+                     GetFloat( pParm , fStepZ , "grid step Z" )
+                     if (cint(fStepZ)*100) <> cint(fStepZ*100) then printf(!"Warning: float grid step Z (%f)\n", fStepZ)
+                     'printf(!"Grid: %ix%i step %g,%g\n",lCntX,lCntZ,fStepX,fStepZ)
+                     pNew->bFlagHasGrid = true
+                     with pNew->tGrid
+                        .Xcnt  = lCntX  : .Zcnt  = lCntZ
+                        .Xstep = fStepX : .Zstep = fStepZ
+                     end with
+                  case cvl3("ori")   'Mat3x3
                      var pOri = @(pNew->fOri(0)) , pParm = cast(ubyte ptr,strptr(sParms))
                      for N as long = 0 to (9-1) 'Orientation 3x3 matrix
                         GetFloat( pParm , *pOri , "Orientation" )
-                        printf("<%f>",*pOri)
+                        'printf("<%f>",*pOri)
                         pOri += 1
                      next N
-                     puts("")
+                     'puts("")
                   case cvl("center") 'T'rue or 'F'alse
                      select case sParms[0] or &h20
                      case asc("f"): pNew->bFlagCenter = false
@@ -234,8 +456,8 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string )
                   case cvl("scale")  '"none" , "YOnly" , "ROnly" , "YandR" 
                      select case *cptr(ulong ptr,strptr(sParms)) or &h20202020 'lcase(sName)
                      case cvl("none")  : pNew->bScale = ss_None
-                     case cvl("yOnly") : pNew->bScale = ss_YOnly
-                     case cvl("rOnly") : pNew->bScale = ss_ROnly
+                     case cvl("yonly") : pNew->bScale = ss_YOnly
+                     case cvl("ronly") : pNew->bScale = ss_ROnly
                      case cvl("yandr") : pNew->bScale = ss_YandR
                      case else
                         iResu = -1
@@ -249,24 +471,25 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string )
                         iResu = -1
                         CheckError("Invalid Mirror")
                      end select
-                  case cvl("group")
-                  case else
+                  case cvl("group")  '-- maybe implement --
+                  case else          'ID or error...
                      'special case for 2 letters
                      select case (*cptr(ulong ptr,strptr(sName)) or &h20202020) and &hFFFFFF
-                     case cvl2("id")
+                     case cvl2("id") '-- maybe implement --
                      case else
                         iResu=-1
-                        CheckError("Syntax")
+                        CheckError("Cylinder Parm")
                      end select
                   end select                    
                loop                  
-               NextLine() : continue do               
+               NextLine() : continue do
             case "SNAP_CLP"   '0 !LDCAD SNAP_CLP [radius=4] [length=8] [pos=0 0 0] [ori=1 0 0 0 1 0 0 0 1] [center=true]
             case "SNAP_FGR"   '0 !LDCAD SNAP_FGR [group=lckHng] [genderOfs=M] [seq=4.5 8 4.5] [radius=6] [center=true] [pos=-30 10 0] [ori=1 0 0 0 0 1 0 -1 0]
             case "SNAP_GEN"   '0 !LDCAD SNAP_GEN [group=nxtc] [gender=M] [pos=0 -1.5 1.5] [ori=1 0 0 0 0 1 0 -1 0] [bounding=box 12.5 16.5 8]
             case "SNAP_SPH"   '0 !LDCAD SNAP_SPH [gender=M] [radius=4]
             end select
             
+            'printf(!"unimplmented shadow: <'%s'>\n",sType)
             pFile += ReadLine( pFile , sType )                        
             printf(!"'%s'\n",sType)            
             NextLine() : continue do

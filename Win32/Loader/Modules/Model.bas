@@ -222,10 +222,8 @@ type PartSize
    as single xMin , xMax
    as single yMin , yMax
    as single zMin , zMax
-end type   
-
+end type
 static shared as long g_TotalLines , g_TotalOptis , g_TotalTrigs , g_TotalQuads
-
 sub SizeModel( pPart as DATFile ptr , tSize as PartSize , pRoot as DATFile ptr = NULL )
    
    if pRoot = NULL then pRoot = pPart
@@ -320,6 +318,72 @@ sub SizeModel( pPart as DATFile ptr , tSize as PartSize , pRoot as DATFile ptr =
       next N
    end with   
 end sub
+
+type PartSnap
+   lStudCnt    as long
+   lClutchCnt  as long
+   lAliasCnt   as long 
+   lAxleCnt    as long
+   lPinHoleCnt as long   
+end type
+sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr = NULL )
+         
+   if pRoot = NULL then pRoot = pPart        
+   with *pPart 
+      if .iShadowCount then
+         printf(!"Shadow Entries=%i\n",.iShadowCount)
+         var iIdent = 2, iPrevRec = 0
+         for N as long = 0 to .iShadowCount-1
+            with .paShadow[N]
+               select case .bType
+               case sit_Include
+                  iIdent += 2
+               case sit_Cylinder
+                  static as zstring ptr pzCaps(...)={@"none",@"one",@"two",@"A",@"B"}
+                  if iPrevRec>.bRecurse then iIdent -= 2
+                  iPrevRec=.bRecurse
+                  printf(!"%sSecs=%i Gender=%s Caps=%s HasGrid=%s GridX=%i GridZ=%i",space(iIdent), _
+                  .bSecCnt , iif(.bFlagMale,"F","M") , pzCaps(.bCaps) , iif(.bFlagHasGrid,"Yes","No") , _
+                  abs(.tGrid.xCnt) , abs(.tGrid.zCnt) )
+                  for I as long = 0 to .bSecCnt-1
+                     static as zstring ptr pzSecs(...)={@"Invalid",@"Round",@"Axle",@"Square",@"FlexPrev",@"FlexNext"}                     
+                     with .tSecs(I)
+                        printf(" %s",pzSecs(.bShape))
+                     end with
+                  next I                  
+                  puts("")
+                  if .bFlagHasGrid then
+                     if .bFlagMale then tSnap.lStudCnt += .tGrid.xCnt*.tGrid.zCnt else tSnap.lClutchCnt += .tGrid.xCnt*.tGrid.zCnt
+                  else
+                     if .bFlagMale then tSnap.lStudCnt += 1 else tSnap.lClutchCnt += 1
+                  end if
+               end select
+               
+            end with
+         next N
+      end if
+      for N as long = 0 to .iPartCount-1         
+         with .tParts(N)            
+            if .bType = 1 then 'we only care for includes
+               'continue for
+               with ._1
+                  var pSubPart = g_tModels(.lModelIndex).pModel
+                  var sName = *cptr(zstring ptr,strptr(g_sFilenames)+g_tModels(.lModelIndex).iFilenameOffset+6)
+                  dim as single fMatrix(15) = { _
+                    .fA*cScale , .fD*cScale , .fG*cScale , 0 , _
+                    .fB*cScale , .fE*cScale , .fH*cScale , 0 , _
+                    .fC*cScale , .fF*cScale , .fI*cScale , 0 , _
+                    .fX*cScale , .fY*cScale , .fZ*cScale , 1 }                                      
+                  PushAndMultMatrix( @fMatrix(0) )
+                  SnapModel( pSubPart , tSnap , pRoot )
+                  PopMatrix()                  
+               end with               
+            end if
+         end with
+      next N
+   end with   
+end sub
+
 
 sub DrawLimitsCube( xMin as single , xMax as single , yMin as single , yMax as single , zMin as single , zMax as single )
 

@@ -35,7 +35,8 @@ end scope
 dim shared as zstring ptr g_pzShadowPaths(...) = { _
    NULL      , _
    @"\parts" , _
-   @"\p"       _
+   @"\p"     , _
+   @"\parts\s" _
 }
 
 dim shared as string g_sShadowPathList( ubound(g_pzShadowPaths) )
