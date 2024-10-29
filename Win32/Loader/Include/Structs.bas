@@ -55,11 +55,14 @@ const cShadowMaxSecs = 8
 enum SubpartType
    spUnknown
    spStud
-   spClutch
+   spClutch   
    spAxle
    spAxlehole 
    spPin
-   spPinhole   
+   spPinhole
+   spBar
+   spBarhole
+   spAlias
 end enum
 enum ShadowScale
    ss_None

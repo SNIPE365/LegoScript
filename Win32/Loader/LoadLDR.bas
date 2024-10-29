@@ -116,9 +116,14 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
             dim as string sType
             iResu = ReadToken( pFile , sType )            
             pFile += iResu
-                        
+                     
+            var suType = ucase(sType)
+            if suType = "//!LDCAD" then
+               puts("Unignoring commented !LDCAD")
+               suType = "!LDCAD"
+            end if
             'ignore all non !LDCAD comments
-            if ucase(sType) <> "!LDCAD" then 
+            if suType <> "!LDCAD" then 
                NextLine() : continue do
             end if                        
             iResu = ReadToken( pFile , sType )
@@ -126,7 +131,7 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
                         
             'https://www.melkert.net/LDCad/tech/meta
             '[scale<vec3>] [ID<string>] [grid<annoying>]
-            
+                                    
             select case ucase(sType)
             case "SNAP_CLEAR" '0 !LDCAD SNAP_CLEAR [id<string>=axleHole]
             case "SNAP_INCL"  '0 !LDCAD SNAP_INCL [ref<string>=connhole.dat] [pos<vec3>=-50 10 0] [ori<mat3>=0 -1 0 0 0 -1 1 0 0] [grid=C 1 C 3 20 20] // 
@@ -280,7 +285,7 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
                   '                      	           Be careful while setting this option as it can cause unwanted sliding of e.g. a stud inside an anti stud. In practice it is best to limit the slide=true value to things you know will slide most of the time (e.g. clips, bush and gear parts etc).
                #endif
                ReadLine( pFile , sType )
-               ''printf(!"<%s>\n",sType)
+               printf(!"<%s>\n",sType)
                dim as string sName,sParms
                pPart->iShadowCount += 1
                dim as ShadowStruct ptr pNew = realloc( pPart->paShadow ,  sizeof(ShadowStruct)*pPart->iShadowCount )
@@ -300,7 +305,7 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
                   var iResu = ReadBracketOption( pFile , sName , sParms )
                   CheckError( "Syntax" )
                   pFile += iResu : if len(sName)=0 then exit do
-                  printf(!">> name='%s' parms='%s'\n",sName,sParms)
+                  ''printf(!">> name='%s' parms='%s'\n",sName,sParms)
                   select case *cptr(ulong ptr,strptr(sName)) or &h20202020 'lcase(sName)
                   case cvl("gender") 'F' or 'M'
                      select case sParms[0] or &h20
@@ -491,7 +496,7 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
             
             'printf(!"unimplmented shadow: <'%s'>\n",sType)
             pFile += ReadLine( pFile , sType )                        
-            printf(!"'%s'\n",sType)            
+            if sType<>"" then printf(!"unimplmented shadow: '%s'\n",sType)
             NextLine() : continue do
          rem end select
       loop
@@ -500,7 +505,7 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
       end if
    end if
 
-end sub   
+end sub
 
 function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex as long = -1 , iLoadDependencies as byte = 1 ) as DATFile ptr   
    #macro CheckError(_s , _separator... )

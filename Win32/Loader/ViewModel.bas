@@ -19,10 +19,31 @@
    'seems that only cylindrical ones will be important for now
    'Male being stud... Female being clutches (detect aliases? to account for others?)   
 
-'TODO: add studs from te DAT file (in SizeModel function)
+'TODO: add studs from the DAT file (in SizeModel function)
 'TODO: rename SizeModel function to GetModelInfo (to calculate size,studs,clutches,etc...)
 'TODO: list studs/clutches/axles, their positions and normal vectors
 'TODO: can we match studs/clutches/axles from sub primatives? (only studs and aliases?)
+
+'--------------------------------  NOTES: ------------------------------------
+'STUDS     are normally defined on it's own (each stud have an included shadow entry)
+'CLUTCHES  are normally defined on the main part shadow library (using GRIDS)
+'ALIASES   "ID='aStud'" must be "F" designations wtihout using grids... or by subpart name?? (we are researching this)
+'PINHOLES  ID='connhole'" must be "F" , Slide=true? (any clutch with slide?)
+'BARHOLES  must be "F" , Slide=false , [caps=None](hollow otherwise semi-hollow) , sec=R 4
+
+'barhole hollow
+'<[gender=F] [caps=none] [secs=R 4 12] [pos=0 8 0]>
+'barhole semi-hollow
+'<[gender=F] [caps=one] [secs=R 4 4] [pos=0 -4 0] [ori=-1 0 0 0 -1 0 0 0 1] [grid=C 2 1 40 0]>
+'stud2a (used on the semi-hollow/hollow
+'[ID=studO] [gender=M] [caps=one] [secs=R 6 4]>
+
+'---- for aliases ---
+
+'stud3 (studs or aliases? used on "2431.dat"
+'<[id=stud3] [gender=M] [caps=one] [secs=R 4 4] [scale=YOnly]>
+
+'-----------------------------------------------------------------------------
 
 var sPath = environ("userprofile")+"\Desktop\LDCAD\"
 
@@ -53,6 +74,12 @@ var sPath = environ("userprofile")+"\Desktop\LDCAD\"
 'var sFile = "3673.dat" 'Shadow: SNAP_CLEAR
 'var sFile = "3002.dat"
 var sFile ="3001.dat"     'FINE
+'var sFile = "3022.dat"
+'var sFile = "11203.dat" 'inverted tile
+'var sFile = "2431.dat" 'tile
+'var sFile = "35459.dat" 'tile
+'var sFile = "32530.dat" 'OK 2 clutches , 2 pinholes
+'var sFile = "3865.dat" 'baseplate
 
 'var sFile = "connhole.dat"
 'var sFile = "C:\Users\greg\Desktop\LDCAD\examples\5510.mpd"
@@ -221,8 +248,8 @@ end with
 dim as PartSnap tSnap
 SnapModel( pModel , tSnap )
 with tSnap
-   printf(!"Studs=%i Clutchs=%i Aliases=%i Axles=%i Pins=%i\n", _
-   .lStudCnt , .lClutchCnt , .lAliasCnt , .lAxleCnt , .lPinHoleCnt )
+   printf(!"Studs=%i Clutchs=%i Aliases=%i Axles=%i Bars=%i Pins=%i\n", _
+   .lStudCnt , .lClutchCnt , .lAliasCnt , .lAxleCnt , .lBarHoleCnt , .lPinHoleCnt )
 end with
 
 dim as double dRot = timer

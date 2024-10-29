@@ -324,6 +324,7 @@ type PartSnap
    lClutchCnt  as long
    lAliasCnt   as long 
    lAxleCnt    as long
+   lBarHoleCnt as long
    lPinHoleCnt as long   
 end type
 sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr = NULL )
@@ -343,7 +344,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                   if iPrevRec>.bRecurse then iIdent -= 2
                   iPrevRec=.bRecurse
                   printf(!"%sSecs=%i Gender=%s Caps=%s HasGrid=%s GridX=%i GridZ=%i",space(iIdent), _
-                  .bSecCnt , iif(.bFlagMale,"F","M") , pzCaps(.bCaps) , iif(.bFlagHasGrid,"Yes","No") , _
+                  .bSecCnt , iif(.bFlagMale,"M","F") , pzCaps(.bCaps) , iif(.bFlagHasGrid,"Yes","No") , _
                   abs(.tGrid.xCnt) , abs(.tGrid.zCnt) )
                   for I as long = 0 to .bSecCnt-1
                      static as zstring ptr pzSecs(...)={@"Invalid",@"Round",@"Axle",@"Square",@"FlexPrev",@"FlexNext"}                     
@@ -352,13 +353,40 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                      end with
                   next I                  
                   puts("")
-                  if .bFlagHasGrid then
-                     if .bFlagMale then tSnap.lStudCnt += .tGrid.xCnt*.tGrid.zCnt else tSnap.lClutchCnt += .tGrid.xCnt*.tGrid.zCnt
-                  else
-                     if .bFlagMale then tSnap.lStudCnt += 1 else tSnap.lClutchCnt += 1
-                  end if
+                  
+                  '>>>>> Detect Shape type (stud,clutch,alias,etc...) >>>>>
+                  scope
+                     var iConCnt = 1 , bConType = spUnknown
+                     'negative xCnt/zCnt are "centered"
+                     if .bFlagHasGrid then iConCnt = abs(.tGrid.xCnt)*abs(.tGrid.zCnt)                                           
+                     if .bFlagMale then 
+                        if iConCnt > 1 then puts("!!!!!! MALE GRID FOUND !!!!!")
+                        bConType = spStud
+                     else 'females can be BARHOLE / PINHOLE / CLUTCHES / ALIAS
+                        bConType = spClutch 
+                        if .bFlagSlide then 'PINHOLE
+                           if iConCnt > 1 then puts("!!!!! GRID PINHOLE FOUND !!!!!")
+                           bConType = spPinHole                           
+                        else 'BARHOLE / CLUTCH
+                           for I as long = 0 to .bSecCnt-1                              
+                              if .tSecs(I).bShape = sss_Round then 'barholes have radius of 4.0
+                                 if .tSecs(I).wFixRadius = 400 then bConType = spBarhole 'BARHOLE
+                              end if
+                           next I  
+                           if bConType = spBarHole andalso .bCaps = sc_None then iConCnt *= 2 'dual for hollow
+                        end if
+                     end if      
+                     select case bConType                           
+                     case spStud    : tSnap.lStudCnt    += iConCnt
+                     case spClutch  : tSnap.lClutchCnt  += iConCnt
+                     case spAlias   : tSnap.lAliasCnt   += iConCnt
+                     case spBarHole : tSnap.lBarHoleCnt += iConCnt
+                     case spPinHole : tSnap.lPinHoleCnt += iConCnt                           
+                     end select 
+                  end scope
+                  ' <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+                  
                end select
-               
             end with
          next N
       end if
@@ -383,7 +411,6 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
       next N
    end with   
 end sub
-
 
 sub DrawLimitsCube( xMin as single , xMax as single , yMin as single , yMax as single , zMin as single , zMax as single )
 
