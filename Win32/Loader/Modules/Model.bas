@@ -320,12 +320,15 @@ sub SizeModel( pPart as DATFile ptr , tSize as PartSize , pRoot as DATFile ptr =
 end sub
 
 type PartSnap
-   lStudCnt    as long
-   lClutchCnt  as long
-   lAliasCnt   as long 
-   lAxleCnt    as long
-   lBarHoleCnt as long
-   lPinHoleCnt as long   
+   lStudCnt     as long
+   lClutchCnt   as long
+   lAliasCnt    as long 
+   lAxleCnt     as long
+   lAxleHoleCnt as long
+   lBarCnt      as long
+   lBarHoleCnt  as long
+   lPinCnt      as long
+   lPinHoleCnt  as long   
 end type
 sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr = NULL )
          
@@ -356,33 +359,76 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                   
                   '>>>>> Detect Shape type (stud,clutch,alias,etc...) >>>>>
                   scope
-                     var iConCnt = 1 , bConType = spUnknown
+                     var iConCnt = 1 , bConType = spUnknown , bSecs = .bSecCnt , bSides = 1
+                     select case .bCaps
+                     case sc_None : bSides = 2
+                     case sc_One  : bSides = 1
+                     case sc_Two  : puts("!!!!! CHECK TWO CAPS!!!!!")
+                     end select
+                     
                      'negative xCnt/zCnt are "centered"
                      if .bFlagHasGrid then iConCnt = abs(.tGrid.xCnt)*abs(.tGrid.zCnt)                                           
                      if .bFlagMale then 
                         if iConCnt > 1 then puts("!!!!!! MALE GRID FOUND !!!!!")
                         bConType = spStud
+                        for I as long = 0 to .bSecCnt-1
+                           select case .tSecs(I).bShape
+                           case sss_Axle:
+                              tSnap.lAxleCnt += iConCnt : bSecs -= 1 'AXLEHOLE //bConType = spAxleHole: exit for 
+                           case sss_FlexPrev
+                              tSnap.lPinCnt += iConCnt : bSecs -= 1  'PIN // bConType = spPin : exit for
+                           case sss_Round
+                              if .tSecs(I).wFixRadius = 400 then tSnap.lBarCnt += iConCnt : bSecs -= 1 'BARHOLE
+                           end select                           
+                        next I
                      else 'females can be BARHOLE / PINHOLE / CLUTCHES / ALIAS
                         bConType = spClutch 
-                        if .bFlagSlide then 'PINHOLE
+                        if .bFlagSlide then 'PINHOLE / AXLE / BARHOLE
                            if iConCnt > 1 then puts("!!!!! GRID PINHOLE FOUND !!!!!")
-                           bConType = spPinHole                           
-                        else 'BARHOLE / CLUTCH
+                           'bConType = spPinHole
+                           var iMaybePins = 0
                            for I as long = 0 to .bSecCnt-1                              
-                              if .tSecs(I).bShape = sss_Round then 'barholes have radius of 4.0
-                                 if .tSecs(I).wFixRadius = 400 then bConType = spBarhole 'BARHOLE
-                              end if
+                              select case .tSecs(I).bShape 
+                              case sss_Axle
+                                 tSnap.lAxleHoleCnt += iConCnt : bSecs -= 1: 'AXLEHOLE //bConType = spAxleHole: exit for 
+                                 'if there's an axlehole then it can't be a pinhole, and it can't have dual clutches
+                                 iMaybePins=-999 : bSides = 1
+                              case sss_Square
+                                 tSnap.lBarHoleCnt  += iConCnt : bSecs -= 1 'BARHOLE //bConType = spBarHole: exit for
+                              case sss_Round
+                                 select case .tSecs(I).wFixRadius
+                                 case 600: iMaybePins += 1 
+                                 case 400: tSnap.lBarHoleCnt += iConCnt : bSecs -= 1 'BARHOLE
+                                 end select                                 
+                              end select
+                           next I
+                           if iMaybePins>0 then tSnap.lPinHoleCnt += iConCnt*iMaybePins : bSecs -= iMaybePins 'PINHOLE
+                        else 'BARHOLE / CLUTCH / KingPin (fat)
+                           for I as long = 0 to .bSecCnt-1                              
+                              'if .tSecs(I).wFixRadius > 600 then bConType = spPinHole : exit for
+                              select case .tSecs(I).bShape
+                              case sss_FlexPrev
+                                 tSnap.lPinHoleCnt += iConCnt : bSecs -= 1: 'bConType = spPinHole
+                              case sss_Round 'barholes have radius of 4.0
+                                 if .tSecs(I).wFixRadius = 400 then tSnap.lBarHoleCnt += iConCnt : bSecs -= 1 'bConType = spBarhole : exit for 'BARHOLE
+                              end select
                            next I  
-                           if bConType = spBarHole andalso .bCaps = sc_None then iConCnt *= 2 'dual for hollow
+                           ''if bConType = spBarHole andalso .bCaps = sc_None then iConCnt *= 2 'dual for hollow
                         end if
-                     end if      
-                     select case bConType                           
-                     case spStud    : tSnap.lStudCnt    += iConCnt
-                     case spClutch  : tSnap.lClutchCnt  += iConCnt
-                     case spAlias   : tSnap.lAliasCnt   += iConCnt
-                     case spBarHole : tSnap.lBarHoleCnt += iConCnt
-                     case spPinHole : tSnap.lPinHoleCnt += iConCnt                           
-                     end select 
+                     end if
+                     if bSecs then
+                        select case bConType                           
+                        case spStud    : tSnap.lStudCnt     += iConCnt
+                        case spClutch  : tSnap.lClutchCnt   += iConCnt*bSides : puts("!!! FALLBACK CLUTCH !!!")
+                        case spAlias   : tSnap.lAliasCnt    += iConCnt
+                        case spBar     : tSnap.lBarCnt      += iConCnt
+                        case spBarHole : tSnap.lBarHoleCnt  += iConCnt
+                        case spPin     : tSnap.lPinCnt      += iConCnt 
+                        case spPinHole : tSnap.lPinHoleCnt  += iConCnt : puts("!!! PINHOLE !!!")                         
+                        case spAxle    : tSnap.lAxleCnt     += iConCnt
+                        case spAxleHole: tSnap.lAxleHoleCnt += iConCnt
+                        end select
+                     end if
                   end scope
                   ' <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
                   

@@ -131,9 +131,9 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
                         
             'https://www.melkert.net/LDCad/tech/meta
             '[scale<vec3>] [ID<string>] [grid<annoying>]
-                                    
+            printf("{%s} - ",sType)
             select case ucase(sType)
-            case "SNAP_CLEAR" '0 !LDCAD SNAP_CLEAR [id<string>=axleHole]
+            'case "SNAP_CLEAR" '0 !LDCAD SNAP_CLEAR [id<string>=axleHole]
             case "SNAP_INCL"  '0 !LDCAD SNAP_INCL [ref<string>=connhole.dat] [pos<vec3>=-50 10 0] [ori<mat3>=0 -1 0 0 0 -1 1 0 0] [grid=C 1 C 3 20 20] // 
                'printf(!"<%s>\n",sType)
                if bRecursion=3 then
@@ -160,7 +160,7 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
                   var iResu = ReadBracketOption( pFile , sName , sParms )
                   CheckError( "Syntax" )
                   pFile += iResu : if len(sName)=0 then exit do
-                  'printf(!">>> name='%s' parms='%s'\n",sName,sParms)
+                  printf(!">>> name='%s' parms='%s'\n",sName,sParms)
                   select case *cptr(ulong ptr,strptr(sName)) or &h20202020 'lcase(sName)
                   case cvl3("ref")
                      if len(sRefFile) then
@@ -488,15 +488,16 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
                   end select                    
                loop                  
                NextLine() : continue do
-            case "SNAP_CLP"   '0 !LDCAD SNAP_CLP [radius=4] [length=8] [pos=0 0 0] [ori=1 0 0 0 1 0 0 0 1] [center=true]
-            case "SNAP_FGR"   '0 !LDCAD SNAP_FGR [group=lckHng] [genderOfs=M] [seq=4.5 8 4.5] [radius=6] [center=true] [pos=-30 10 0] [ori=1 0 0 0 0 1 0 -1 0]
-            case "SNAP_GEN"   '0 !LDCAD SNAP_GEN [group=nxtc] [gender=M] [pos=0 -1.5 1.5] [ori=1 0 0 0 0 1 0 -1 0] [bounding=box 12.5 16.5 8]
-            case "SNAP_SPH"   '0 !LDCAD SNAP_SPH [gender=M] [radius=4]
+            'case "SNAP_CLP"   '0 !LDCAD SNAP_CLP [radius=4] [length=8] [pos=0 0 0] [ori=1 0 0 0 1 0 0 0 1] [center=true]
+            'case "SNAP_FGR"   '0 !LDCAD SNAP_FGR [group=lckHng] [genderOfs=M] [seq=4.5 8 4.5] [radius=6] [center=true] [pos=-30 10 0] [ori=1 0 0 0 0 1 0 -1 0]
+            'case "SNAP_GEN"   '0 !LDCAD SNAP_GEN [group=nxtc] [gender=M] [pos=0 -1.5 1.5] [ori=1 0 0 0 0 1 0 -1 0] [bounding=box 12.5 16.5 8]
+            'case "SNAP_SPH"   '0 !LDCAD SNAP_SPH [gender=M] [radius=4]
             end select
             
             'printf(!"unimplmented shadow: <'%s'>\n",sType)
             pFile += ReadLine( pFile , sType )                        
-            if sType<>"" then printf(!"unimplmented shadow: '%s'\n",sType)
+            if sType="" then sType=" "               
+            printf(!"unimplmented shadow: '%s'\n",sType)
             NextLine() : continue do
          rem end select
       loop

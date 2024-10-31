@@ -47,18 +47,30 @@
 
 var sPath = environ("userprofile")+"\Desktop\LDCAD\"
 
+'pinhole
+'{SNAP_CYL} - <[id=connhole] [gender=F] [caps=none] [secs=R 8 2   R 6 16   R 8 2] [center=true] [slide=true]>
+'not pinhole
+'{SNAP_CYL} - <[gender=F] [caps=none] [secs=R 6 6   A 6 6   R 4 16] [slide=true] [pos=0 24 0]>
+
 '3044a 'Regx for good files = ^1.*\.dat
-'var sFile = sPath+"\LDraw\parts\3023.dat"
-'var sFile = sPath+"\LDraw\parts\3024.dat"
-'var sFile = sPath+"\LDraw\parts\3044a.dat"
-'var sFile = sPath+"\LDraw\parts\4589.dat"
-'var sFile = sPath+"\LDraw\parts\3461.dat" '10??
-'var sFile = sPath+"\LDraw\p\t01i3261.dat"
-'var sFile = sPath+"LDraw\deleted\official\168315a.dat"
-'var sFile = sPath+"\LDraw\parts\3011.dat"
-'var sFile = sPath+"\LDraw\parts\3001.dat"
-'var sFile = sPath+"\LDraw\parts\s\3001s01.dat"
-''var sFile = sPath+"\LDraw\parts\4070.dat"
+'var sFile = "3023.dat"
+'var sFile = "3626cp0p.dat"
+'var sFile = "65826.dat" 'no shadow pin?
+'var sFile = "4274.dat" '3 studs??
+'var sFile = "3749.dat" 'axle+pin (have 2axles?)
+'var sFile = "18651.dat" 'axle+pin (have 2xales?)
+'var sFile = "3024.dat" 'duplicated clutches
+'var sFile = "3044a.dat" 'square clutches in a grid can slide? (or need hardcoded slide?)
+''var sFile = "18654.dat" pinhole
+var sFile = "32006.dat" 'pinholes+axlehole+clutch
+''var sFile = "4589.dat" 'axlehole(that needs to be clutch as well?)
+'var sFile = "87994.dat" 'bar
+
+'var sFile = "3461.dat" 'have a (king)fat pinhole
+'var sFile = "967.dat"  'have a (king)pin
+'var sFile = "3011.dat" 'duplo (extra clutches)
+'var sFile = "3001.dat" 'clutches as aliases?
+'var sFile = "4070.dat"
 'var sFile = sPath+"\LDraw\parts\78329.dat"
 'var sFile = sPath+"\LDraw\parts\2711.dat"
 'var sFile = sPath+"\LDraw\parts\32124.dat" (axle holes)
@@ -73,7 +85,6 @@ var sPath = environ("userprofile")+"\Desktop\LDCAD\"
 'var sFile = "4531.dat" 'Shadow: SNAP_*
 'var sFile = "3673.dat" 'Shadow: SNAP_CLEAR
 'var sFile = "3002.dat"
-var sFile ="3001.dat"     'FINE
 'var sFile = "3022.dat"
 'var sFile = "11203.dat" 'inverted tile
 'var sFile = "2431.dat" 'tile
@@ -81,7 +92,10 @@ var sFile ="3001.dat"     'FINE
 'var sFile = "32530.dat" 'OK 2 clutches , 2 pinholes
 'var sFile = "3865.dat" 'baseplate
 
-'var sFile = "connhole.dat"
+'var sFile = "168315a.dat" 'sticker
+'var sFile = "3001s01.dat" 'subpart of 3001.dat
+'var sFile = "connhole.dat" 'subpart
+'var sFile = "t01i3261.dat" 'subpart
 'var sFile = "C:\Users\greg\Desktop\LDCAD\examples\5510.mpd"
 
 #if 1
@@ -248,8 +262,8 @@ end with
 dim as PartSnap tSnap
 SnapModel( pModel , tSnap )
 with tSnap
-   printf(!"Studs=%i Clutchs=%i Aliases=%i Axles=%i Bars=%i Pins=%i\n", _
-   .lStudCnt , .lClutchCnt , .lAliasCnt , .lAxleCnt , .lBarHoleCnt , .lPinHoleCnt )
+   printf(!"Studs=%i Clutchs=%i Aliases=%i Axles=%i Axlehs=%i Bars=%i Barhs=%i Pins=%i Pinhs=%i\n", _
+   .lStudCnt , .lClutchCnt , .lAliasCnt , .lAxleCnt , .lAxleHoleCnt ,.lBarCnt , .lBarHoleCnt , .lPinCnt , .lPinHoleCnt )
 end with
 
 dim as double dRot = timer
