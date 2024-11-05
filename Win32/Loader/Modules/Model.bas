@@ -33,6 +33,9 @@ function GetSubPartType( sPartName as string , bDebug as boolean = false ) as lo
       if bDebug then printf(!"%s\n",sPartName,"spStud")
       return spStud
    end if
+   if instr(sL,"axle.") then
+      return spAxle
+   end if
    return spUnknown
 end function
 
@@ -98,12 +101,15 @@ sub RenderModel( pPart as DATFile ptr , iBorders as long , uCurrentColor as ulon
                     .fB*cScale , .fE*cScale , .fH*cScale , 0 , _
                     .fC*cScale , .fF*cScale , .fI*cScale , 0 , _
                     .fX*cScale , .fY*cScale , .fZ*cScale , 1 }                                      
-                  PushAndMultMatrix( @fMatrix(0) ) 
+                  
+                  'if sName = "axle.dat" then fMatrix(4) *= 2
+                  PushAndMultMatrix( @fMatrix(0) )
                   
                   if iBorders=0 then
                      select case GetSubPartType( sName )
-                     case spStud : uColor = &hFF4488FF                        
+                     case spStud   : uColor = &hFF4488FF                        
                      case spClutch : uColor = &hFF1122FF
+                     case spAxle   : uColor = &hFF44FF88
                      end select
                   end if
                   
@@ -256,14 +262,14 @@ sub SizeModel( pPart as DATFile ptr , tSize as PartSize , pRoot as DATFile ptr =
                   PushAndMultMatrix( @fMatrix(0) )                   
                   
                   #if 0
-                  select case GetSubPartType( sName , false )
-                  case spStud                        
-                     with tMatrixStack(g_CurrentMatrix)
-                        printf(!"Stud X=%1.1f Y=%1.1f Z=%1.1f\n",.m(12),.m(13),.m(14))
-                     end with
-                  case spClutch 
-                     rem nothing yet
-                  end select
+                     select case GetSubPartType( sName , false )
+                     case spStud                        
+                        with tMatrixStack(g_CurrentMatrix)
+                           printf(!"Stud X=%1.1f Y=%1.1f Z=%1.1f\n",.m(12),.m(13),.m(14))
+                        end with
+                     case spClutch 
+                        rem nothing yet
+                     end select
                   #endif
                   
                   SizeModel( pSubPart , tSize , pRoot )
@@ -335,7 +341,9 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
    if pRoot = NULL then pRoot = pPart        
    with *pPart 
       if .iShadowCount then
+         #ifndef __Tester
          printf(!"Shadow Entries=%i\n",.iShadowCount)
+         #endif
          var iIdent = 2, iPrevRec = 0
          for N as long = 0 to .iShadowCount-1
             with .paShadow[N]
@@ -345,17 +353,23 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                case sit_Cylinder
                   static as zstring ptr pzCaps(...)={@"none",@"one",@"two",@"A",@"B"}
                   if iPrevRec>.bRecurse then iIdent -= 2
-                  iPrevRec=.bRecurse
+                  iPrevRec=.bRecurse '4
+                  #ifndef __Tester
                   printf(!"%sSecs=%i Gender=%s Caps=%s HasGrid=%s GridX=%i GridZ=%i",space(iIdent), _
                   .bSecCnt , iif(.bFlagMale,"M","F") , pzCaps(.bCaps) , iif(.bFlagHasGrid,"Yes","No") , _
                   abs(.tGrid.xCnt) , abs(.tGrid.zCnt) )
+                  #endif
                   for I as long = 0 to .bSecCnt-1
                      static as zstring ptr pzSecs(...)={@"Invalid",@"Round",@"Axle",@"Square",@"FlexPrev",@"FlexNext"}                     
                      with .tSecs(I)
+                        #ifndef __Tester
                         printf(" %s",pzSecs(.bShape))
+                        #endif
                      end with
-                  next I                  
+                  next I      
+                  #ifndef __Tester
                   puts("")
+                  #endif
                   
                   '>>>>> Detect Shape type (stud,clutch,alias,etc...) >>>>>
                   scope
@@ -369,16 +383,48 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                      'negative xCnt/zCnt are "centered"
                      if .bFlagHasGrid then iConCnt = abs(.tGrid.xCnt)*abs(.tGrid.zCnt)                                           
                      if .bFlagMale then 
+                        var iIgnore = 0
                         if iConCnt > 1 then puts("!!!!!! MALE GRID FOUND !!!!!")
                         bConType = spStud
                         for I as long = 0 to .bSecCnt-1
                            select case .tSecs(I).bShape
+                           case sss_FlexNext, sss_FlexPrev : iIgnore += 1
+                           end select
+                        next I                           
+                        for I as long = 0 to .bSecCnt-1
+                           if .tSecs(I).bLength = 1 then bSecs -= 1 : continue for 'ignore length=1 sections
+                           select case .tSecs(I).bShape
                            case sss_Axle:
                               tSnap.lAxleCnt += iConCnt : bSecs -= 1 'AXLEHOLE //bConType = spAxleHole: exit for 
+                              'puts("Axle " & bSecs)
+                           case sss_FlexNext
+                              bSecs -= 1 'other side of pin?
+                              'puts("Pin Mirror " & bSecs)
                            case sss_FlexPrev
                               tSnap.lPinCnt += iConCnt : bSecs -= 1  'PIN // bConType = spPin : exit for
+                              'bSecs -= 1: 'continuation of the pin must be ignored
+                              'puts("Pin" & bSecs)
                            case sss_Round
-                              if .tSecs(I).wFixRadius = 400 then tSnap.lBarCnt += iConCnt : bSecs -= 1 'BARHOLE
+                              if .tSecs(I).wFixRadius = 800 then
+                                 bSecs -= 1 'STOPPER? Ignoring it for now
+                                 'puts("Stopper" & bSecs)
+                              elseif .tSecs(I).wFixRadius = 400 then
+                                 tSnap.lBarCnt += iConCnt : bSecs -= 1 'BARHOLE
+                                 'puts("Bar" & bSecs)
+                              else
+                                 if iIgnore then
+                                    iIgnore -= 1 : bSecs -= 1
+                                    '#ifndef __Tester
+                                    'puts("Ignored (pin part)" & bSecs)
+                                    '#endif
+                                 else
+                                    #ifndef __Tester
+                                    puts("Unknown male round cylinder?")
+                                    #endif
+                                 end if
+                              end if
+                           case else
+                              puts("Unknown male?")
                            end select                           
                         next I
                      else 'females can be BARHOLE / PINHOLE / CLUTCHES / ALIAS
@@ -388,21 +434,27 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                            'bConType = spPinHole
                            var iMaybePins = 0
                            for I as long = 0 to .bSecCnt-1                              
+                              if .tSecs(I).bLength = 1 then bSecs -= 1 : continue for 'ignore length=1 sections
                               select case .tSecs(I).bShape 
                               case sss_Axle
                                  tSnap.lAxleHoleCnt += iConCnt : bSecs -= 1: 'AXLEHOLE //bConType = spAxleHole: exit for 
                                  'if there's an axlehole then it can't be a pinhole, and it can't have dual clutches
                                  iMaybePins=-999 : bSides = 1
-                              case sss_Square
+                              case sss_Square   
+                                 tSnap.lClutchCnt  += iConCnt
                                  tSnap.lBarHoleCnt  += iConCnt : bSecs -= 1 'BARHOLE //bConType = spBarHole: exit for
                               case sss_Round
                                  select case .tSecs(I).wFixRadius
+                                 case 800: bSecs -= 1 '???? (anti-stopper??)
                                  case 600: iMaybePins += 1 
                                  case 400: tSnap.lBarHoleCnt += iConCnt : bSecs -= 1 'BARHOLE
                                  end select                                 
                               end select
                            next I
-                           if iMaybePins>0 then tSnap.lPinHoleCnt += iConCnt*iMaybePins : bSecs -= iMaybePins 'PINHOLE
+                           if iMaybePins>0 then 
+                              tSnap.lClutchCnt += iConCnt*iMaybePins*bSides 
+                              tSnap.lPinHoleCnt += iConCnt*iMaybePins : bSecs -= iMaybePins 'PINHOLE
+                           end if
                         else 'BARHOLE / CLUTCH / KingPin (fat)
                            for I as long = 0 to .bSecCnt-1                              
                               'if .tSecs(I).wFixRadius > 600 then bConType = spPinHole : exit for
@@ -416,15 +468,29 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                            ''if bConType = spBarHole andalso .bCaps = sc_None then iConCnt *= 2 'dual for hollow
                         end if
                      end if
-                     if bSecs then
+                     if bSecs < 0 then puts("ERROR: remaining section counter is negative")
+                     if bSecs > 1 then puts("ERROR: Too many unhandled sections!")
+                     if bSecs > 0 then
                         select case bConType                           
                         case spStud    : tSnap.lStudCnt     += iConCnt
-                        case spClutch  : tSnap.lClutchCnt   += iConCnt*bSides : puts("!!! FALLBACK CLUTCH !!!")
+                           #ifndef __Tester
+                           puts("!!! FALLBACK STUD !!!")
+                           #endif
+                        case spClutch  
+                           'printf(!"Sides=%i\n",bSides)
+                           tSnap.lClutchCnt   += iConCnt*bSides 
+                           #ifndef __Tester
+                           puts("!!! FALLBACK CLUTCH !!!")
+                           #endif
                         case spAlias   : tSnap.lAliasCnt    += iConCnt
                         case spBar     : tSnap.lBarCnt      += iConCnt
                         case spBarHole : tSnap.lBarHoleCnt  += iConCnt
                         case spPin     : tSnap.lPinCnt      += iConCnt 
-                        case spPinHole : tSnap.lPinHoleCnt  += iConCnt : puts("!!! PINHOLE !!!")                         
+                        case spPinHole 
+                           tSnap.lPinHoleCnt  += iConCnt
+                           #ifndef __Tester
+                           puts("!!! PINHOLE !!!")
+                           #endif
                         case spAxle    : tSnap.lAxleCnt     += iConCnt
                         case spAxleHole: tSnap.lAxleHoleCnt += iConCnt
                         end select
@@ -448,7 +514,14 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                     .fB*cScale , .fE*cScale , .fH*cScale , 0 , _
                     .fC*cScale , .fF*cScale , .fI*cScale , 0 , _
                     .fX*cScale , .fY*cScale , .fZ*cScale , 1 }                                      
-                  PushAndMultMatrix( @fMatrix(0) )
+                  
+                  'puts(sName)                  
+                  'for N as long = 0 to 15
+                  '   printf("%f ",fMatrix(N))
+                  '   if (N and 3)=3 then puts("")
+                  'next N
+                  
+                  PushAndMultMatrix( @fMatrix(0) )                  
                   SnapModel( pSubPart , tSnap , pRoot )
                   PopMatrix()                  
                end with               

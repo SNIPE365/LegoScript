@@ -66,11 +66,13 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
    var sShadowFile = mid(sFromFile,iPos+1)
    #define sFilename sShadowFile
    if FindShadowFile( sShadowFile ) then         
-      if bRecursion=0 then
-         printf(!"[%s] have shadow\n",sShadowFile)
-      else
-         printf(!"[%s] included shadow\n",sFromFile)
-      end if
+      #ifndef __Tester
+         if bRecursion=0 then
+            printf(!"[%s] have shadow\n",sShadowFile)
+         else
+            printf(!"[%s] included shadow\n",sFromFile)
+         end if
+      #endif
    else
       if bRecursion then
          printf(!"[%s] was referenced in a shadow file, but was not found\n",sShadowFile)
@@ -119,7 +121,9 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
                      
             var suType = ucase(sType)
             if suType = "//!LDCAD" then
+               #ifndef __Tester
                puts("Unignoring commented !LDCAD")
+               #endif
                suType = "!LDCAD"
             end if
             'ignore all non !LDCAD comments
@@ -131,7 +135,9 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
                         
             'https://www.melkert.net/LDCad/tech/meta
             '[scale<vec3>] [ID<string>] [grid<annoying>]
+            #ifndef __Tester
             printf("{%s} - ",sType)
+            #endif
             select case ucase(sType)
             'case "SNAP_CLEAR" '0 !LDCAD SNAP_CLEAR [id<string>=axleHole]
             case "SNAP_INCL"  '0 !LDCAD SNAP_INCL [ref<string>=connhole.dat] [pos<vec3>=-50 10 0] [ori<mat3>=0 -1 0 0 0 -1 1 0 0] [grid=C 1 C 3 20 20] // 
@@ -160,7 +166,9 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
                   var iResu = ReadBracketOption( pFile , sName , sParms )
                   CheckError( "Syntax" )
                   pFile += iResu : if len(sName)=0 then exit do
+                  #ifndef __Tester
                   printf(!">>> name='%s' parms='%s'\n",sName,sParms)
+                  #endif
                   select case *cptr(ulong ptr,strptr(sName)) or &h20202020 'lcase(sName)
                   case cvl3("ref")
                      if len(sRefFile) then
@@ -177,7 +185,9 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
                      var pPos = @(pNew->fPosX) , pParm = cast(ubyte ptr,strptr(sParms))
                      for N as long = 0 to (3-1) 'position vector
                         GetFloat( pParm , *pPos , "Position" )
+                        '#ifndef __Tester
                         'printf("<%f>",*pPos)
+                        '#endif
                         pPos += 1
                      next N
                      'puts("")
@@ -220,7 +230,9 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
                      if (cint(fStepX)*100) <> cint(fStepX*100) then printf(!"Warning: float grid step X (%f)\n", fStepX)
                      GetFloat( pParm , fStepZ , "grid step Z" )
                      if (cint(fStepZ)*100) <> cint(fStepZ*100) then printf(!"Warning: float grid step Z (%f)\n", fStepZ)
+                     '#ifndef __Tester
                      'printf(!"Grid: %ix%i step %g,%g\n",lCntX,lCntZ,fStepX,fStepZ)
+                     '#endif
                      pNew->bFlagHasGrid = true
                      with pNew->tGrid
                         .Xcnt  = lCntX  : .Zcnt  = lCntZ
@@ -230,7 +242,9 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
                      var pOri = @(pNew->fOri(0)) , pParm = cast(ubyte ptr,strptr(sParms))
                      for N as long = 0 to (9-1) 'Orientation 3x3 matrix
                         GetFloat( pParm , *pOri , "Orientation" )
+                        '#ifndef __Tester
                         'printf("<%f>",*pOri)
+                        '#endif
                         pOri += 1
                      next N
                      'puts("")
@@ -285,7 +299,9 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
                   '                      	           Be careful while setting this option as it can cause unwanted sliding of e.g. a stud inside an anti stud. In practice it is best to limit the slide=true value to things you know will slide most of the time (e.g. clips, bush and gear parts etc).
                #endif
                ReadLine( pFile , sType )
+               #ifndef __Tester
                printf(!"<%s>\n",sType)
+               #endif
                dim as string sName,sParms
                pPart->iShadowCount += 1
                dim as ShadowStruct ptr pNew = realloc( pPart->paShadow ,  sizeof(ShadowStruct)*pPart->iShadowCount )
@@ -305,7 +321,9 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
                   var iResu = ReadBracketOption( pFile , sName , sParms )
                   CheckError( "Syntax" )
                   pFile += iResu : if len(sName)=0 then exit do
+                  ''#ifndef __Tester
                   ''printf(!">> name='%s' parms='%s'\n",sName,sParms)
+                  ''#endif
                   select case *cptr(ulong ptr,strptr(sName)) or &h20202020 'lcase(sName)
                   case cvl("gender") 'F' or 'M'
                      select case sParms[0] or &h20
@@ -357,7 +375,9 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
                         if (cint(fRad*100)*100) <> cint(fRad*100*100) then printf(!"Warning: innacurate fixed Radius (%f)\n", fRad)
                         GetFloat( pParm , fLen , "Length" )
                         if (cint(fLen)*100) <> cint(fLen*100) then printf(!"Warning: float Length (%f)\n", fLen)
+                        '#ifndef __Tester
                         'printf(!"Shape:(%i)'%s' Rad:%g Len:%g\n",iShapeID,sShape,fRad,fLen)
+                        '#endif
                         with pNew->tSecs(iSecs)
                            .bshape  = iShapeID
                            .wFixRadius = fRad*100
@@ -385,10 +405,14 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
                      var pPos = @(pNew->fPosX) , pParm = cast(ubyte ptr,strptr(sParms))
                      for N as long = 0 to (3-1) 'position vector
                         GetFloat( pParm , *pPos , "Position" )
+                        '#ifndef __Tester
                         'printf("<%f>",*pPos)
+                        '#endif
                         pPos += 1
                      next N
+                     '#ifndef __Tester
                      'puts("")
+                     '#endif
                   case cvl("grid")   '['C'] CntX ['C'] CntY StepX stepZ
                      var pParm = cast(ubyte ptr,strptr(sParms))
                      dim as long   lCntX=any , lCntZ=any
@@ -428,7 +452,9 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
                      if (cint(fStepX)*100) <> cint(fStepX*100) then printf(!"Warning: float grid step X (%f)\n", fStepX)
                      GetFloat( pParm , fStepZ , "grid step Z" )
                      if (cint(fStepZ)*100) <> cint(fStepZ*100) then printf(!"Warning: float grid step Z (%f)\n", fStepZ)
+                     '#ifndef __Tester
                      'printf(!"Grid: %ix%i step %g,%g\n",lCntX,lCntZ,fStepX,fStepZ)
+                     '#endif
                      pNew->bFlagHasGrid = true
                      with pNew->tGrid
                         .Xcnt  = lCntX  : .Zcnt  = lCntZ
@@ -438,10 +464,14 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
                      var pOri = @(pNew->fOri(0)) , pParm = cast(ubyte ptr,strptr(sParms))
                      for N as long = 0 to (9-1) 'Orientation 3x3 matrix
                         GetFloat( pParm , *pOri , "Orientation" )
+                        '#ifndef __Tester
                         'printf("<%f>",*pOri)
+                        '#endif
                         pOri += 1
                      next N
+                     '#ifndef __Tester
                      'puts("")
+                     '#endif
                   case cvl("center") 'T'rue or 'F'alse
                      select case sParms[0] or &h20
                      case asc("f"): pNew->bFlagCenter = false
@@ -494,10 +524,14 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
             'case "SNAP_SPH"   '0 !LDCAD SNAP_SPH [gender=M] [radius=4]
             end select
             
+            '#ifndef __Tester
             'printf(!"unimplmented shadow: <'%s'>\n",sType)
+            '#endif
             pFile += ReadLine( pFile , sType )                        
             if sType="" then sType=" "               
+            #ifndef __Tester
             printf(!"unimplmented shadow: '%s'\n",sType)
+            #endif
             NextLine() : continue do
          rem end select
       loop

@@ -23,6 +23,9 @@
 'TODO: rename SizeModel function to GetModelInfo (to calculate size,studs,clutches,etc...)
 'TODO: list studs/clutches/axles, their positions and normal vectors
 'TODO: can we match studs/clutches/axles from sub primatives? (only studs and aliases?)
+'TODO: Length of shadow must be multiplied by matrix (Y=mat[4]), and duplicates must be ignored!
+
+'???? Should All PinHoles add also an AxleHole? ???? (as they add a clutch)
 
 '--------------------------------  NOTES: ------------------------------------
 'STUDS     are normally defined on it's own (each stud have an included shadow entry)
@@ -56,18 +59,18 @@ var sPath = environ("userprofile")+"\Desktop\LDCAD\"
 'var sFile = "3023.dat"
 'var sFile = "3626cp0p.dat"
 'var sFile = "65826.dat" 'no shadow pin?
-'var sFile = "4274.dat" '3 studs??
-'var sFile = "3749.dat" 'axle+pin (have 2axles?)
-'var sFile = "18651.dat" 'axle+pin (have 2xales?)
-'var sFile = "3024.dat" 'duplicated clutches
+'var sFile = "4274.dat" 'Duplicated Stud (bigger lock compressible cylinder)?? (still wrong stud count?)
+'var sFile = "3749.dat" 'axle+pin (duplicated axles) (no barhole!!)
+'var sFile = "18651.dat" 'axle+pin (duplicated axles) (the only one of this class with barhole)
+'var sFile = "3024.dat" 'duplicated clutches (CHECK: unknown male)
 'var sFile = "3044a.dat" 'square clutches in a grid can slide? (or need hardcoded slide?)
-''var sFile = "18654.dat" pinhole
-var sFile = "32006.dat" 'pinholes+axlehole+clutch
-''var sFile = "4589.dat" 'axlehole(that needs to be clutch as well?)
+'var sFile = "18654.dat" 'pinhole (hollow pin = 2 clutches)
+'var sFile = "32006.dat" 'pinholes+axlehole+clutch
+'var sFile = "4589.dat" ' axlehole with clutch (bigger hollow stud?)
 'var sFile = "87994.dat" 'bar
 
-'var sFile = "3461.dat" 'have a (king)fat pinhole
-'var sFile = "967.dat"  'have a (king)pin
+'var sFile = "3461.dat" 'have a (king)fat pinhole (maybe add a fat clutch/pinhole class?)
+var sFile = "967.dat"  'have a (king)pin
 'var sFile = "3011.dat" 'duplo (extra clutches)
 'var sFile = "3001.dat" 'clutches as aliases?
 'var sFile = "4070.dat"
@@ -96,6 +99,8 @@ var sFile = "32006.dat" 'pinholes+axlehole+clutch
 'var sFile = "3001s01.dat" 'subpart of 3001.dat
 'var sFile = "connhole.dat" 'subpart
 'var sFile = "t01i3261.dat" 'subpart
+'var sFile = "connect.dat" 'subpart
+'var sFile = "axle.dat" 'subpart
 'var sFile = "C:\Users\greg\Desktop\LDCAD\examples\5510.mpd"
 
 #if 1
