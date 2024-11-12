@@ -42,12 +42,12 @@ type LineType5Struct          'line type 5
 end type
 
 #if 0
-type StudInfo
-   as single fX,fY,fZ
-end type
-type ClutchInfo as StudInfo
-type AliasInfo as StudInfo
-type AxleInfo as StudInfo
+   type StudInfo
+      as single fX,fY,fZ
+   end type
+   type ClutchInfo as StudInfo
+   type AliasInfo as StudInfo
+   type AxleInfo as StudInfo
 #endif
 
 const cShadowMaxSecs = 8

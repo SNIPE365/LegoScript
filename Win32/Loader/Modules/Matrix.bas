@@ -2,9 +2,20 @@
   #error " Don't compile this one"
 #endif  
 
+'type Matrix4x4
+'   m(15) as single
+'end type   
 type Matrix4x4
-   m(15) as single
-end type   
+   union
+      m(15) as single
+      type
+         as single fScaleX ,   f_1   ,  f_2    , f0_3
+         as single  f_4    , fScaleY ,  f_6    , f0_7
+         as single  f_8    ,   f_9   , fScaleZ , f0_11
+         as single  fPosX  ,  fPosY  ,  fPosZ  , f1_15
+      end type
+   end union
+end type
 
 static shared as Matrix4x4 tMatrixStack(1023)
 static shared as long g_CurrentMatrix
@@ -46,7 +57,7 @@ sub PopMatrix()
 end sub   
 sub MultiplyMatrixVector( pVec as single ptr )
    dim as single fX = pVec[0] , fY = pVec[1] , fZ = pVec[2]
-   with tMatrixStack(g_CurrentMatrix)    
+   with tMatrixStack(g_CurrentMatrix)
       pVec[0] = .m(0) * fX + .m(4) * fY + .m( 8) * fZ + .m(12)
       pVec[1] = .m(1) * fX + .m(5) * fY + .m( 9) * fZ + .m(13)
       pVec[2] = .m(2) * fX + .m(6) * fY + .m(10) * fZ + .m(14)
