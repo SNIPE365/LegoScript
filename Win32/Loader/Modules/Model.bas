@@ -116,13 +116,15 @@ sub RenderModel( pPart as DATFile ptr , iBorders as long , uCurrentColor as ulon
                   'if sName = "axle.dat" then fMatrix(4) *= 2
                   PushAndMultMatrix( @fMatrix(0) )
                   
-                  if iBorders=0 then
+                  #ifdef ColorizePrimatives
+                  if iBorders=0 then                     
                      select case GetSubPartType( sName )
                      case spStud   : uColor = &hFF4488FF                        
                      case spClutch : uColor = &hFF1122FF
                      case spAxle   : uColor = &hFF44FF88
                      end select
                   end if
+                  #endif
                   
                   RenderModel( pSubPart , iBorders , uColor , uEdge DebugPrimIdent )
                   PopMatrix()
@@ -356,7 +358,7 @@ end type
 sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr = NULL )
          
    if pRoot = NULL then pRoot = pPart        
-   with *pPart 
+   with *pPart
       if .iShadowCount then
          #ifndef __Tester
          printf(!"Shadow Entries=%i (%s)\n",.iShadowCount,GetPartName(pPart))
@@ -456,7 +458,8 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                            'if iConCnt > 1 then puts("!!!!! GRID PINHOLE FOUND !!!!!")
                            'bConType = spPinHole
                            var iMaybePins = 0
-                           for I as long = 0 to .bSecCnt-1
+                           dim as byte bDidAxleHole,bDidClutch,bDidBarHole
+                           for I as long = 0 to .bSecCnt-1                              
                               if .tSecs(I).bLength*YScale = 1 then
                                  puts("Length 1 section ignored")
                                  bSecs -= 1 : continue for 'ignore length=1 sections
@@ -464,21 +467,24 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                               select case .tSecs(I).bShape 
                               case sss_Axle                                 
                                  DbgConnect(!"AxleHole += %i (Axle slide)\n",iConCnt*bSides)
-                                 tSnap.lAxleHoleCnt += iConCnt*bSides : bSecs -= 1: 'AXLEHOLE //bConType = spAxleHole: exit for 
+                                 if bDidAxleHole=0 then bDidAxleHole=1 : tSnap.lAxleHoleCnt += iConCnt*bSides 
+                                 'AXLEHOLE //bConType = spAxleHole: exit for 
                                  'if there's an axlehole then it can't be a pinhole, and it can't have dual clutches
-                                 iMaybePins=-999 : bSides = 1
+                                 bSecs -= 1 : iMaybePins=-999 : bSides = 1
                               case sss_Square   
                                  DbgConnect(!"Clutch += %i (Square slide)\n",iConCnt)
-                                 DbgConnect(!"BarHole += %i (Square slide)\n",iConCnt)
-                                 tSnap.lClutchCnt  += iConCnt
-                                 tSnap.lBarHoleCnt  += iConCnt : bSecs -= 1 'BARHOLE //bConType = spBarHole: exit for
+                                 DbgConnect(!"BarHole += %i (Square slide)\n",iConCnt*bSides)
+                                 if bDidClutch=0  then bDidClutch=1  : tSnap.lClutchCnt  += iConCnt
+                                 if bDidBarHole=0 then bDidBarHole=1 : tSnap.lBarHoleCnt += iConCnt*bSides
+                                 bSecs -= 1 'BARHOLE //bConType = spBarHole: exit for
                               case sss_Round
                                  select case .tSecs(I).wFixRadius
                                  case 800: bSecs -= 1 '???? (anti-stopper??)
                                  case 600: iMaybePins += 1 
                                  case 400
-                                    DbgConnect(!"BarHole += %i (Round slide)\n",iConCnt)
-                                    tSnap.lBarHoleCnt += iConCnt : bSecs -= 1 'BARHOLE
+                                    DbgConnect(!"BarHole += %i (Round slide)\n",iConCnt*bSides)
+                                    if bDidBarHole=0 then bDidBarHole=1 : tSnap.lBarHoleCnt += iConCnt*bSides 
+                                    bSecs -= 1 'BARHOLE
                                  end select                                 
                               end select
                            next I
@@ -489,6 +495,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                               tSnap.lPinHoleCnt += iConCnt*iMaybePins : bSecs -= iMaybePins 'PINHOLE
                            end if
                         else 'BARHOLE / CLUTCH / KingPin (fat)
+                           dim as byte bDidPinHole,bDidBarHole
                            for I as long = 0 to .bSecCnt-1                              
                               'if .tSecs(I).wFixRadius > 600 then bConType = spPinHole : exit for
                               select case .tSecs(I).bShape
@@ -496,11 +503,13 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                                  puts("Axle hole without slide??????")
                               case sss_FlexPrev
                                  DbgConnect(!"PinHole += %i (FlexPrev)\n",iConCnt)
-                                 tSnap.lPinHoleCnt += iConCnt : bSecs -= 1: 'bConType = spPinHole
+                                 if bDidPinHole=0 then bDidPinHole=1 : tSnap.lPinHoleCnt += iConCnt 
+                                 bSecs -= 1: 'bConType = spPinHole
                               case sss_Round 'barholes have radius of 4.0
                                  if .tSecs(I).wFixRadius = 400 then 
-                                    DbgConnect(!"BarHole += %i (Round)\n",iConCnt)
-                                    tSnap.lBarHoleCnt += iConCnt : bSecs -= 1 'bConType = spBarhole : exit for 'BARHOLE
+                                    DbgConnect(!"BarHole += %i (Round)\n",iConCnt*bSides)
+                                    if bDidBarHole=0 then bDidBarHole = 1 : tSnap.lBarHoleCnt += iConCnt*bSides 
+                                    bSecs -= 1 'bConType = spBarhole : exit for 'BARHOLE
                                  end if
                               end select
                            next I  
@@ -520,7 +529,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                         case spClutch  
                            'printf(!"Sides=%i\n",bSides)
                            DbgConnect(!"Clutch += %i (Fallback)\n",iConCnt)
-                           tSnap.lClutchCnt   += iConCnt*bSides 
+                           tSnap.lClutchCnt   += iConCnt '*bSides 
                            '#ifndef __Tester
                            'puts("!!! FALLBACK CLUTCH !!!")
                            '#endif
@@ -530,7 +539,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                         case spBar     
                            DbgConnect(!"Bar += %i (Fallback)\n",iConCnt)
                            tSnap.lBarCnt      += iConCnt
-                        case spBarHole : tSnap.lBarHoleCnt  += iConCnt
+                        case spBarHole : tSnap.lBarHoleCnt  += iConCnt*bSides
                            DbgConnect(!"BarHole += %i (Fallback)\n",iConCnt)
                         case spPin     : tSnap.lPinCnt      += iConCnt 
                            DbgConnect(!"Pin += %i (Fallback)\n",iConCnt)

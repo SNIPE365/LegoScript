@@ -1,4 +1,7 @@
 #define __Main
+'#define __Tester
+
+'#define ColorizePrimatives
 
 #include "LoadLDR.bas"
 
@@ -56,7 +59,7 @@ var sPath = environ("userprofile")+"\Desktop\LDCAD\"
 '{SNAP_CYL} - <[gender=F] [caps=none] [secs=R 6 6   A 6 6   R 4 16] [slide=true] [pos=0 24 0]>
 
 '3044a 'Regx for good files = ^1.*\.dat
-'var sFile = "3023.dat"
+var sFile = "3023.dat"
 'var sFile = "3626cp0p.dat"
 'var sFile = "65826.dat" 'no shadow pin?
 'var sFile = "4274.dat" 'Duplicated Stud (bigger lock compressible cylinder)?? (still wrong stud count?)
@@ -93,8 +96,8 @@ var sPath = environ("userprofile")+"\Desktop\LDCAD\"
 'var sFile = "3022.dat" 'same class of piece as 3001.dat
 'var sFile = "11203.dat" 'inverted tile
 'var sFile = "2431.dat" 'tile
-var sFile = "35459.dat" 'tile (TODO: check barhole count)
-'var sFile = "32530.dat" 'OK 2 clutches , 2 pinholes
+'var sFile = "35459.dat" 'tile
+'var sFile = "32530.dat" 'OK 6 clutches , 2 pinholes
 'var sFile = "3865.dat" 'baseplate
 
 'var sFile = "168315a.dat" 'sticker
@@ -108,34 +111,34 @@ var sFile = "35459.dat" 'tile (TODO: check barhole count)
 #if 1
    'var sFile = sPath+"\LDraw\parts\3001.dat"     'FINE
    'var sFile = sPath+"\LDraw\parts\3002.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3003.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3004.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3005.dat"     'FINE (needs shadow library for clutch)
+   'var sFile = sPath+"\LDraw\parts\3003.dat"     'FINE (duplicated clutches from two subparts)
+   'var sFile = sPath+"\LDraw\parts\3004.dat"     'FINE (duplicated clutches
+   'var sFile = sPath+"\LDraw\parts\3005.dat"     'FINE
    'var sFile = sPath+"\LDraw\parts\3006.dat"     'FINE
    'var sFile = sPath+"\LDraw\parts\3007.dat"     'FINE
    'var sFile = sPath+"\LDraw\parts\3008.dat"     'FINE
    'var sFile = sPath+"\LDraw\parts\3009.dat"     'FINE
    'var sFile = sPath+"\LDraw\parts\3010.dat"     'FINE
    'var sFile = sPath+"\LDraw\parts\3011.dat"     'THE 59 LOOKS A LITTLE SUS BUT WHEN I TESTED I LDACAD IT SEEMS FINE
-   'var sFile = sPath+"\LDraw\parts\3018.dat"     'FINE
+   'var sFile = sPath+"\LDraw\parts\3018.dat"     'FINE (huge stud/clutch)
    'var sFile = sPath+"\LDraw\parts\3020.dat"     'FINE
    'var sFile = sPath+"\LDraw\parts\3021.dat"     'FINE
    'var sFile = sPath+"\LDraw\parts\3022.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3023.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3026.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3027.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3030.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3031.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3032.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3033.dat"     'FINE
+   'var sFile = sPath+"\LDraw\parts\3023.dat"     'FINE plate
+   'var sFile = sPath+"\LDraw\parts\3026.dat"     'FINE (144 studs 259 clutches)
+   'var sFile = sPath+"\LDraw\parts\3027.dat"     'FINE plate
+   'var sFile = sPath+"\LDraw\parts\3030.dat"     'FINE plate
+   'var sFile = sPath+"\LDraw\parts\3031.dat"     'FINE plate
+   'var sFile = sPath+"\LDraw\parts\3032.dat"     'FINE plate
+   'var sFile = sPath+"\LDraw\parts\3033.dat"     'FINE plate
    'var sFile = sPath+"\LDraw\parts\3034.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3035.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3036.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3037.dat"     'FINE
+   'var sFile = sPath+"\LDraw\parts\3035.dat"     'FINE plate
+   'var sFile = sPath+"\LDraw\parts\3036.dat"     'FINE plate
+   'var sFile = sPath+"\LDraw\parts\3037.dat"     'FINE (missing shadow for the clutch holes?)
    'var sFile = sPath+"\LDraw\parts\3038.dat"     'FINE
    'var sFile = sPath+"\LDraw\parts\3039.dat"     'FINE
    'var sFile = sPath+"\LDraw\parts\18654.dat"    'should be 20x20x20 but maybe it has a slightly thinner diameter compared to a 1x1 round brick
-   'var sFile = sPath+"\LDraw\parts\3062bp02.dat" 'FINE yeah the above part is probably just slightly narrower in diameter
+   'var sFile = sPath+"\LDraw\parts\3062bp02.dat" 'FINE (A caps?)
    'var sFile = sPath+"\LDraw\parts\4588.dat"     'FINE
    'var sFile = sPath+"\LDraw\parts\3040.dat"     'FINE
    'var sFile = sPath+"\LDraw\parts\3041.dat"     'FINE
@@ -144,39 +147,38 @@ var sFile = "35459.dat" 'tile (TODO: check barhole count)
    'var sFile = sPath+"\LDraw\parts\3044.dat"     'FINE (special clutch)
    'var sFile = sPath+"\LDraw\parts\3045.dat"     'FINE
    'var sFile = sPath+"\LDraw\parts\3046.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3048.dat"     'FINE (special clutch)
+   'var sFile = sPath+"\LDraw\parts\3048.dat"      'FINE (special clutch) (TODO: (ignore) male grid of square clutches????)
    'var sFile = sPath+"\LDraw\parts\3049.dat"     'FINE
    'var sFile = sPath+"\LDraw\parts\3058.dat"     'FINE (combination of aliases)
    'var sFile = sPath+"\LDraw\parts\3062.dat"     'FINE
    'var sFile = sPath+"\LDraw\parts\3063.dat"     'FINE
    'var sFile = sPath+"\LDraw\parts\3065.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3066.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3067.dat"     'FINE
+   'var sFile = sPath+"\LDraw\parts\3066.dat"     'FINE (slide clutch defined as 8 clutches)
+   'var sFile = sPath+"\LDraw\parts\3067.dat"     'FINE (slide clutch)
    'var sFile = sPath+"\LDraw\parts\3068.dat"     'FINE
    'var sFile = sPath+"\LDraw\parts\3069.dat"     'FINE
    'var sFile = sPath+"\LDraw\parts\3070.dat"     'FINE
    'var sFile = sPath+"\LDraw\parts\3082.dat"     'THIS APPEARS TO BE WRONG, IT LOOKS LIKE ITS 2 LDU thick by 39 LDU tall including the nub and 32 LDU WIDE 
-   'var sFile = sPath+"\LDraw\parts\3109.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3110.dat"     'this appears to be 20 LDU tall by 32 LDU wide by 72 LDU long
-   'var sFile = sPath+"\LDraw\parts\3111.dat"     'actually right :) (need further review on the subparts of this)
-   'var sFile = sPath+"\LDraw\parts\3112.dat"     'actually right :) (need further review on the subparts of this)
-   'var sFile = sPath+"\LDraw\parts\3127.dat"     'mega wrong :D
-   'var sFile = sPath+"\LDraw\parts\3130.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3131.dat"     'FINE
+   'var sFile = sPath+"\LDraw\parts\3109.dat"     'FINE (subpart? shadow does not account holes)
+   'var sFile = sPath+"\LDraw\parts\3110.dat"     '(subpart) this appears to be 20 LDU tall by 32 LDU wide by 72 LDU long
+   'var sFile = sPath+"\LDraw\parts\3111.dat"     '(no shadow) actually right :) (need further review on the subparts of this)
+   'var sFile = sPath+"\LDraw\parts\3112.dat"     '(no shadow) actually right :) (need further review on the subparts of this)
+   'var sFile = sPath+"\LDraw\parts\3127.dat"     '(size? mega wrong :D)
+   'var sFile = sPath+"\LDraw\parts\3130.dat"     'FINE (miss many shadow info)
+   'var sFile = sPath+"\LDraw\parts\3131.dat"     'FINE (miss many shadow info)
    'var sFile = sPath+"\LDraw\parts\3134.dat"     'FINE
    'var sFile = sPath+"\LDraw\parts\3135.dat"     '45 LDU not 100 LDU
-   'var sFile = sPath+"\LDraw\parts\3136.dat"     'cool, fine
-   'var sFile = sPath+"\LDraw\parts\3137.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3139.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3144.dat"     'damn this is actaully right
-   
-   'var sFile = sPath+"\LDraw\parts\3145.dat"     'I cant move that finley in ldcad but 122.96 LDU looks correct as well as 69.28
-   'var sFile = sPath+"\LDraw\parts\3148.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3149.dat"     'FINE
+   'var sFile = sPath+"\LDraw\parts\3136.dat"      'cool, fine (different size studs?)
+   'var sFile = sPath+"\LDraw\parts\3137.dat"     'FINE (check shadow?)
+   'var sFile = sPath+"\LDraw\parts\3139.dat"     'FINE (no shadow info)
+   'var sFile = sPath+"\LDraw\parts\3144.dat"     'damn this is actaully right (male grid (to be ignored?), two caps)
+   'var sFile = sPath+"\LDraw\parts\3145.dat"     '(TODO: 3 sided connections, missing some?) I cant move that finley in ldcad but 122.96 LDU looks correct as well as 69.28
+   'var sFile = sPath+"\LDraw\parts\3148.dat"     'FINE (TODO: hinge)
+   'var sFile = sPath+"\LDraw\parts\3149.dat"     'FINE (TODO: hinges)
    'var sFile = sPath+"\LDraw\parts\3160.dat"     'width and depdth is fine, heigh seems kinda insaneley precise.
    'var sFile = sPath+"\LDraw\parts\3161.dat"     'FINE
    'var sFile = sPath+"\LDraw\parts\3167.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3176.dat"     'FINE
+   'var sFile = sPath+"\LDraw\parts\3176.dat"     'FINE (resume checking from here)
    'var sFile = sPath+"\LDraw\parts\3190.dat"     'FINE
    'var sFile = sPath+"\LDraw\parts\3191.dat"     'FINE
    'var sFile = sPath+"\LDraw\parts\3192.dat"     'FINE
@@ -278,6 +280,12 @@ dim as boolean bBoundingBox
 dim as boolean bLeftPressed,bRightPressed,bWheelPressed
 dim as long iFps
 
+static shared as ulong MaleStipple(32-1), FemaleStipple(32-1)
+for iY as long = 0 to 31         
+   MaleStipple(iY)   = iif(iY and 1,&h55555555,&hAAAAAAAA)
+   FeMaleStipple(iY) = iif(iY and 1,&hAAAAAAAA,&h55555555)
+next iY
+
 do
    
    glClear GL_COLOR_BUFFER_BIT OR GL_DEPTH_BUFFER_BIT      
@@ -297,12 +305,45 @@ do
    
    glPushMatrix()
    with tSz
-      glTranslatef( (.xMin+.xMax)/-2  , (.yMin+.yMax)/-2 , (.zMin+.zMax)/-2 )
+      'glTranslatef( (.xMin+.xMax)/-2  , (.yMin+.yMax)/-2 , (.zMin+.zMax)/-2 )
    end with
    
    glDisable( GL_LIGHTING )
    glCallList(	iModel )   
    glEnable( GL_LIGHTING )
+   
+   glEnable( GL_POLYGON_STIPPLE )
+   
+   'SnapModel( pModel , tSnap )
+   
+   
+   glTranslatef( -10 , -8 , 0 ) '/-5)
+   
+   #if 1
+      glPushMatrix()
+      glRotatef( 90 , 1,0,0 )
+      glScalef( 2*.5 , 2*.5 , 2*.05*4 )
+      glPolygonStipple(	cptr(glbyte ptr,@MaleStipple(0)) )   
+      glColor3f( 0 , 1 , 0 )
+      'glutSolidSphere( 6*2 , 18 , 7 ) 'male round (.5,.5,N\2)
+      glutSolidCube(6*2) 'male square (1,1,N)
+      glPopMatrix()
+   #endif
+   
+   #if 0
+      glPushMatrix()
+      
+      glRotatef( 90 , 1,0,0 )
+      glScalef( .5 , .5 , .05*4 )      
+      
+      glPolygonStipple(	cptr(glbyte ptr,@FeMaleStipple(0)) )
+      glColor3f( 1 , 0 , 0 )   
+      'glutSolidTorus( 0.5 , 8 , 18 , 3  ) 'female "square" (.5,.5,N*8)
+      glutSolidTorus( 0.5 , 8 , 18 , 18 ) 'female round? (.5,.5,N*8)
+      glPopMatrix()
+   #endif
+   
+   glDisable( GL_POLYGON_STIPPLE )
    
    if bBoundingBox then         
       glColor4f(0,1,0,.25)

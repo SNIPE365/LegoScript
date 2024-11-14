@@ -35,10 +35,10 @@ end type
 
 '   (@"3626cp0p.dat",(   0   ,   0    ,   0   ,  0   ,   0   ,  0  ,  0   ,  0  ,  0  )) _
 dim as PartCheck tCheckList(...) = { _
-_   '    name      ,  Stud , Clutch , Alias , Axle  , AxleH , Bar , BarH , Pin , PinH
+_   '    name      ,  Stud  , Clutch , Alias , Axle , AxleH , Bar , BarH , Pin , PinH
    (@"3023.dat"    ,(   2   ,   2    ,   0   ,  0   ,   0   ,  1  ,  0   ,  0  ,  0  )), _
    (@"3626cp0p.dat",(   2   ,   1    ,   0   ,  0   ,   0   ,  0  ,  1   ,  0  ,  1  )), _
-   (@"4274.dat"    ,( 1+q(1),   0    ,   0   ,  0   ,   0   ,  0  ,  1   ,  1  ,  0  )), _ 'careful duplication pin/stud
+   (@"4274.dat"    ,( 1+q(1),   0    ,   0   ,  0   ,   0   ,  0  ,  2   ,  1  ,  0  )), _ 'careful duplication pin/stud
    (@"3749.dat"    ,(   0   ,   0    ,   0   , q(1) ,   0   ,  0  ,  0   ,  1  ,  0  )), _ 'missing barhole
    (@"18651.dat"   ,(   0   ,   0    ,   0   , q(1) ,   0   ,  0  ,  1   ,  1  ,  0  )), _
    (@"3024.dat"    ,(   1   ,  d(1)  ,   0   ,  0   ,   0   ,  0  ,  0   ,  0  ,  0  )), _
@@ -51,13 +51,24 @@ _   '    name      ,  Stud , Clutch , Alias , Axle  , AxleH , Bar , BarH , Pin ,
    (@"967.dat"     ,(  32   ,  53    ,   0   ,  0   ,   0   ,  0  ,  0   ,  1  ,  0  )), _
    (@"3001.dat"    ,(   8   ,  11    ,   0   ,  0   ,   0   ,  0  ,  0   ,  0  ,  0  )), _
    _ ''(@"3002.dat"    ,(   6   ,   8    ,   0   ,  0   ,   0   ,  0  ,  0   ,  0  ,  0  )), _ 'same case as 3001? comment it out?
+   (@"3007.dat"    ,(  16   ,  23    ,   0   ,  0   ,   0   ,  0  ,  0   ,  0  ,  0  )), _
    (@"4070.dat"    ,(   2   ,   2    ,   0   ,  0   ,   0   ,  0  ,  2   ,  0  ,  0  )), _
    (@"78329.dat"   ,(   5   ,   5    ,   0   ,  0   ,   0   ,  4  ,  0   ,  0  ,  0  )), _
    _ '(@"2711.dat"    ,(   2   ,   6    ,   0   ,  0   ,   2   ,  0  ,  2   ,  0  ,  4  )), _
    (@"32124.dat"   ,(   4   ,   4    ,   0   ,  0   ,   2   ,  2  ,  4   ,  0  ,  0  )), _
    (@"15588.dat"   ,(   3   ,   3    ,   0   ,  0   ,   0   ,  0  ,  0   ,  0  ,  0  )), _   
-   (@"18651.dat"   ,(   0   ,   0    ,   0   ,  1   ,   0   ,  0  ,  1   ,  1  ,  0  )) _
-   
+   (@"18651.dat"   ,(   0   ,   0    ,   0   ,  1   ,   0   ,  0  ,  1   ,  1  ,  0  )), _
+   (@"35459.dat"   ,(   3   ,   0    ,   0   ,  0   ,   0   ,  0  ,  4   ,  0  ,  0  )), _
+   (@"32530.dat"   ,(   0   ,   6    ,   0   ,  0   ,   0   ,  0  ,  0   ,  0  ,  2  )), _
+   (@"3865.dat"    ,( 128   ,   0    ,   0   ,  0   ,   0   ,  0  ,  0   ,  0  ,  0  )), _
+   (@"4588.dat"    ,(   1   ,   1    ,   0   ,  0   ,   0   ,  0  ,  2   ,  0  ,  0  )), _
+   (@"3058.dat"    ,(  60   ,  84    ,   0   ,  0   ,   0   , 18  ,  0   ,  0  ,  0  )), _
+   (@"3066.dat"    ,(   4   ,   8    ,   0   ,  0   ,   0   ,  0  ,  0   ,  0  ,  0  )), _  'slide clutch defined as 8 clutches
+   (@"3127.dat"    ,(   2   ,   2    ,   0   ,  0   ,   0   ,  1  ,  0   ,  0  ,  0  )), _
+   (@"3135.dat"    ,(   2   ,   8    ,   0   ,  0   ,   0   ,  0  ,  0   ,  0  ,  0  )), _
+   (@"3136.dat"    ,(   6   ,   0    ,   0   ,  0   ,   0   ,  0  ,  4   ,  0  ,  0  )), _
+   (@"3167.dat"    ,(   0   ,  10    ,   0   ,  0   ,   0   ,  0  ,  0   ,  0  ,  5  )) _
+   _'    name      ,  Stud  , Clutch , Alias , Axle , AxleH , Bar , BarH , Pin , PinH   
 }
 
 for N as long = 0 to ubound( tCheckList )
@@ -73,7 +84,7 @@ for N as long = 0 to ubound( tCheckList )
       SnapModel( pModel , tSnap )
       var p = @.tSnaps
       with tSnap
-         printf(!"Studs:%2i  Clutchs:%2i  Aliases:%2i  Axles:%2i  Axlehs:%2i  Bars:%2i  Barhs:%2i  Pins:%2i  Pinhs:%2i ", _
+         printf(!"Studs:%3i  Clutchs:%2i  Aliases:%2i  Axles:%2i  Axlehs:%2i  Bars:%2i  Barhs:%2i  Pins:%2i  Pinhs:%2i ", _
          .lStudCnt , .lClutchCnt , .lAliasCnt , .lAxleCnt , .lAxleHoleCnt ,.lBarCnt , .lBarHoleCnt , .lPinCnt , .lPinHoleCnt )
          #define CheckMember( _Name ) if .l##_Name##Cnt <> p->l##_Name##Cnt then color 12: iError += 1 : print !"\n" #_Name " Mismatch. Wanted: " & p->l##_Name##Cnt & "  Got: " & .l##_Name##Cnt;: color 7
          var iError = 0
