@@ -111,6 +111,7 @@ type ShadowStruct
          bFlagCenter  :1 as ubyte 
          bFlagSlide   :1 as ubyte
          bFlagHasGrid :1 as ubyte
+         bFlagOriMat  :1 as ubyte
       end type
    end union
    bScale    as ubyte      'ShadowScale

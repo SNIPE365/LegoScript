@@ -22,6 +22,8 @@
    'seems that only cylindrical ones will be important for now
    'Male being stud... Female being clutches (detect aliases? to account for others?)   
 
+'TODO: !! check matrix orientation multiplication !!!
+
 'TODO: add studs from the DAT file (in SizeModel function)
 'TODO: rename SizeModel function to GetModelInfo (to calculate size,studs,clutches,etc...)
 'TODO: list studs/clutches/axles, their positions and normal vectors
@@ -66,7 +68,7 @@ var sFile = "3023.dat"
 'var sFile = "3749.dat" 'axle+pin (duplicated axles) (no barhole!!)
 'var sFile = "18651.dat" 'axle+pin (duplicated axles) (the only one of this class with barhole)
 'var sFile = "3024.dat" 'duplicated clutches (CHECK: unknown male)
-'var sFile = "3044a.dat" 'square clutches in a grid can slide? (or need hardcoded slide?)
+'var sFile = "3044a.dat" 'square clutches in a grid can slide? (or need hardcoded slide?) [!bad center?]
 'var sFile = "18654.dat" 'pinhole (hollow pin = 2 clutches)
 ''var sFile = "32006.dat" 'pinholes+axlehole+clutch (duplicated axlehole both sides???????)
 ''var sFile = "4589.dat" ' axlehole with clutch (bigger hollow stud?) (duplicated axlehole both sides?????)
@@ -79,22 +81,22 @@ var sFile = "3023.dat"
 'var sFile = "4070.dat"
 'var sFile = "78329.dat"
 'var sFile = "axlehole.dat"
-''var sFile = "2711.dat" '(grid pinhole!! duplicated clutches (2711+steerend)
+'var sFile = "2711.dat" '(grid pinhole!! duplicated clutches (2711+steerend) [!outside! female round]
 'var sFile = "steerend.dat"
-'var sFile = "32124.dat" '(axle holes)
+'var sFile = "32124.dat" '(axle holes) [!outside! female round]
 'var sFile = sPath+"\LDraw\parts\17715.dat" (removed??)
 'var sFile = "15588.dat" 'alias of 48092 (need extra aliases clutches?)
 'var sFile = "48092.dat"
 'var sFile = "stud.dat"
-'var sFile = "18651.dat" (big axle that could have one extra virtual axle?)
+''var sFile = "18651.dat" '(big axle that could have one extra virtual axle?) [!rotated!]
 ''var sFile = "3703.dat" '(included shadow over a grid... TODO: implement!)
 'var sFile = "3003.dat" 'Shadow: SNAP_INCL
 ''var sFile = "3004.dat" 'Shadow: SNAP_INCL (name ref? duplicated clutches? (ignore?) TODO!)
 'var sFile = "4531.dat" 'Shadow: SNAP_* (hinges, TODO: later implement)
-'var sFile = "3673.dat" 'Shadow: SNAP_CLEAR (extra pin, missing barhole?)
+'var sFile = "3673.dat" 'Shadow: SNAP_CLEAR (extra pin, missing barhole?) [!rotated!]
 'var sFile = "3002.dat" 'same class of piece as 3001.dat
 'var sFile = "3022.dat" 'same class of piece as 3001.dat
-'var sFile = "11203.dat" 'inverted tile
+'var sFile = "11203.dat" 'inverted tile '[!outside! inverted?]
 'var sFile = "2431.dat" 'tile
 'var sFile = "35459.dat" 'tile
 'var sFile = "32530.dat" 'OK 6 clutches , 2 pinholes
@@ -144,12 +146,12 @@ var sFile = "3023.dat"
    'var sFile = sPath+"\LDraw\parts\3041.dat"     'FINE
    'var sFile = sPath+"\LDraw\parts\3042.dat"     'FINE
    'var sFile = sPath+"\LDraw\parts\3043.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3044.dat"     'FINE (special clutch)
+   'var sFile = sPath+"\LDraw\parts\3044.dat"     'FINE (special clutch) [!Center! mismatch]
    'var sFile = sPath+"\LDraw\parts\3045.dat"     'FINE
    'var sFile = sPath+"\LDraw\parts\3046.dat"     'FINE
    'var sFile = sPath+"\LDraw\parts\3048.dat"      'FINE (special clutch) (TODO: (ignore) male grid of square clutches????)
    'var sFile = sPath+"\LDraw\parts\3049.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3058.dat"     'FINE (combination of aliases)
+   'var sFile = sPath+"\LDraw\parts\3058.dat"     'FINE (combination of aliases) [!Center?! mismatch]
    'var sFile = sPath+"\LDraw\parts\3062.dat"     'FINE
    'var sFile = sPath+"\LDraw\parts\3063.dat"     'FINE
    'var sFile = sPath+"\LDraw\parts\3065.dat"     'FINE
@@ -167,7 +169,7 @@ var sFile = "3023.dat"
    'var sFile = sPath+"\LDraw\parts\3130.dat"     'FINE (miss many shadow info)
    'var sFile = sPath+"\LDraw\parts\3131.dat"     'FINE (miss many shadow info)
    'var sFile = sPath+"\LDraw\parts\3134.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3135.dat"     '45 LDU not 100 LDU
+   'var sFile = sPath+"\LDraw\parts\3135.dat"     '45 LDU not 100 LDU [!center! mismatch]
    'var sFile = sPath+"\LDraw\parts\3136.dat"      'cool, fine (different size studs?)
    'var sFile = sPath+"\LDraw\parts\3137.dat"     'FINE (check shadow?)
    'var sFile = sPath+"\LDraw\parts\3139.dat"     'FINE (no shadow info)
@@ -280,12 +282,6 @@ dim as boolean bBoundingBox
 dim as boolean bLeftPressed,bRightPressed,bWheelPressed
 dim as long iFps
 
-static shared as ulong MaleStipple(32-1), FemaleStipple(32-1)
-for iY as long = 0 to 31         
-   MaleStipple(iY)   = iif(iY and 1,&h55555555,&hAAAAAAAA)
-   FeMaleStipple(iY) = iif(iY and 1,&hAAAAAAAA,&h55555555)
-next iY
-
 do
    
    glClear GL_COLOR_BUFFER_BIT OR GL_DEPTH_BUFFER_BIT      
@@ -312,38 +308,44 @@ do
    glCallList(	iModel )   
    glEnable( GL_LIGHTING )
    
+   
+   dim as PartSnap tSnap = any
+   SnapModel( pModel , tSnap , true )
+
+   #if 0
    glEnable( GL_POLYGON_STIPPLE )
    
    'SnapModel( pModel , tSnap )
    
-   
-   glTranslatef( -10 , -8 , 0 ) '/-5)
-   
-   #if 1
+   #if 0 
       glPushMatrix()
+      glTranslatef( 10 , -2f , 0 ) '/-5)
       glRotatef( 90 , 1,0,0 )
-      glScalef( 2*.5 , 2*.5 , 2*.05*4 )
+      glScalef( 2 , 2 , (4.0/6.0) ) 'square
+      'glScalef( 8f/7f , 8f/7f , (4.0/6.0)*(5f/7f) ) 'cylinder
       glPolygonStipple(	cptr(glbyte ptr,@MaleStipple(0)) )   
       glColor3f( 0 , 1 , 0 )
-      'glutSolidSphere( 6*2 , 18 , 7 ) 'male round (.5,.5,N\2)
-      glutSolidCube(6*2) 'male square (1,1,N)
+      'glutSolidSphere( 6 , 18 , 7 ) 'male round (.5,.5,N\2)
+      glutSolidCube(6) 'male square (1,1,N)
       glPopMatrix()
-   #endif
-   
+   #endif   
    #if 0
       glPushMatrix()
+      glTranslatef( 10 , -2f , 0 )
       
       glRotatef( 90 , 1,0,0 )
-      glScalef( .5 , .5 , .05*4 )      
+      glRotatef( 45 , 0,0,1 ) 'square
+      glScalef( 1 , 1 , 4 )      
       
       glPolygonStipple(	cptr(glbyte ptr,@FeMaleStipple(0)) )
       glColor3f( 1 , 0 , 0 )   
-      'glutSolidTorus( 0.5 , 8 , 18 , 3  ) 'female "square" (.5,.5,N*8)
-      glutSolidTorus( 0.5 , 8 , 18 , 18 ) 'female round? (.5,.5,N*8)
+      glutSolidTorus( 0.5 , 6 , 18 , 4  ) 'female "square" (.5,.5,N*8)
+      'glutSolidTorus( 0.5 , 6 , 18 , 18 ) 'female round? (.5,.5,N*8)
       glPopMatrix()
    #endif
    
    glDisable( GL_POLYGON_STIPPLE )
+   #endif
    
    if bBoundingBox then         
       glColor4f(0,1,0,.25)

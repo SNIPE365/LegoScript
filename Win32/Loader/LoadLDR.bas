@@ -240,6 +240,7 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
                      end with
                   case cvl3("ori")   'Mat3x3
                      var pOri = @(pNew->fOri(0)) , pParm = cast(ubyte ptr,strptr(sParms))
+                     pNew->bFlagOriMat = true
                      for N as long = 0 to (9-1) 'Orientation 3x3 matrix
                         GetFloat( pParm , *pOri , "Orientation" )
                         '#ifndef __Tester

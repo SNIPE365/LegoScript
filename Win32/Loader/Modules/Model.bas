@@ -117,7 +117,7 @@ sub RenderModel( pPart as DATFile ptr , iBorders as long , uCurrentColor as ulon
                   PushAndMultMatrix( @fMatrix(0) )
                   
                   #ifdef ColorizePrimatives
-                  if iBorders=0 then                     
+                  if iBorders=0 then
                      select case GetSubPartType( sName )
                      case spStud   : uColor = &hFF4488FF                        
                      case spClutch : uColor = &hFF1122FF
@@ -355,13 +355,68 @@ type PartSnap
    lPinCnt      as long
    lPinHoleCnt  as long   
 end type
-sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr = NULL )
+
+static shared as ulong MaleStipple(32-1), FemaleStipple(32-1)
+for iY as long = 0 to 31         
+   MaleStipple(iY)   = iif(iY and 1,&h55555555,&hAAAAAAAA)
+   FeMaleStipple(iY) = iif(iY and 1,&hAAAAAAAA,&h55555555)
+next iY
+
+sub DrawMaleShape( fX_ as single , fY_ as single , fZ_ as single , fRadius as single , fLength as single , bRound as byte )
+   dim as single fVec(2) = {fX_,fY_,fZ_}
+   'MultiplyMatrixVector( @fVec(0) )
+   #define FX fVec(0)
+   #define FY fVec(1)
+   #define FZ fVec(2)
+   
+   glEnable( GL_POLYGON_STIPPLE )
+   glPushMatrix()
+   glTranslatef( fX , fY-fLength/2.0 , fZ )
+   glRotatef( 90 , 1,0,0 )   
+   glPolygonStipple(	cptr(glbyte ptr,@MaleStipple(0)) )   
+   glColor3f( 1 , 1 , 0 )   
+   if bRound then
+      glScalef( 8/7 , 8/7 , (fLength/fRadius)*(5/7) ) 'cylinder
+      glutSolidSphere( fRadius , 18 , 7 ) 'male round (.5,.5,N\2)
+   else
+      glScalef( 2 , 2 , (fLength/fRadius) ) 'square
+      glutSolidCube(fRadius) 'male square (1,1,N)
+   end if
+   glPopMatrix()
+   glDisable( GL_POLYGON_STIPPLE )
+end sub
+sub DrawFemaleShape( fX_ as single , fY_ as single , fZ_ as single , fRadius as single , fLength as single , bRound as byte )
+   dim as single fVec(2) = {fX_,fY_,fZ_}
+   'MultiplyMatrixVector( @fVec(0) )
+   #define FX fVec(0)
+   #define FY fVec(1)
+   #define FZ fVec(2)   
+   glEnable( GL_POLYGON_STIPPLE )
+   glPushMatrix()
+   glTranslatef( fX , fY-fLength/2.0 , fZ )   
+   glRotatef( 90 , 1,0,0 )
+   glPolygonStipple(	cptr(glbyte ptr,@FeMaleStipple(0)) )
+   glColor3f( 1 , 0 , 0 )   
+   if bRound then      
+      glScalef( 1 , 1 , fLength )      
+      glutSolidTorus( 0.5 , fRadius , 18 , 18 ) 'female round? (.5,.5,N*8)
+   else
+      glRotatef( 45 , 0,0,1 ) 'square
+      glScalef( 1 , 1 , fLength )
+      glutSolidTorus( 0.5 , fRadius , 18 , 4  ) 'female "square" (.5,.5,N*8)
+   end if   
+   glPopMatrix()
+   glDisable( GL_POLYGON_STIPPLE )
+end sub
+
+
+sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false , pRoot as DATFile ptr = NULL )
          
    if pRoot = NULL then pRoot = pPart        
    with *pPart
       if .iShadowCount then
          #ifndef __Tester
-         printf(!"Shadow Entries=%i (%s)\n",.iShadowCount,GetPartName(pPart))
+         if bDraw=0 then printf(!"Shadow Entries=%i (%s)\n",.iShadowCount,GetPartName(pPart))
          #endif
          var iIdent = 2, iPrevRec = 0         
          var pMat = @tMatrixStack(g_CurrentMatrix)
@@ -376,21 +431,71 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                   static as zstring ptr pzCaps(...)={@"none",@"one",@"two",@"A",@"B"}
                   if iPrevRec>.bRecurse then iIdent -= 2
                   iPrevRec=.bRecurse '4
-                  #ifndef __Tester
-                  printf(!"%sSecs=%i Gender=%s Caps=%s HasGrid=%s GridX=%i GridZ=%i (Pos=%g,%g,%g)",space(iIdent), _
-                  .bSecCnt , iif(.bFlagMale,"M","F") , pzCaps(.bCaps) , iif(.bFlagHasGrid,"Yes","No") , _
-                  abs(.tGrid.xCnt) , abs(.tGrid.zCnt) , .fPosX+pMat->fPosX , .fPosY+pMat->fPosY , .fPosZ+pMat->fPosZ )
+                                    
+                  
+                  #ifndef __Tester                  
+                  if bDraw then
+                     
+                     if .bFlagOriMat then                     
+                        dim as single fMatrix(15) = { _
+                          .fOri(0) , .fOri(3) , .fOri(6) , 0 , _ 'X scale ,    0?   ,   0?    , 0 
+                          .fOri(1) , .fOri(4) , .fOri(7) , 0 , _ '  0?    , Y Scale ,   0?    , 0 
+                          .fOri(2) , .fOri(5) , .fOri(8) , 0 , _ '  0?    ,    0?   , Z Scale , 0 
+                             0     ,    0     ,     0    , 1 }   ' X Pos  ,  Y Pos  ,  Z Pos  , 1 
+                        PushAndMultMatrix( @fMatrix(0) )
+                     end if
+                     
+                     #define __Position__ fCenX+fOffX+.fPosX+pMat->fPosX , fCenY+.fPosY+pMat->fPosY , fCenZ+fOffZ+.fPosZ+pMat->fPosZ
+                     var xCnt=0 , zCnt=0 , fStartX=0f , fOffZ=0f
+                     if .bFlagHasGrid then 
+                        xCnt = abs(.tGrid.xCnt)-1 : zCnt = abs(.tGrid.zCnt)-1
+                        if .tGrid.xCnt < 0 then fStartX = ((xCnt)*.tGrid.Xstep)/-2 '.tGrid.Xstep/-2
+                        if .tGrid.zCnt < 0 then fOffZ   = ((zCnt)*.tGrid.Xstep)/-2 '.tGrid.ZStep/-2
+                     end if
+                     for iZ as long = 0 to zCnt
+                        var fOffX = fStartX
+                        for iX as long = 0 to xCnt
+                           for I as long = 0 to .bSecCnt-1
+                              var p = @.tSecs(I)                        
+                              dim as byte bRound = false
+                              select case p->bShape
+                              case sss_Round  : bRound  = true
+                              case sss_Square : bRound  = false
+                              case else      : continue for 'skip
+                              end select  
+                              dim as single fCenX,fCenY,fCenZ
+                              if .bFlagCenter then 
+                                 fCenY = (p->bLength*fYScale)/2
+                              end if                              
+                              if .bFlagMale then
+                                 DrawMaleShape( __Position__ , p->wFixRadius/100 , p->bLength*fYScale , bRound ) 
+                              else
+                                 DrawFemaleShape( __Position__ , p->wFixRadius/100 , p->bLength*fYScale , bRound )
+                              end if
+                              
+                           next I
+                           fOffX += .tGrid.Xstep
+                        next iX
+                        fOffZ += .tGrid.Zstep
+                     next iZ                     
+                     if .bFlagOriMat then PopMatrix()
+                  else
+                     #define __Position__ .fPosX+pMat->fPosX , .fPosY+pMat->fPosY , .fPosZ+pMat->fPosZ
+                     printf(!"%sSecs=%i Gender=%s Caps=%s HasGrid=%s GridX=%i GridZ=%i (Pos=%g,%g,%g)",space(iIdent), _
+                     .bSecCnt , iif(.bFlagMale,"M","F") , pzCaps(.bCaps) , iif(.bFlagHasGrid,"Yes","No") , _
+                     abs(.tGrid.xCnt) , abs(.tGrid.zCnt) , __Position__ )
+                  end if
                   #endif                  
                   for I as long = 0 to .bSecCnt-1
                      static as zstring ptr pzSecs(...)={@"Invalid",@"Round",@"Axle",@"Square",@"FlexPrev",@"FlexNext"}                     
                      with .tSecs(I)
                         #ifndef __Tester 
-                        printf(" %s(%g %g)",pzSecs(.bShape),.wFixRadius/100,.bLength*fYScale)
+                        if bDraw=0 then printf(" %s(%g %g)",pzSecs(.bShape),.wFixRadius/100,.bLength*fYScale)
                         #endif
                      end with
                   next I      
                   #ifndef __Tester
-                  puts("")
+                  if bDraw=0 then puts("")
                   #endif                  
                   
                   '>>>>> Detect Shape type (stud,clutch,alias,etc...) >>>>>
@@ -399,14 +504,14 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                      select case .bCaps
                      case sc_None : bSides = 2
                      case sc_One  : bSides = 1
-                     case sc_Two  : puts("!!!!! CHECK TWO CAPS!!!!!")
+                     case sc_Two  : if bDraw=0 then puts("!!!!! CHECK TWO CAPS!!!!!")
                      end select
                      
                      'negative xCnt/zCnt are "centered"
                      if .bFlagHasGrid then iConCnt = abs(.tGrid.xCnt)*abs(.tGrid.zCnt)                                           
                      if .bFlagMale then 
                         var iIgnore = 0
-                        if iConCnt > 1 then puts("!!!!!! MALE GRID FOUND !!!!!")
+                        if iConCnt > 1 andalso bDraw=0 then puts("!!!!!! MALE GRID FOUND !!!!!")
                         bConType = spStud
                         for I as long = 0 to .bSecCnt-1
                            select case .tSecs(I).bShape
@@ -417,14 +522,18 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                            if .tSecs(I).bLength = 1 then bSecs -= 1 : continue for 'ignore length=1 sections
                            select case .tSecs(I).bShape
                            case sss_Axle
-                              DbgConnect(!"Axle += %i\n",iConCnt)
+                              if bDraw=0 then 
+                                 DbgConnect(!"Axle += %i\n",iConCnt)
+                              end if
                               tSnap.lAxleCnt += iConCnt : bSecs -= 1 'AXLEHOLE //bConType = spAxleHole: exit for 
                               'puts("Axle " & bSecs)
                            case sss_FlexNext
                               bSecs -= 1 'other side of pin?
                               'puts("Pin Mirror " & bSecs)
                            case sss_FlexPrev
-                              DbgConnect(!"Pin += %i\n",iConCnt)
+                              if bDraw=0 then 
+                                 DbgConnect(!"Pin += %i\n",iConCnt)
+                              end if
                               tSnap.lPinCnt += iConCnt : bSecs -= 1  'PIN // bConType = spPin : exit for
                               'bSecs -= 1: 'continuation of the pin must be ignored
                               'puts("Pin" & bSecs)
@@ -433,7 +542,9 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                                  bSecs -= 1 'STOPPER? Ignoring it for now
                                  'puts("Stopper" & bSecs)
                               elseif .tSecs(I).wFixRadius = 400 then
-                                 DbgConnect(!"Bar += %i\n",iConCnt)
+                                 if bDraw=0 then 
+                                    DbgConnect(!"Bar += %i\n",iConCnt)
+                                 end if
                                  tSnap.lBarCnt += iConCnt : bSecs -= 1 'BARHOLE
                                  'puts("Bar" & bSecs)
                               else
@@ -444,12 +555,12 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                                     '#endif
                                  else
                                     #ifndef __Tester
-                                    puts("Unknown male round cylinder?")
+                                    if bDraw=0 then puts("Unknown male round cylinder?")
                                     #endif
                                  end if
                               end if
                            case else
-                              puts("Unknown male?")
+                              if bDraw=0 then puts("Unknown male?")
                            end select
                         next I
                      else 'females can be BARHOLE / PINHOLE / CLUTCHES / ALIAS
@@ -461,19 +572,23 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                            dim as byte bDidAxleHole,bDidClutch,bDidBarHole
                            for I as long = 0 to .bSecCnt-1                              
                               if .tSecs(I).bLength*YScale = 1 then
-                                 puts("Length 1 section ignored")
+                                 if bDraw=0 then puts("Length 1 section ignored")
                                  bSecs -= 1 : continue for 'ignore length=1 sections
                               end if
                               select case .tSecs(I).bShape 
                               case sss_Axle                                 
-                                 DbgConnect(!"AxleHole += %i (Axle slide)\n",iConCnt*bSides)
+                                 if bDraw=0 then 
+                                    DbgConnect(!"AxleHole += %i (Axle slide)\n",iConCnt*bSides)
+                                 end if
                                  if bDidAxleHole=0 then bDidAxleHole=1 : tSnap.lAxleHoleCnt += iConCnt*bSides 
                                  'AXLEHOLE //bConType = spAxleHole: exit for 
                                  'if there's an axlehole then it can't be a pinhole, and it can't have dual clutches
                                  bSecs -= 1 : iMaybePins=-999 : bSides = 1
                               case sss_Square   
-                                 DbgConnect(!"Clutch += %i (Square slide)\n",iConCnt)
-                                 DbgConnect(!"BarHole += %i (Square slide)\n",iConCnt*bSides)
+                                 if bDraw=0 then 
+                                    DbgConnect(!"Clutch += %i (Square slide)\n",iConCnt)
+                                    DbgConnect(!"BarHole += %i (Square slide)\n",iConCnt*bSides)
+                                 end if
                                  if bDidClutch=0  then bDidClutch=1  : tSnap.lClutchCnt  += iConCnt
                                  if bDidBarHole=0 then bDidBarHole=1 : tSnap.lBarHoleCnt += iConCnt*bSides
                                  bSecs -= 1 'BARHOLE //bConType = spBarHole: exit for
@@ -482,15 +597,19 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                                  case 800: bSecs -= 1 '???? (anti-stopper??)
                                  case 600: iMaybePins += 1 
                                  case 400
-                                    DbgConnect(!"BarHole += %i (Round slide)\n",iConCnt*bSides)
+                                    if bDraw=0 then 
+                                       DbgConnect(!"BarHole += %i (Round slide)\n",iConCnt*bSides)
+                                    end if
                                     if bDidBarHole=0 then bDidBarHole=1 : tSnap.lBarHoleCnt += iConCnt*bSides 
                                     bSecs -= 1 'BARHOLE
                                  end select                                 
                               end select
                            next I
                            if iMaybePins>0 then 
-                              DbgConnect(!"Clutch += %i (round slide from pin?)\n",iConCnt*iMaybePins*bSides )
-                              DbgConnect(!"PinHole += %i (round slide )\n", iConCnt*iMaybePins)
+                              if bDraw=0 then 
+                                 DbgConnect(!"Clutch += %i (round slide from pin?)\n",iConCnt*iMaybePins*bSides )
+                                 DbgConnect(!"PinHole += %i (round slide )\n", iConCnt*iMaybePins)
+                              end if
                               tSnap.lClutchCnt += iConCnt*iMaybePins*bSides 
                               tSnap.lPinHoleCnt += iConCnt*iMaybePins : bSecs -= iMaybePins 'PINHOLE
                            end if
@@ -500,14 +619,18 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                               'if .tSecs(I).wFixRadius > 600 then bConType = spPinHole : exit for
                               select case .tSecs(I).bShape
                               case sss_Axle
-                                 puts("Axle hole without slide??????")
+                                 if bDraw=0 then puts("Axle hole without slide??????")
                               case sss_FlexPrev
-                                 DbgConnect(!"PinHole += %i (FlexPrev)\n",iConCnt)
+                                 if bDraw=0 then 
+                                    DbgConnect(!"PinHole += %i (FlexPrev)\n",iConCnt)
+                                 end if
                                  if bDidPinHole=0 then bDidPinHole=1 : tSnap.lPinHoleCnt += iConCnt 
                                  bSecs -= 1: 'bConType = spPinHole
                               case sss_Round 'barholes have radius of 4.0
                                  if .tSecs(I).wFixRadius = 400 then 
-                                    DbgConnect(!"BarHole += %i (Round)\n",iConCnt*bSides)
+                                    if bDraw=0 then 
+                                       DbgConnect(!"BarHole += %i (Round)\n",iConCnt*bSides)
+                                    end if
                                     if bDidBarHole=0 then bDidBarHole = 1 : tSnap.lBarHoleCnt += iConCnt*bSides 
                                     bSecs -= 1 'bConType = spBarhole : exit for 'BARHOLE
                                  end if
@@ -516,44 +639,64 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                            ''if bConType = spBarHole andalso .bCaps = sc_None then iConCnt *= 2 'dual for hollow
                         end if
                      end if
-                     if bSecs < 0 then puts("ERROR: remaining section counter is negative")
-                     if bSecs > 1 then puts("ERROR: Too many unhandled sections!")
+                     if bDraw=0 then 
+                        if bSecs < 0 then puts("ERROR: remaining section counter is negative")
+                        if bSecs > 1 then puts("ERROR: Too many unhandled sections!")
+                     end if
                      if bSecs > 0 then 'remaining sects (fallback)
                         select case bConType                           
                         case spStud    
-                           DbgConnect(!"Stud += %i (Fallback)\n",iConCnt)
+                           if bDraw=0 then 
+                              DbgConnect(!"Stud += %i (Fallback)\n",iConCnt)
+                           end if
                            tSnap.lStudCnt     += iConCnt
                            '#ifndef __Tester
                            'puts("!!! FALLBACK STUD !!!")
                            '#endif
                         case spClutch  
                            'printf(!"Sides=%i\n",bSides)
-                           DbgConnect(!"Clutch += %i (Fallback)\n",iConCnt)
+                           if bDraw=0 then 
+                              DbgConnect(!"Clutch += %i (Fallback)\n",iConCnt)
+                           end if
                            tSnap.lClutchCnt   += iConCnt '*bSides 
                            '#ifndef __Tester
                            'puts("!!! FALLBACK CLUTCH !!!")
                            '#endif
                         case spAlias   
-                           DbgConnect(!"Alias += %i (Fallback)\n",iConCnt)
+                           if bDraw=0 then 
+                              DbgConnect(!"Alias += %i (Fallback)\n",iConCnt)
+                           end if
                            tSnap.lAliasCnt    += iConCnt
                         case spBar     
-                           DbgConnect(!"Bar += %i (Fallback)\n",iConCnt)
+                           if bDraw=0 then 
+                              DbgConnect(!"Bar += %i (Fallback)\n",iConCnt)
+                           end if
                            tSnap.lBarCnt      += iConCnt
                         case spBarHole : tSnap.lBarHoleCnt  += iConCnt*bSides
-                           DbgConnect(!"BarHole += %i (Fallback)\n",iConCnt)
+                           if bDraw=0 then 
+                              DbgConnect(!"BarHole += %i (Fallback)\n",iConCnt)
+                           end if
                         case spPin     : tSnap.lPinCnt      += iConCnt 
-                           DbgConnect(!"Pin += %i (Fallback)\n",iConCnt)
+                           if bDraw=0 then 
+                              DbgConnect(!"Pin += %i (Fallback)\n",iConCnt)
+                           end if
                         case spPinHole 
-                           DbgConnect(!"PinHole += %i (Fallback)\n",iConCnt)
+                           if bDraw=0 then 
+                              DbgConnect(!"PinHole += %i (Fallback)\n",iConCnt)
+                           end if
                            tSnap.lPinHoleCnt  += iConCnt
                            '#ifndef __Tester
                            'puts("!!! FALLBACK PINHOLE !!!")
                            '#endif
-                        case spAxle    
-                           DbgConnect(!"Axle += %i (Fallback)\n",iConCnt)
+                        case spAxle
+                           if bDraw=0 then 
+                              DbgConnect(!"Axle += %i (Fallback)\n",iConCnt)
+                           end if
                            tSnap.lAxleCnt     += iConCnt
                         case spAxleHole
-                           DbgConnect(!"AxleHole += %i (Fallback)\n",iConCnt)
+                           if bDraw=0 then 
+                              DbgConnect(!"AxleHole += %i (Fallback)\n",iConCnt)
+                           end if
                            tSnap.lAxleHoleCnt += iConCnt
                         end select
                      end if
@@ -585,14 +728,16 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                   'next N
                   
                   PushAndMultMatrix( @fMatrix(0) )                  
-                  SnapModel( pSubPart , tSnap , pRoot )
-                  PopMatrix()                  
+                  SnapModel( pSubPart , tSnap , bDraw , pRoot )
+                  PopMatrix()
                end with               
             end if
          end with
       next N
    end with   
 end sub
+
+
 
 sub DrawLimitsCube( xMin as single , xMax as single , yMin as single , yMax as single , zMin as single , zMax as single )
 
