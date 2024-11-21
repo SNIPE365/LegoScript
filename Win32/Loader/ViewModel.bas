@@ -61,42 +61,43 @@ var sPath = environ("userprofile")+"\Desktop\LDCAD\"
 '{SNAP_CYL} - <[gender=F] [caps=none] [secs=R 6 6   A 6 6   R 4 16] [slide=true] [pos=0 24 0]>
 
 '3044a 'Regx for good files = ^1.*\.dat
-var sFile = "3023.dat"
+'var sFile = "3023.dat"
 'var sFile = "3626cp0p.dat"
 'var sFile = "65826.dat" 'no shadow pin?
-'var sFile = "4274.dat" 'Duplicated Stud (bigger lock compressible cylinder)?? (still wrong stud count?)
-'var sFile = "3749.dat" 'axle+pin (duplicated axles) (no barhole!!)
-'var sFile = "18651.dat" 'axle+pin (duplicated axles) (the only one of this class with barhole)
+'var sFile = "4274.dat" 'Duplicated Stud (bigger lock compressible cylinder)?? (still wrong stud count?) [!bad orientation?]
+'var sFile = "3749.dat" 'axle+pin (duplicated axles) (no barhole!!) [!bad center?]
+'var sFile = "18651.dat" 'axle+pin (duplicated axles) (the only one of this class with barhole) [!bad orientation?]
 'var sFile = "3024.dat" 'duplicated clutches (CHECK: unknown male)
-'var sFile = "3044a.dat" 'square clutches in a grid can slide? (or need hardcoded slide?) [!bad center?]
 'var sFile = "18654.dat" 'pinhole (hollow pin = 2 clutches)
-''var sFile = "32006.dat" 'pinholes+axlehole+clutch (duplicated axlehole both sides???????)
-''var sFile = "4589.dat" ' axlehole with clutch (bigger hollow stud?) (duplicated axlehole both sides?????)
+'var sFile = "32006.dat" 'pinholes+axlehole+clutch (duplicated axlehole both sides???????)
+'var sFile = "4589.dat" ' axlehole with clutch (bigger hollow stud?) (duplicated axlehole both sides?????) [!bad orientation?]
 'var sFile = "87994.dat" 'bar
-
 'var sFile = "3461.dat" 'have a (king)fat pinhole (maybe add a fat clutch/pinhole class?)
-'var sFile = "967.dat"  'have a (king)pin
+'var sFile = "967.dat"  'have a (king)pin [??bad center??]
 'var sFile = "3011.dat" 'duplo (extra clutches)
 'var sFile = "3001.dat" 'clutches as aliases?
-'var sFile = "4070.dat"
+'var sFile = "3044a.dat" 'square clutches in a grid can slide? (or need hardcoded slide?) 
+
+'var sFile = "4070.dat" '[!bad center]
+'var sFile = "11203.dat" 'inverted tile '[!bad centering! (good test)] {?} '[grid centering?]
+'var sFile = "32124.dat" '(axle holes) [!outside! female round] '[grid centering?]
+'var sFile = "2711.dat" '(grid pinhole!! duplicated clutches (2711+steerend) [!outside! female round] '[!bad orientation]
+
 'var sFile = "78329.dat"
 'var sFile = "axlehole.dat"
-'var sFile = "2711.dat" '(grid pinhole!! duplicated clutches (2711+steerend) [!outside! female round]
 'var sFile = "steerend.dat"
-'var sFile = "32124.dat" '(axle holes) [!outside! female round]
 'var sFile = sPath+"\LDraw\parts\17715.dat" (removed??)
 'var sFile = "15588.dat" 'alias of 48092 (need extra aliases clutches?)
 'var sFile = "48092.dat"
 'var sFile = "stud.dat"
-''var sFile = "18651.dat" '(big axle that could have one extra virtual axle?) [!rotated!]
-''var sFile = "3703.dat" '(included shadow over a grid... TODO: implement!)
-'var sFile = "3003.dat" 'Shadow: SNAP_INCL
+'var sFile = "18651.dat" '(big axle that could have one extra virtual axle?) [!bad orientation!]
+''var sFile = "3703.dat" '(included shadow over a grid... TODO: implement!) (SNAP_INCL)
+''var sFile = "3003.dat" 'Shadow: SNAP_INCL
 ''var sFile = "3004.dat" 'Shadow: SNAP_INCL (name ref? duplicated clutches? (ignore?) TODO!)
 'var sFile = "4531.dat" 'Shadow: SNAP_* (hinges, TODO: later implement)
-'var sFile = "3673.dat" 'Shadow: SNAP_CLEAR (extra pin, missing barhole?) [!rotated!]
+'var sFile = "3673.dat" 'Shadow: SNAP_CLEAR (extra pin, missing barhole?) [!good orientation?!]
 'var sFile = "3002.dat" 'same class of piece as 3001.dat
 'var sFile = "3022.dat" 'same class of piece as 3001.dat
-'var sFile = "11203.dat" 'inverted tile '[!outside! inverted?]
 'var sFile = "2431.dat" 'tile
 'var sFile = "35459.dat" 'tile
 'var sFile = "32530.dat" 'OK 6 clutches , 2 pinholes

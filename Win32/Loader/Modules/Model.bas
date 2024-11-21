@@ -362,17 +362,18 @@ for iY as long = 0 to 31
    FeMaleStipple(iY) = iif(iY and 1,&hAAAAAAAA,&h55555555)
 next iY
 
-sub DrawMaleShape( fX_ as single , fY_ as single , fZ_ as single , fRadius as single , fLength as single , bRound as byte )
-   dim as single fVec(2) = {fX_,fY_,fZ_}
+sub DrawMaleShape( fX as single , fY as single , fZ as single , fRadius as single , fLength as single , bRound as byte )
+   'dim as single fVec(2) = {fX_,fY_,fZ_}
    'MultiplyMatrixVector( @fVec(0) )
-   #define FX fVec(0)
-   #define FY fVec(1)
-   #define FZ fVec(2)
+   '#define FX fVec(0)
+   '#define FY fVec(1)
+   '#define FZ fVec(2)   
    
    glEnable( GL_POLYGON_STIPPLE )
-   glPushMatrix()
+   glPushMatrix()   
+   glLoadCurrentMatrix()
    glTranslatef( fX , fY-fLength/2.0 , fZ )
-   glRotatef( 90 , 1,0,0 )   
+   glRotatef( 90 , 1,0,0 )      
    glPolygonStipple(	cptr(glbyte ptr,@MaleStipple(0)) )   
    glColor3f( 1 , 1 , 0 )   
    if bRound then
@@ -385,16 +386,17 @@ sub DrawMaleShape( fX_ as single , fY_ as single , fZ_ as single , fRadius as si
    glPopMatrix()
    glDisable( GL_POLYGON_STIPPLE )
 end sub
-sub DrawFemaleShape( fX_ as single , fY_ as single , fZ_ as single , fRadius as single , fLength as single , bRound as byte )
-   dim as single fVec(2) = {fX_,fY_,fZ_}
+sub DrawFemaleShape( fX as single , fY as single , fZ as single , fRadius as single , fLength as single , bRound as byte )   
+   'dim as single fVec(2) = {fX_,fY_,fZ_}
    'MultiplyMatrixVector( @fVec(0) )
-   #define FX fVec(0)
-   #define FY fVec(1)
-   #define FZ fVec(2)   
+   '#define FX fVec(0)
+   '#define FY fVec(1)
+   '#define FZ fVec(2)   
    glEnable( GL_POLYGON_STIPPLE )
-   glPushMatrix()
+   glPushMatrix()   
+   glLoadCurrentMatrix()
    glTranslatef( fX , fY-fLength/2.0 , fZ )   
-   glRotatef( 90 , 1,0,0 )
+   glRotatef( 90 , 1,0,0 )   
    glPolygonStipple(	cptr(glbyte ptr,@FeMaleStipple(0)) )
    glColor3f( 1 , 0 , 0 )   
    if bRound then      
@@ -418,14 +420,17 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
          #ifndef __Tester
          if bDraw=0 then printf(!"Shadow Entries=%i (%s)\n",.iShadowCount,GetPartName(pPart))
          #endif
+         
          var iIdent = 2, iPrevRec = 0         
-         var pMat = @tMatrixStack(g_CurrentMatrix)
-         var fYScale = pMat->fScaleY , YScale = cint(fYScale)
+         'var pMat = @tMatrixStack(g_CurrentMatrix)
+         'var fYScale = (pMat->fScaleY) , YScale = cint(fYScale)
+         'const fYScale = 1 , YScale = 1
          
          for N as long = 0 to .iShadowCount-1
             with .paShadow[N]
                select case .bType
                case sit_Include
+                  if bDraw=0 then puts("sit_Include")
                   iIdent += 2
                case sit_Cylinder
                   static as zstring ptr pzCaps(...)={@"none",@"one",@"two",@"A",@"B"}
@@ -434,23 +439,28 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                                     
                   
                   #ifndef __Tester                  
-                  if bDraw then
+                  if bDraw then                     
                      
-                     if .bFlagOriMat then                     
-                        dim as single fMatrix(15) = { _
+                     if .bFlagOriMat then                        
+                        dim as single fMatrix(15) = { _                           
                           .fOri(0) , .fOri(3) , .fOri(6) , 0 , _ 'X scale ,    0?   ,   0?    , 0 
-                          .fOri(1) , .fOri(4) , .fOri(7) , 0 , _ '  0?    , Y Scale ,   0?    , 0 
+                          .fOri(1) , .fOri(4),  .fOri(7) , 0 , _ '  0?    , Y Scale ,   0?    , 0 
                           .fOri(2) , .fOri(5) , .fOri(8) , 0 , _ '  0?    ,    0?   , Z Scale , 0 
-                             0     ,    0     ,     0    , 1 }   ' X Pos  ,  Y Pos  ,  Z Pos  , 1 
+                            0      ,    0    ,    0     , 1 }
+                          '-.fPosX  ,  -.fPosY , -.fPosZ  , 1 }   ' X Pos  ,  Y Pos  ,  Z Pos  , 1 
                         PushAndMultMatrix( @fMatrix(0) )
                      end if
                      
-                     #define __Position__ fCenX+fOffX+.fPosX+pMat->fPosX , fCenY+.fPosY+pMat->fPosY , fCenZ+fOffZ+.fPosZ+pMat->fPosZ
+                     'var pMat = @tMatrixStack(g_CurrentMatrix)
+                     'var fYScale = (pMat->fScaleY) , YScale = cint(fYScale)
+                     
+                     '#define __Position__ fCenX+fOffX+.fPosX+pMat->fPosX , fCenY+.fPosY+pMat->fPosY , fCenZ+fOffZ+.fPosZ+pMat->fPosZ
+                     #define __Position__ fCenX+fOffX+.fPosX , fCenY+.fPosY , fCenZ+fOffZ+.fPosZ
                      var xCnt=0 , zCnt=0 , fStartX=0f , fOffZ=0f
                      if .bFlagHasGrid then 
                         xCnt = abs(.tGrid.xCnt)-1 : zCnt = abs(.tGrid.zCnt)-1
                         if .tGrid.xCnt < 0 then fStartX = ((xCnt)*.tGrid.Xstep)/-2 '.tGrid.Xstep/-2
-                        if .tGrid.zCnt < 0 then fOffZ   = ((zCnt)*.tGrid.Xstep)/-2 '.tGrid.ZStep/-2
+                        if .tGrid.zCnt < 0 then fOffZ   = ((zCnt)*.tGrid.Zstep)/-2 '.tGrid.ZStep/-2
                      end if
                      for iZ as long = 0 to zCnt
                         var fOffX = fStartX
@@ -464,13 +474,19 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                               case else      : continue for 'skip
                               end select  
                               dim as single fCenX,fCenY,fCenZ
-                              if .bFlagCenter then 
-                                 fCenY = (p->bLength*fYScale)/2
-                              end if                              
-                              if .bFlagMale then
-                                 DrawMaleShape( __Position__ , p->wFixRadius/100 , p->bLength*fYScale , bRound ) 
+                              var pMat = @tMatrixStack(g_CurrentMatrix)
+                              if .bFlagCenter then                                 
+                                 'fCenY = (p->bLength*fYScale)/-2
+                                 'fCenY = (p->bLength*(pMat->fScaleY))/-2
+                                 fCenY = p->bLength/-2
+                                 fCenZ += .fPosY
                               else
-                                 DrawFemaleShape( __Position__ , p->wFixRadius/100 , p->bLength*fYScale , bRound )
+                                 'continue for
+                              end if                              
+                              if .bFlagMale then                                 
+                                 DrawMaleShape( __Position__ , p->wFixRadius/100 , p->bLength , bRound ) 
+                              else
+                                 DrawFemaleShape( __Position__ , p->wFixRadius/100 , p->bLength , bRound ) '*(pMat->fScaleY)
                               end if
                               
                            next I
@@ -480,7 +496,8 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                      next iZ                     
                      if .bFlagOriMat then PopMatrix()
                   else
-                     #define __Position__ .fPosX+pMat->fPosX , .fPosY+pMat->fPosY , .fPosZ+pMat->fPosZ
+                     '#define __Position__ .fPosX+pMat->fPosX , .fPosY+pMat->fPosY , .fPosZ+pMat->fPosZ
+                     #define __Position__ .fPosX , .fPosY , .fPosZ
                      printf(!"%sSecs=%i Gender=%s Caps=%s HasGrid=%s GridX=%i GridZ=%i (Pos=%g,%g,%g)",space(iIdent), _
                      .bSecCnt , iif(.bFlagMale,"M","F") , pzCaps(.bCaps) , iif(.bFlagHasGrid,"Yes","No") , _
                      abs(.tGrid.xCnt) , abs(.tGrid.zCnt) , __Position__ )
@@ -490,7 +507,8 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                      static as zstring ptr pzSecs(...)={@"Invalid",@"Round",@"Axle",@"Square",@"FlexPrev",@"FlexNext"}                     
                      with .tSecs(I)
                         #ifndef __Tester 
-                        if bDraw=0 then printf(" %s(%g %g)",pzSecs(.bShape),.wFixRadius/100,.bLength*fYScale)
+                        var pMat = @tMatrixStack(g_CurrentMatrix)
+                        if bDraw=0 then printf(" %s(%g %g)",pzSecs(.bShape),.wFixRadius/100,.bLength*(pMat->fScaleY))
                         #endif
                      end with
                   next I      
@@ -570,8 +588,9 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                            'bConType = spPinHole
                            var iMaybePins = 0
                            dim as byte bDidAxleHole,bDidClutch,bDidBarHole
-                           for I as long = 0 to .bSecCnt-1                              
-                              if .tSecs(I).bLength*YScale = 1 then
+                           for I as long = 0 to .bSecCnt-1
+                              var pMat = @tMatrixStack(g_CurrentMatrix)
+                              if .tSecs(I).bLength*((pMat->fScaleY)) = 1 then
                                  if bDraw=0 then puts("Length 1 section ignored")
                                  bSecs -= 1 : continue for 'ignore length=1 sections
                               end if
@@ -713,7 +732,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                'continue for
                with ._1
                   var pSubPart = g_tModels(.lModelIndex).pModel
-                  'var sName = *cptr(zstring ptr,strptr(g_sFilenames)+g_tModels(.lModelIndex).iFilenameOffset+6)
+                  
                   
                   dim as single fMatrix(15) = { _
                     .fA , .fD , .fG , 0 , _ 'X scale ,    0?   ,   0?    , 0 
@@ -721,6 +740,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                     .fC , .fF , .fI , 0 , _ '  0?    ,    0?   , Z Scale , 0 
                     .fX , .fY , .fZ , 1 }   ' X Pos  ,  Y Pos  ,  Z Pos  , 1 
                   
+                  'var sName = *cptr(zstring ptr,strptr(g_sFilenames)+g_tModels(.lModelIndex).iFilenameOffset+6)
                   'puts(sName)                  
                   'for N as long = 0 to 15
                   '   printf("%f ",fMatrix(N))
