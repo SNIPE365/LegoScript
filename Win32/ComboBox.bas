@@ -1,11 +1,44 @@
-#include "windows.bi"
-#include "fbgfx.bi"
-#include "fbthread.bi"
+#include once "windows.bi"
+#include once "fbgfx.bi"
+#include once "fbthread.bi"
 
 #define __Main
+#define __NoRender
 
 'kill exepath+"\PartCache.bin"
 #include "Loader\PartSearch.bas"
+
+#if 1
+   #include "Loader\LoadLDR.bas"
+   '#include "Loader\Include\Colours.bas"
+   '#include "Loader\Modules\Math3D.bas"
+   '#include "Loader\Modules\Normals.bas"
+   #include "Loader\Modules\Matrix.bas"
+   #include "Loader\Modules\Model.bas"
+#endif
+
+'SnapModel( pModel , tSnap )
+'with tSnap   
+'   printf(!"Studs=%i Clutchs=%i Aliases=%i Axles=%i Axlehs=%i Bars=%i Barhs=%i Pins=%i Pinhs=%i\n", _
+'   .lStudCnt , .lClutchCnt , .lAliasCnt , .lAxleCnt , .lAxleHoleCnt ,.lBarCnt , .lBarHoleCnt , .lPinCnt , .lPinHoleCnt )
+'   puts("---------- stud ----------")
+'   for N as long = 0 to .lStudCnt-1
+'      with .pStud[N]
+'         printf(!"#%i %g %g %g\n",N+1,.fPX,.fPY,.fPZ)
+'      end with
+'   next N
+'   puts("--------- clutch ---------")
+'   for N as long = 0 to .lClutchCnt-1
+'      with .pClutch[N]
+'         printf(!"#%i %g %g %g\n",N+1,.fPX,.fPY,.fPZ)
+'      end with
+'   next N
+'end with'
+'puts("3001 <2> B1 s7 = 3001 <2> B2 c1;")
+'puts("")
+'puts("3001 B1 s7 = 3001 B2 c1;")
+'puts("1 0 40 -24 -20 1 0 0 0 1 0 0 0 1 3001.dat")
+'puts("1 0 0 0 0 1 0 0 0 1 0 0 0 1 3001.dat")
 
 'https://img.bricklink.com/ItemImage/PL/30473.png
 'TODO: improve the tokenizer to keep track of the command token by token
@@ -26,6 +59,9 @@
 
 'BUG i cant find 3002.dat (Brick 2L x 3L x 1B) even if I hit all of the above 
 ' shortcut keys so therefore it does not auto-insert ' B' after the part ID.
+
+'LS -> LDCAD
+
 
 dim shared as HWND g_hCon=any,g_hContainer=any  'console/container
 dim shared as HWND g_hSearch=any,g_hStatus=any 'controls

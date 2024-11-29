@@ -48,6 +48,7 @@ function GetPartName( pPart as DATFile ptr ) as string
    next I
 end function
 
+#ifndef __NoRender
 sub RenderModel( pPart as DATFile ptr , iBorders as long , uCurrentColor as ulong = &h70605040 , uCurrentEdge as ulong = 0 DebugPrimParm )
    if uCurrentColor = &h70605040 then uCurrentColor = g_Colours(c_Blue) : uCurrentEdge = g_EdgeColours(c_Blue)
    
@@ -236,6 +237,7 @@ sub RenderModel( pPart as DATFile ptr , iBorders as long , uCurrentColor as ulon
       iOnce = 1
    end with   
 end sub
+#endif
 
 type PartSize
    as single xMin , xMax
@@ -338,12 +340,16 @@ sub SizeModel( pPart as DATFile ptr , tSize as PartSize , pRoot as DATFile ptr =
    end with   
 end sub
 
-#ifdef __Tester
+#if defined(__Tester) orelse (not defined(DebugShadow))
    #define DbgConnect rem
 #else
    #define DbgConnect printf
 #endif
 
+type SnapPV
+   as float fPX,fPY,fPZ 'position
+   as float fVX,fVy,fVZ 'direction vector
+end type
 type PartSnap
    lStudCnt     as long
    lClutchCnt   as long
@@ -354,20 +360,40 @@ type PartSnap
    lBarHoleCnt  as long
    lPinCnt      as long
    lPinHoleCnt  as long   
+   as SnapPV ptr pStud,pClutch
 end type
 
+sub SnapAddStud( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) )
+   with tSnap
+      for N as long = 0 to iCnt-1
+        .lStudCnt += 1
+        .pStud = reallocate(.pStud,sizeof(tPV)*.lStudCnt)
+        .pStud[.lStudCnt-1] = tPV
+      next N
+   end with
+end sub
+sub SnapAddClutch( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) )
+   with tSnap
+      for N as long = 0 to iCnt-1
+        .lClutchCnt += 1
+        .pClutch = reallocate(.pClutch,sizeof(tPV)*.lClutchCnt)
+        .pClutch[.lClutchCnt-1] = tPV
+      next N
+   end with
+end sub   
+
+#ifndef __NoRender
 static shared as ulong MaleStipple(32-1), FemaleStipple(32-1)
 for iY as long = 0 to 31         
    MaleStipple(iY)   = iif(iY and 1,&h55555555,&hAAAAAAAA)
    FeMaleStipple(iY) = iif(iY and 1,&hAAAAAAAA,&h55555555)
 next iY
-
 sub DrawMaleShape( fX as single , fY as single , fZ as single , fRadius as single , fLength as single , bRound as byte )
    'dim as single fVec(2) = {fX_,fY_,fZ_}
    'MultiplyMatrixVector( @fVec(0) )
    '#define FX fVec(0)
    '#define FY fVec(1)
-   '#define FZ fVec(2)   
+   '#define FZ fVec(2)
    
    glEnable( GL_POLYGON_STIPPLE )
    glPushMatrix()   
@@ -410,15 +436,25 @@ sub DrawFemaleShape( fX as single , fY as single , fZ as single , fRadius as sin
    glPopMatrix()
    glDisable( GL_POLYGON_STIPPLE )
 end sub
-
+#endif
 
 sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false , pRoot as DATFile ptr = NULL )
-         
+   #ifdef __NoRender
+   bDraw=false
+   #endif
    if pRoot = NULL then pRoot = pPart        
    with *pPart
+      if .fSizeZ=0 then
+         dim as PartSize tSz : SizeModel( pPart , tSz )
+         .fSizeX = tSz.xMax - tSz.xMin
+         .fSizeY = tSz.yMax - tSz.yMin
+         .fSizeZ = tSz.zMax - tSz.zMin
+      end if
       if .iShadowCount then
          #ifndef __Tester
-         if bDraw=0 then printf(!"Shadow Entries=%i (%s)\n",.iShadowCount,GetPartName(pPart))
+            #ifdef DebugShadow
+               if bDraw=0 then printf(!"Shadow Entries=%i (%s)\n",.iShadowCount,GetPartName(pPart))
+            #endif
          #endif
          
          var iIdent = 2, iPrevRec = 0         
@@ -428,6 +464,14 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
          
          for N as long = 0 to .iShadowCount-1
             with .paShadow[N]
+               dim as single fPX = .fPosX , fPY = .fPosY , fPZ = .fPosZ
+               var pG = @.tGrid 'grid xCnt,zCnt,xStep,zStep
+               var pMat = @tMatrixStack(g_CurrentMatrix)
+               var xCnt = abs(.tGrid.xCnt)-1 , zCnt = abs(.tGrid.zCnt)-1
+               if .bFlagHasGrid then
+                  if .tGrid.xCnt < 0 then fPX += (xCnt*.tGrid.Xstep)/-2 '.tGrid.Xstep/-2
+                  if .tGrid.zCnt < 0 then fpZ += (zCnt*.tGrid.Zstep)/-2 '.tGrid.ZStep/-2
+               end if
                select case .bType
                case sit_Include
                   if bDraw=0 then puts("sit_Include")
@@ -436,10 +480,10 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                   static as zstring ptr pzCaps(...)={@"none",@"one",@"two",@"A",@"B"}
                   if iPrevRec>.bRecurse then iIdent -= 2
                   iPrevRec=.bRecurse '4
-                                    
                   
-                  #ifndef __Tester                  
-                  if bDraw then                     
+                  #ifndef __Tester                   
+                  #ifndef __NoRender
+                  if bDraw then
                      
                      if .bFlagOriMat then                        
                         dim as single fMatrix(15) = { _                           
@@ -449,6 +493,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                             0      ,    0    ,    0     , 1 }
                           '-.fPosX  ,  -.fPosY , -.fPosZ  , 1 }   ' X Pos  ,  Y Pos  ,  Z Pos  , 1 
                         PushAndMultMatrix( @fMatrix(0) )
+                        puts("Origin!")
                      end if
                      
                      'var pMat = @tMatrixStack(g_CurrentMatrix)
@@ -480,11 +525,22 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                                  'fCenY = (p->bLength*(pMat->fScaleY))/-2
                                  fCenY = p->bLength/-2
                                  fCenZ += .fPosY
+                                 puts("Center flag")
                               else
                                  'continue for
                               end if                              
                               if .bFlagMale then                                 
+                                 'if bDraw=2 then
+                                    'printf( !"%g %g %g\n" , __Position__ )
+                                    'with tMatrixStack(g_CurrentMatrix)
+                                    '   printf(!"[ %g %g %g %g\n",.m( 0),.m( 1),.m( 2),.m( 3))
+                                    '   printf(!"  %g %g %g %g\n",.m( 4),.m( 5),.m( 6),.m( 7))
+                                    '   printf(!"  %g %g %g %g\n",.m( 8),.m( 9),.m(10),.m(11))
+                                    '   printf(!"  %g %g %g %g ]\n",.m(12),.m(13),.m(14),.m(15))
+                                    'end with
+                                 'end if                                 
                                  DrawMaleShape( __Position__ , p->wFixRadius/100 , p->bLength , bRound ) 
+                                 
                               else
                                  DrawFemaleShape( __Position__ , p->wFixRadius/100 , p->bLength , bRound ) '*(pMat->fScaleY)
                               end if
@@ -496,24 +552,34 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                      next iZ                     
                      if .bFlagOriMat then PopMatrix()
                   else
+                  #endif
+                  #ifdef __NoRender
+                  if 1 then
+                  #endif
                      '#define __Position__ .fPosX+pMat->fPosX , .fPosY+pMat->fPosY , .fPosZ+pMat->fPosZ
                      #define __Position__ .fPosX , .fPosY , .fPosZ
-                     printf(!"%sSecs=%i Gender=%s Caps=%s HasGrid=%s GridX=%i GridZ=%i (Pos=%g,%g,%g)",space(iIdent), _
-                     .bSecCnt , iif(.bFlagMale,"M","F") , pzCaps(.bCaps) , iif(.bFlagHasGrid,"Yes","No") , _
-                     abs(.tGrid.xCnt) , abs(.tGrid.zCnt) , __Position__ )
+                     #ifdef DebugShadow
+                        printf(!"%sSecs=%i Gender=%s Caps=%s HasGrid=%s GridX=%i GridZ=%i (Pos=%g,%g,%g)",space(iIdent), _
+                        .bSecCnt , iif(.bFlagMale,"M","F") , pzCaps(.bCaps) , iif(.bFlagHasGrid,"Yes","No") , _
+                        abs(.tGrid.xCnt) , abs(.tGrid.zCnt) , __Position__ )
+                     #endif
                   end if
                   #endif                  
                   for I as long = 0 to .bSecCnt-1
                      static as zstring ptr pzSecs(...)={@"Invalid",@"Round",@"Axle",@"Square",@"FlexPrev",@"FlexNext"}                     
                      with .tSecs(I)
-                        #ifndef __Tester 
-                        var pMat = @tMatrixStack(g_CurrentMatrix)
-                        if bDraw=0 then printf(" %s(%g %g)",pzSecs(.bShape),.wFixRadius/100,.bLength*(pMat->fScaleY))
+                        #ifndef __Tester                            
+                           #ifdef DebugShadow
+                              var pMat = @tMatrixStack(g_CurrentMatrix)
+                              if bDraw=0 then printf(" %s(%g %g)",pzSecs(.bShape),.wFixRadius/100,.bLength*(pMat->fScaleY))
+                           #endif
                         #endif
                      end with
                   next I      
                   #ifndef __Tester
-                  if bDraw=0 then puts("")
+                     #ifdef DebugShadow
+                        if bDraw=0 then puts("")
+                     #endif
                   #endif                  
                   
                   '>>>>> Detect Shape type (stud,clutch,alias,etc...) >>>>>
@@ -526,8 +592,9 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                      end select
                      
                      'negative xCnt/zCnt are "centered"
-                     if .bFlagHasGrid then iConCnt = abs(.tGrid.xCnt)*abs(.tGrid.zCnt)                                           
+                     if .bFlagHasGrid then iConCnt = abs(.tGrid.xCnt)*abs(.tGrid.zCnt)
                      if .bFlagMale then 
+                        var pMat = @tMatrixStack(g_CurrentMatrix)
                         var iIgnore = 0
                         if iConCnt > 1 andalso bDraw=0 then puts("!!!!!! MALE GRID FOUND !!!!!")
                         bConType = spStud
@@ -555,7 +622,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                               tSnap.lPinCnt += iConCnt : bSecs -= 1  'PIN // bConType = spPin : exit for
                               'bSecs -= 1: 'continuation of the pin must be ignored
                               'puts("Pin" & bSecs)
-                           case sss_Round
+                           case sss_Round                              
                               if .tSecs(I).wFixRadius = 800 then
                                  bSecs -= 1 'STOPPER? Ignoring it for now
                                  'puts("Stopper" & bSecs)
@@ -565,6 +632,15 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                                  end if
                                  tSnap.lBarCnt += iConCnt : bSecs -= 1 'BARHOLE
                                  'puts("Bar" & bSecs)
+                              elseif .tSecs(I).wFixRadius = 600 then 'stud
+                                 if bDraw=0 then
+                                    DbgConnect(!"Stud += %i\n",iConCnt)
+                                    'var p = pPart
+                                    with *pMat
+                                       SnapAddStud( tSnap , iConCnt , type(fPX+.fPosX , fPY+.fPosY , fPZ+.fPosZ) )                                       
+                                    end with
+                                 end if                                 
+                                 bSecs -= 1 'stud
                               else
                                  if iIgnore then
                                     iIgnore -= 1 : bSecs -= 1
@@ -588,8 +664,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                            'bConType = spPinHole
                            var iMaybePins = 0
                            dim as byte bDidAxleHole,bDidClutch,bDidBarHole
-                           for I as long = 0 to .bSecCnt-1
-                              var pMat = @tMatrixStack(g_CurrentMatrix)
+                           for I as long = 0 to .bSecCnt-1                              
                               if .tSecs(I).bLength*((pMat->fScaleY)) = 1 then
                                  if bDraw=0 then puts("Length 1 section ignored")
                                  bSecs -= 1 : continue for 'ignore length=1 sections
@@ -604,14 +679,14 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                                  'if there's an axlehole then it can't be a pinhole, and it can't have dual clutches
                                  bSecs -= 1 : iMaybePins=-999 : bSides = 1
                               case sss_Square   
-                                 if bDraw=0 then 
+                                 if bDraw=0 then
                                     DbgConnect(!"Clutch += %i (Square slide)\n",iConCnt)
                                     DbgConnect(!"BarHole += %i (Square slide)\n",iConCnt*bSides)
                                  end if
                                  if bDidClutch=0  then bDidClutch=1  : tSnap.lClutchCnt  += iConCnt
                                  if bDidBarHole=0 then bDidBarHole=1 : tSnap.lBarHoleCnt += iConCnt*bSides
                                  bSecs -= 1 'BARHOLE //bConType = spBarHole: exit for
-                              case sss_Round
+                              case sss_Round                                 
                                  select case .tSecs(I).wFixRadius
                                  case 800: bSecs -= 1 '???? (anti-stopper??)
                                  case 600: iMaybePins += 1 
@@ -625,7 +700,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                               end select
                            next I
                            if iMaybePins>0 then 
-                              if bDraw=0 then 
+                              if bDraw=0 then                                  
                                  DbgConnect(!"Clutch += %i (round slide from pin?)\n",iConCnt*iMaybePins*bSides )
                                  DbgConnect(!"PinHole += %i (round slide )\n", iConCnt*iMaybePins)
                               end if
@@ -652,6 +727,18 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                                     end if
                                     if bDidBarHole=0 then bDidBarHole = 1 : tSnap.lBarHoleCnt += iConCnt*bSides 
                                     bSecs -= 1 'bConType = spBarhole : exit for 'BARHOLE
+                                 elseif .tSecs(I).wFixRadius = 600 then 'clutch?
+                                    if bDraw=0 then 
+                                       DbgConnect(!"Clutch += %i (Round)\n",iConCnt)
+                                       with *pMat                                       
+                                          for iGX as long = 0 to xCnt
+                                             for iGZ as long = 0 to zCnt
+                                                SnapAddClutch( tSnap , 1 , type(fPX+.fPosX+iGX*pG->xStep , fPY+.fPosY , fPZ+.fPosZ+iGZ*pG->zStep) )
+                                             next igZ
+                                          next iGX
+                                       end with
+                                    end if
+                                    bSecs -= 1                                    
                                  end if
                               end select
                            next I  
@@ -666,7 +753,8 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                         select case bConType                           
                         case spStud    
                            if bDraw=0 then 
-                              DbgConnect(!"Stud += %i (Fallback)\n",iConCnt)
+                              'DbgConnect(!"Stud += %i (Fallback)\n",iConCnt)
+                              printf(!"Stud += %i (Fallback)\n",iConCnt)
                            end if
                            tSnap.lStudCnt     += iConCnt
                            '#ifndef __Tester
@@ -676,6 +764,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                            'printf(!"Sides=%i\n",bSides)
                            if bDraw=0 then 
                               DbgConnect(!"Clutch += %i (Fallback)\n",iConCnt)
+                              'printf(!"Clutch += %i (Fallback)\n",iConCnt)
                            end if
                            tSnap.lClutchCnt   += iConCnt '*bSides 
                            '#ifndef __Tester
@@ -757,8 +846,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
    end with   
 end sub
 
-
-
+#ifndef __NoRender
 sub DrawLimitsCube( xMin as single , xMax as single , yMin as single , yMax as single , zMin as single , zMax as single )
 
     glBegin(GL_QUADS)'  // Start drawing the cube with quads
@@ -807,3 +895,4 @@ sub DrawLimitsCube( xMin as single , xMax as single , yMin as single , yMax as s
 
     glEnd()
 end sub
+#endif

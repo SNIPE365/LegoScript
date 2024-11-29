@@ -1,7 +1,9 @@
 #define __Main
 '#define __Tester
-
+'#define DebugShadow
 '#define ColorizePrimatives
+
+'#ifndef __NoRender
 
 #include "LoadLDR.bas"
 
@@ -75,7 +77,7 @@ var sPath = environ("userprofile")+"\Desktop\LDCAD\"
 'var sFile = "3461.dat" 'have a (king)fat pinhole (maybe add a fat clutch/pinhole class?)
 'var sFile = "967.dat"  'have a (king)pin [??bad center??]
 'var sFile = "3011.dat" 'duplo (extra clutches)
-'var sFile = "3001.dat" 'clutches as aliases?
+var sFile = "3001.dat" 'clutches as aliases?
 'var sFile = "3044a.dat" 'square clutches in a grid can slide? (or need hardcoded slide?) 
 
 'var sFile = "4070.dat" '[!bad center]
@@ -211,18 +213,16 @@ dim as string sModel
       sleep : system
    end if
    var pModel = LoadModel( strptr(sModel) , sFile )
-#else   
+#else
    sModel = GetClipboard() 
    if instr(sModel,".dat") then
       for N as long = 0 to len(sModel)
          if sModel[N]=13 then sModel[N]=32
       next N
    else 'if there isnt a model in the clipboard, then load this:
-      sModel = _ 
-      "1 14 0 0 0 1 0 0 0 1 0 0 0 1 3001.dat"     EOL _
-      "1 1 0 24 0 1 0 0 0 1 0 0 0 1 3623.dat"     EOL _
-      "1 4 -38 24 73 1 0 0 0 1 0 0 0 1 34103.dat" EOL _
-      "1 2 46 24 75 1 0 0 0 1 0 0 0 1 77850.dat"  EOL _
+      sModel = _    
+      "1 1 -40 24 20 1 0 0 0 1 0 0 0 1 3001.dat" EOL _
+      "1 1 0 0 0 1 0 0 0 1 0 0 0 1 3001.dat" EOL _      
       ' ------------------------------------------------------
       
       'sModel = _ 'all of lines belo should end with EOL _
@@ -247,8 +247,8 @@ RenderModel( pModel , false )
 RenderModel( pModel , true )
 glEndList()
 
-dim as PartSize tSz
 dim as single xMid,yMid,zMid , g_zFar
+dim as PartSize tSz
 SizeModel( pModel , tSz )
 with tSz
    xMid = (.xMin+.xMax)/2
@@ -273,10 +273,28 @@ end with
 
 dim as PartSnap tSnap
 SnapModel( pModel , tSnap )
-with tSnap
+with tSnap   
    printf(!"Studs=%i Clutchs=%i Aliases=%i Axles=%i Axlehs=%i Bars=%i Barhs=%i Pins=%i Pinhs=%i\n", _
    .lStudCnt , .lClutchCnt , .lAliasCnt , .lAxleCnt , .lAxleHoleCnt ,.lBarCnt , .lBarHoleCnt , .lPinCnt , .lPinHoleCnt )
+   puts("---------- stud ----------")
+   for N as long = 0 to .lStudCnt-1
+      with .pStud[N]
+         printf(!"#%i %g %g %g\n",N+1,.fPX,.fPY,.fPZ)
+      end with
+   next N
+   puts("--------- clutch ---------")
+   for N as long = 0 to .lClutchCnt-1
+      with .pClutch[N]
+         printf(!"#%i %g %g %g\n",N+1,.fPX,.fPY,.fPZ)
+      end with
+   next N
 end with
+
+'puts("3001 <2> B1 s7 = 3001 <2> B2 c1;")
+puts("")
+puts("3001 B1 s7 = 3001 B2 c1;")
+puts("1 0 40 -24 -20 1 0 0 0 1 0 0 0 1 3001.dat")
+puts("1 0 0 0 0 1 0 0 0 1 0 0 0 1 3001.dat")
 
 dim as double dRot = timer
 dim as boolean bBoundingBox
@@ -311,41 +329,47 @@ do
    
    
    dim as PartSnap tSnap = any
-   SnapModel( pModel , tSnap , true )
+   static as byte bOnce
+   'if bOnce=0 then
+      'SnapModel( pModel , tSnap , 2 )
+      'bOnce=1
+   'else
+      SnapModel( pModel , tSnap , true )
+   'end if
 
    #if 0
-   glEnable( GL_POLYGON_STIPPLE )
-   
-   'SnapModel( pModel , tSnap )
-   
-   #if 0 
-      glPushMatrix()
-      glTranslatef( 10 , -2f , 0 ) '/-5)
-      glRotatef( 90 , 1,0,0 )
-      glScalef( 2 , 2 , (4.0/6.0) ) 'square
-      'glScalef( 8f/7f , 8f/7f , (4.0/6.0)*(5f/7f) ) 'cylinder
-      glPolygonStipple(	cptr(glbyte ptr,@MaleStipple(0)) )   
-      glColor3f( 0 , 1 , 0 )
-      'glutSolidSphere( 6 , 18 , 7 ) 'male round (.5,.5,N\2)
-      glutSolidCube(6) 'male square (1,1,N)
-      glPopMatrix()
-   #endif   
-   #if 0
-      glPushMatrix()
-      glTranslatef( 10 , -2f , 0 )
+      glEnable( GL_POLYGON_STIPPLE )
       
-      glRotatef( 90 , 1,0,0 )
-      glRotatef( 45 , 0,0,1 ) 'square
-      glScalef( 1 , 1 , 4 )      
+      'SnapModel( pModel , tSnap )
       
-      glPolygonStipple(	cptr(glbyte ptr,@FeMaleStipple(0)) )
-      glColor3f( 1 , 0 , 0 )   
-      glutSolidTorus( 0.5 , 6 , 18 , 4  ) 'female "square" (.5,.5,N*8)
-      'glutSolidTorus( 0.5 , 6 , 18 , 18 ) 'female round? (.5,.5,N*8)
-      glPopMatrix()
-   #endif
-   
-   glDisable( GL_POLYGON_STIPPLE )
+      #if 0 
+         glPushMatrix()
+         glTranslatef( 10 , -2f , 0 ) '/-5)
+         glRotatef( 90 , 1,0,0 )
+         glScalef( 2 , 2 , (4.0/6.0) ) 'square
+         'glScalef( 8f/7f , 8f/7f , (4.0/6.0)*(5f/7f) ) 'cylinder
+         glPolygonStipple(	cptr(glbyte ptr,@MaleStipple(0)) )   
+         glColor3f( 0 , 1 , 0 )
+         'glutSolidSphere( 6 , 18 , 7 ) 'male round (.5,.5,N\2)
+         glutSolidCube(6) 'male square (1,1,N)
+         glPopMatrix()
+      #endif   
+      #if 0
+         glPushMatrix()
+         glTranslatef( 10 , -2f , 0 )
+         
+         glRotatef( 90 , 1,0,0 )
+         glRotatef( 45 , 0,0,1 ) 'square
+         glScalef( 1 , 1 , 4 )      
+         
+         glPolygonStipple(	cptr(glbyte ptr,@FeMaleStipple(0)) )
+         glColor3f( 1 , 0 , 0 )   
+         glutSolidTorus( 0.5 , 6 , 18 , 4  ) 'female "square" (.5,.5,N*8)
+         'glutSolidTorus( 0.5 , 6 , 18 , 18 ) 'female round? (.5,.5,N*8)
+         glPopMatrix()
+      #endif
+      
+      glDisable( GL_POLYGON_STIPPLE )
    #endif
    
    if bBoundingBox then         

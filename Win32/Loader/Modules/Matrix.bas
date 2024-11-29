@@ -63,8 +63,10 @@ sub MultiplyMatrixVector( pVec as single ptr )
       pVec[2] = .m(2) * fX + .m(6) * fY + .m(10) * fZ + .m(14)
    end with
 end sub
+#ifndef __NoRender
 sub glLoadCurrentMatrix()
    'with tMatrixStack(g_CurrentMatrix)
    'glLoadMatrixf( @tMatrixStack(g_CurrentMatrix).m(0) )
    glMultMatrixf( @tMatrixStack(g_CurrentMatrix).m(0) )   
 end sub
+#endif

@@ -141,14 +141,17 @@ type PartStruct
       _3 as LineType3Struct
       _4 as LineType4Struct
       _5 as LineType5Struct      
-   end union   
+   end union
 end type
 
 type DATFile
   iPartCount      as long                  'number of parts in this file
+  fSizeX          as single     'X Size
+  fSizeY          as single     'Y Size
+  fSizeZ          as single     'Z Size
   'this info is filled dynamically based on studs/clutches etc... (also including the shadow info)
   iShadowCount    as long                  'number of entries in the shadow dynamic array
-  paShadow        as ShadowStruct ptr
+  paShadow        as ShadowStruct ptr  
   as PartStruct tParts( (1 shl 25)-1 ) 'maximum number of parts (dynamic)
 end type
 type ModelList

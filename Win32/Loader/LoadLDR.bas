@@ -2,9 +2,9 @@
   #error " Don't compile this one"
 #endif  
 
-#cmdline "-gen gcc -O 3"
-#include "crt.bi"
-#include "vbcompat.bi"
+'#cmdline "-gen gcc -O 3"
+#include once "crt.bi"
+#include once "vbcompat.bi"
 
 #define RGBA_R( c ) ( CUInt( c ) Shr 16 And 255 )
 #define RGBA_G( c ) ( CUInt( c ) Shr  8 And 255 )
@@ -17,8 +17,8 @@
 
 const cScale = 1'/20
 
-#include "Include\Structs.bas"
-#include "Include\PartPaths.bas"
+#include once "Include\Structs.bas"
+#include once "Include\PartPaths.bas"
 
 'dim shared as string g_sLog
 dim shared as string g_sFilenames,g_sFilesToLoad
@@ -159,6 +159,8 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
                clear *pNew , 0 , sizeof(ShadowStruct)
                pNew->bType       = sit_Include
                pNew->bRecurse    = bRecursion
+               pNew->tGrid.xCnt = 1 : pNew->tGrid.xStep = 0
+               pNew->tGrid.zCnt = 1 : pNew->tGrid.zStep = 0
                dim as string sRefFile
                do
                   #define cvl2(_s) (cvl(_s "  ") and &hFFFFFF)
@@ -236,7 +238,7 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
                      pNew->bFlagHasGrid = true
                      with pNew->tGrid
                         .Xcnt  = lCntX  : .Zcnt  = lCntZ
-                        .Xstep = fStepX : .Zstep = fStepZ
+                        .Xstep = fStepX : .Zstep = fStepZ                        
                      end with
                   case cvl3("ori")   'Mat3x3
                      var pOri = @(pNew->fOri(0)) , pParm = cast(ubyte ptr,strptr(sParms))
@@ -316,6 +318,8 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
                pNew->bType       = sit_Cylinder 
                pNew->bRecurse    = bRecursion
                pNew->bFlagMirror = true 'defaults
+               pNew->tGrid.xCnt = 1 : pNew->tGrid.xStep = 0
+               pNew->tGrid.zCnt = 1 : pNew->tGrid.zStep = 0
                do
                   #define cvl2(_s) (cvl(_s "  ") and &hFFFFFF)
                   #define cvl3(_s) cvl(_s " ")
@@ -458,7 +462,7 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
                      '#endif
                      pNew->bFlagHasGrid = true
                      with pNew->tGrid
-                        .Xcnt  = lCntX  : .Zcnt  = lCntZ
+                        .Xcnt  = lCntX  : .Zcnt  = lCntZ                        
                         .Xstep = fStepX : .Zstep = fStepZ
                      end with
                   case cvl3("ori")   'Mat3x3
