@@ -38,6 +38,12 @@ function GetSubPartType( sPartName as string , bDebug as boolean = false ) as lo
    end if
    return spUnknown
 end function
+function GetPartNameByIndex( iIndex as long ) as string
+   if iIndex < 0 or iIndex >= g_ModelCount then return ""
+   with g_tModels(iIndex)         
+      return *cptr(zstring ptr,strptr(g_sFilenames)+.iFilenameOffset+6)   
+   end with
+end function
 function GetPartName( pPart as DATFile ptr ) as string
    for I as long = 0 to g_ModelCount-1
       with g_tModels(I)

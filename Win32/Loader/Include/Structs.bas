@@ -151,7 +151,8 @@ type DATFile
   fSizeZ          as single     'Z Size
   'this info is filled dynamically based on studs/clutches etc... (also including the shadow info)
   iShadowCount    as long                  'number of entries in the shadow dynamic array
-  paShadow        as ShadowStruct ptr  
+  paShadow        as ShadowStruct ptr
+  pData           as any ptr
   as PartStruct tParts( (1 shl 25)-1 ) 'maximum number of parts (dynamic)
 end type
 type ModelList

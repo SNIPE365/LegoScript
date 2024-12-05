@@ -5,8 +5,6 @@
 #include once "crt.bi"
 #include once "Include\PartPaths.bas"
 
-#define DebugLoading
-
 #macro ForEachPartFlag(_Do)   
    _Do(Donor      ,  0 ) 'what is donor parts
    _Do(Alias      ,  1 ) 'alias to another part
@@ -37,10 +35,11 @@ end enum
 type SearchPartStruct   
    iPartIndex as ulong
    iPrev      as ulong
+   qData      as ulongint
    wFlags     as ushort
    iFolder    as ubyte   
-   bType      as ubyte
-   zDesc      as zstring*116   'piece description (first line)
+   bType      as ubyte   
+   zDesc      as zstring*108   'piece description (first line)
    zName      as zstring*65535 'name limit
 end type
 #if __FB_EVAL__(offsetof(SearchPartStruct,zName)) <> 128  

@@ -16,6 +16,8 @@
 #include "Modules\Matrix.bas"
 #include "Modules\Model.bas"
 
+' TODO make the GUI window so that it can be part of LS in GUI/CLI mode but also part of the lego game.
+
 'https://www.melkert.net/LDCad/tech/meta
 
 'TODO: check shadow library format, Load and parse them??
