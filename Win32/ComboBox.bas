@@ -7,53 +7,16 @@
 '#define DebugLoading
 
 'kill exepath+"\PartCache.bin"
-#include "Loader\PartSearch.bas"
+#include once "Loader\PartSearch.bas"
 
 #if 1
-   #include "Loader\LoadLDR.bas"
+   #include once "Loader\LoadLDR.bas"
    '#include "Loader\Include\Colours.bas"
    '#include "Loader\Modules\Math3D.bas"
    '#include "Loader\Modules\Normals.bas"
-   #include "Loader\Modules\Matrix.bas"
-   #include "Loader\Modules\Model.bas"
+   #include once "Loader\Modules\Matrix.bas"
+   #include once "Loader\Modules\Model.bas"
 #endif
-
-var sFile = "3001.dat"
-dim as string sModel
-FindFile(sFile)
-if LoadFile( sFile , sModel ) = 0 then
-   print "Failed to load '"+sFile+"'"
-   sleep : system
-end if
-
-#if 0
-   var pModel = LoadModel( strptr(sModel) , sFile )
-   var pSnap = cptr(PartSnap ptr,pModel->pData)
-   pSnap = new PartSnap
-   SnapModel( pModel , *pSnap )
-   with *pSnap
-      printf(!"Studs=%i Clutchs=%i Aliases=%i Axles=%i Axlehs=%i Bars=%i Barhs=%i Pins=%i Pinhs=%i\n", _
-      .lStudCnt , .lClutchCnt , .lAliasCnt , .lAxleCnt , .lAxleHoleCnt ,.lBarCnt , .lBarHoleCnt , .lPinCnt , .lPinHoleCnt )
-      puts("---------- stud ----------")
-      for N as long = 0 to .lStudCnt-1
-         with .pStud[N]
-            printf(!"#%i %g %g %g\n",N+1,.fPX,.fPY,.fPZ)
-         end with
-      next N
-      puts("--------- clutch ---------")
-      for N as long = 0 to .lClutchCnt-1
-         with .pClutch[N]
-            printf(!"#%i %g %g %g\n",N+1,.fPX,.fPY,.fPZ)
-         end with
-      next N
-   end with'
-#endif
-
-'puts("3001 <2> B1 s7 = 3001 <2> B2 c1;")
-'puts("")
-'puts("3001 B1 s7 = 3001 B2 c1;")
-'puts("1 0 40 -24 -20 1 0 0 0 1 0 0 0 1 3001.dat")
-'puts("1 0 0 0 0 1 0 0 0 1 0 0 0 1 3001.dat")
 
 'https://img.bricklink.com/ItemImage/PL/30473.png
 'TODO: improve the tokenizer to keep track of the command token by token
@@ -648,78 +611,7 @@ end function
 'puts("1 0 40 -24 -20 1 0 0 0 1 0 0 0 1 3001.dat")
 'puts("1 0 0 0 0 1 0 0 0 1 0 0 0 1 3001.dat")
 
-
-function LegoScriptToLDraw( sScript as string ) as string
-   type fbStr
-      pzData as ubyte ptr
-      Length as long
-      Size   as long
-   end type
-   
-   'split tokens
-   dim as string sStatement, sToken(15)
-   dim as long iStStart=1,iStNext
-   do      
-      'get next statement
-      iStNext = instr(iStStart,sScript,";")
-      var pzFb = cptr(fbStr ptr,@sStatement)
-      with *pzFb
-         .pzData = cptr(ubyte ptr,strptr(sScript))+iStStart-1
-         .Length = iif(iStNext,iStNext,1+len(sScript))-(iStStart)         
-         while .Length>0 andalso (.pzData[0] = 9 orelse .pzData[0] = asc(" "))
-            .pzData += 1 : .Length -= 1
-         wend
-         while .Length>0 andalso (.pzData[.Length-1] = 9 orelse .pzData[.Length-1] = asc(" "))
-            .Length -= 1
-         wend
-         if .Length=0 then 
-            if iStNext=0 then exit do 
-            iStStart = iStNext+1 : continue do
-         end if
-      end with
-      dim as long iTokStart=0,iTokNext,iTokCnt=0,iTokEnd=len(sStatement)
-      'split tokens
-      print "["+sStatement+"]"
-      var pzStatement = cptr(ubyte ptr,strptr(sStatement))
-      do
-         with *cptr(fbStr ptr,@sToken(iTokCnt))
-            .pzData = pzStatement+iTokStart
-            while .pzData[0]=9 orelse .pzData[0]=asc(" ")               
-               if .pzData[0]=0 then exit do
-               .pzData += 1 : iTokStart += 1
-               if iTokStart >= iTokEnd then exit do
-            wend            
-            .Length = 0
-            while .pzData[.Length] <> 9 andalso .pzData[.Length] <> asc(" ")
-               if iTokStart >= iTokEnd then exit while
-               .Length += 1 : iTokStart += 1
-            wend                 
-            if .Length <= 0 then exit do
-            .Size = .Length : iTokCnt += 1 
-         end with         
-      loop 
-      
-      for N as long = 0 to iTokCnt-1
-         print "{"+sToken(N)+"}";
-      next N
-      print
-      
-      if iStNext=0 then exit do else iStStart = iStNext+1      
-   loop
-   
-   
-   'print "[";sToken(iTokCnt);"]"
-   
-   clear @sToken(0),0,16*sizeof(fbStr)
-   clear @sStatement,0,sizeof(fbStr)
-   
-end function
-
-dim as string sText
-var sScript = _
-"3001 B1 s7 = 3001 B2 c1;    ;" _
-"3001 B2 s7 = 3001 B3 c1;"
-print LegoScriptToLDraw(sScript)
+#include "LS2LDR.bas"
 
 'InitSearchWindow()
 'QueryText(sText)

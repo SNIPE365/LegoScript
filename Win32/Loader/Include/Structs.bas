@@ -145,6 +145,7 @@ type PartStruct
 end type
 
 type DATFile
+  iModelIndex     as long
   iPartCount      as long                  'number of parts in this file
   fSizeX          as single     'X Size
   fSizeY          as single     'Y Size
@@ -159,3 +160,11 @@ type ModelList
    iFilenameOffset as long                 'offset for the file name string
    pModel          as DATFile ptr          'ptr to the model structure
 end type   
+
+#define Cast_fbStr( _Str ) cptr( fbStr ptr , @_Str )
+type fbStr
+   pzData as ubyte ptr
+   iLen   as long
+   iSize  as long
+end type
+   

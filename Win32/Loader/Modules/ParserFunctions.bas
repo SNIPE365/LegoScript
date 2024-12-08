@@ -203,7 +203,7 @@ function FindFile( sFile as string ) as long
       sFullPathFile += sFile
       'print sFullPathFile
       if FileExists( sFullPathFile ) then
-         sFile = sFullPathFile : return TRUE         
+         sFile = lcase(sFullPathFile) : return TRUE         
       end if
    next I
    return FALSE

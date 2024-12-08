@@ -609,6 +609,7 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
             pT = pNew
             iFilenameOffset = len(g_sFilenames)
             g_sFilenames += chr(255)+mkl(iModelIndex)+chr(0)+lcase(sFilename)+chr(0)
+            pNew->iModelIndex = iModelIndex
             pNew->iShadowCount = 0
             pNew->pData = NULL
             pNew->paShadow = NULL
