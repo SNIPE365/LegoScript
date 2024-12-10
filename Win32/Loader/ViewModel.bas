@@ -292,7 +292,6 @@ with tSnap
    next N
 end with
 
-'puts("3001 <2> B1 s7 = 3001 <2> B2 c1;")
 puts("")
 puts("3001 B1 s7 = 3001 B2 c1;")
 puts("1 0 40 -24 -20 1 0 0 0 1 0 0 0 1 3001.dat")

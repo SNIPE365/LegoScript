@@ -40,7 +40,7 @@
    end with'
 #endif
 
-'puts("3001 <2> B1 s7 = 3001 <2> B2 c1;")
+'puts("3001 B1 #2 s7 = 3001 B2 #2 c1;")
 'puts("")
 'puts("3001 B1 s7 = 3001 B2 c1;")
 'puts("1 0 40 -24 -20 1 0 0 0 1 0 0 0 1 3001.dat")
@@ -56,20 +56,33 @@ enum ErrorCodes
    ecFailedToLoad
    ecFailedToParse
    ecAlreadyExist
-   ecNoError        = 0
+   ecSuccess        = 0
 end enum   
 
-type PartNameStruct
+type PartStructLS
    sName       as string
+   sPrimative  as string
+   iColor      as long
    iModelIndex as long
+   bFoundPart  as byte
 end type
-
+type PartConnLS
+   iLeftPart  as long
+   iRightPart as long
+   iLeftNum   as short
+   iRightNum  as short
+   iLeftType  as byte   
+   iRightType as byte
+   bResv(1)   as byte
+end type
+   
 static shared as byte g_bSeparators(255)
-static shared as PartNameStruct g_tPart(1023)
-static shared as long g_iNameCount
+static shared as PartStructLS g_tPart(1023)
+static shared as PartConnLS   g_tConn(2047)
+static shared as long g_iPartCount , g_iConnCount = 0
 
 scope
-   var sSeparators = !"\9 "   
+   var sSeparators = !"\9 \r\n"   
    for N as long = 0 to len(sSeparators)-1
       g_bSeparators( sSeparators[N] ) or= stToken
    next N
@@ -87,9 +100,85 @@ function IsTokenNumeric( sToken as string ) as long
    next N
    return true
 end function
-function FindName( sName as string ) as long
+function IsPrimative( sToken as string ) as long
+   if len(sToken)=0 then return false
+   for N as long = 0 to len(sToken)-1
+      select case sToken[0]
+      case asc("a") to asc("z"),asc("0") to asc("9"),asc("_")
+         rem valid chars for primatives
+      case else
+         return false
+      end select
+   next N
+   return true
+end function
+function IsValidPartName( sToken as string ) as long   
+   if len(sToken)=0 then return false
+   select case sToken[0]
+   case asc("A") to asc("Z")
+      rem valid initial chars for part names
+   case else
+      return false
+   end select
+   for N as long = 1 to len(sToken)-1
+      select case sToken[N]
+      case asc("A") to asc("Z"),asc("a") to asc("z")
+         rem valid chars for part names
+      case asc("0") to asc("9"),asc("_")
+         rem valid chars for part names
+      case else
+         return false
+      end select
+   next N
+   return true 
+end function
+
+function ParseColor( sToken as string ) as long
+   var iLen = len(sToken), bHasHex = false, iTokenStart = 1
+   if iLen < 1 orelse sToken[0] <> asc("#") then return ErrInfo(ecFailedToParse)
+   dim as ulong uColor
+   if (iLen-iTokenStart) = 6 then '#RRGGBB
+      for N as long = iTokenStart to iLen-1
+         select case sToken[N]
+         case asc("0") to asc("9"): uColor = uColor*16+sToken[N]-asc("0")
+         case asc("a") to asc("f"): uColor = uColor*16+sToken[N]-asc("a")+10
+         case asc("A") to asc("F"): uColor = uColor*16+sToken[N]-asc("A")+10
+         case else: return ErrInfo(ecFailedToParse)
+         end select
+      next N
+      return uColor+&h1000000
+   elseif (iLen-iTokenStart) = 4 then '#0RGB
+      if sToken[iTokenStart]=asc("0") then
+         iTokenStart += 1 : bHasHex = true
+      end if
+   end if
+   if (iLen-iTokenStart) = 3 then '#RGB
+      if sToken[iTokenStart]=asc("0") then bHasHex = 1
+      for N as long = iTokenStart to iLen-1
+         select case sToken[N]
+         case asc("0") to asc("9"): uColor = uColor*256+(((sToken[N]-asc("0")   )*255)\15)
+         case asc("a") to asc("f"): uColor = uColor*256+(((sToken[N]-asc("a")+10)*255)\15) : bHasHex = 1
+         case asc("A") to asc("F"): uColor = uColor*256+(((sToken[N]-asc("A")+10)*255)\15) : bHasHex = 1
+         case else: return ErrInfo(ecFailedToParse)
+         end select
+      next N
+      if bHasHex then return uColor+&h1000000
+   end if
+   'decimal color index
+   uColor = 0
+   for N as long = iTokenStart to iLen-1
+      select case sToken[N]
+      case asc("0") to asc("9"): uColor = uColor*10+sToken[N]-asc("0")
+      case else: return ErrInfo(ecFailedToParse)
+      end select      
+      if uColor > 10999 then return ErrInfo(ecFailedToParse)
+   next N
+   return uColor
+end function
+
+function FindPartName( sName as string ) as long
    if len(sName) < 1 then return ErrInfo(ecNotFound)
-   for N as long = 0 to g_iNameCount-1
+   for N as long = 0 to g_iPartCount-1
       with g_tPart(N)
          if .sName = sName then return N
       end with
@@ -106,41 +195,69 @@ function FindModelIndex( sPart as string ) as long
    loop
    return *cptr(long ptr,@g_sFilenames[iPos-4])
 end function  
+function LoadPartModel( byref tPart as PartStructLS ) as long
+   with tPart
+      if .iModelIndex >= 0 then return ErrInfo(ecSuccess) 'already loaded
+      'load model
+      dim as string sModel
+      if LoadFile( .sPrimative , sModel ) = 0 then return ErrInfo(ecFailedToLoad) 'part failed to load file
+      var pModel = LoadModel( strptr(sModel) , .sPrimative )                      
+      if pModel=0 then return ErrInfo(ecFailedToParse)                      'part failed to parse
+      .iModelIndex = pModel->iModelIndex : .sPrimative = ""
+      'generate snap if not generated yet
+      'var pModel = g_tModels(.iModelIndex).pModel
+      if pModel->pData = 0 then   
+         pModel->pData = new PartSnap
+         var pSnap = cptr(PartSnap ptr,pModel->pData)
+         SnapModel( pModel , *pSnap )
+      end if
+   end with
+   return ErrInfo(ecSuccess)
+end function
+   
 function AddPartName( sName as string , sPart as string ) as long   
          
    'skip '0 prefix (as no part name start with a '0')
-   var bPartPrefix =  (sPart[0]=asc("0"))
-   if bPartPrefix then with *Cast_fbStr(sPart) : .pzData += 1 : .iLen -= 1 : end with   
+   'var bPartPrefix =  (sPart[0]=asc("0"))
+   'if bPartPrefix then with *Cast_fbStr(sPart) : .pzData += 1 : .iLen -= 1 : end with
    
    var iIndex = FindModelIndex( sPart )
-   'load part if not loaded yet
-   if iIndex < 0 then
-      dim as string sFile=sPart+".dat",sModel
-      if bPartPrefix then with *Cast_fbStr(sPart) : .pzData -= 1 : .iLen += 1 : end with
-      if FindFile(sFile)=0 then return ErrInfo(ecNotFound)                  'part name not found
-      if LoadFile( sFile , sModel ) = 0 then return ErrInfo(ecFailedToLoad) 'part failed to load file
-      var pModel = LoadModel( strptr(sModel) , sFile )                      
-      if pModel=0 then return ErrInfo(ecFailedToParse)                      'part failed to parse
-      iIndex = pModel->iModelIndex
-   else
-      if bPartPrefix then with *Cast_fbStr(sPart) : .pzData -= 1 : .iLen += 1 : end with   
-   end if
-   'generate snap if not generated yet
-   var pModel = g_tModels(iIndex).pModel
-   if pModel->pData = 0 then   
-      pModel->pData = new PartSnap
-      var pSnap = cptr(PartSnap ptr,pModel->pData)
-      SnapModel( pModel , *pSnap )
-   end if
-   
-   with g_tPart( g_iNameCount )
+   with g_tPart( g_iPartCount )
       .sName      = sName
-      .iModelIndex = iIndex
+      .sPrimative = sPart+".dat"
+      .iModelIndex = -1 : .iColor = -1
+      
+      if iIndex < 0 then         
+         'if bPartPrefix then with *Cast_fbStr(sPart) : .pzData -= 1 : .iLen += 1 : end with
+         .bFoundPart = FindFile(.sPrimative)<>0 'part name not found
+      else
+         .bFoundPart = true 'part found previously
+         .iModelIndex = iIndex
+         'if bPartPrefix then with *Cast_fbStr(sPart) : .pzData -= 1 : .iLen += 1 : end with   
+      end if
+         
    end with
-   g_iNameCount += 1
-   return g_iNameCount-1
+   
+   g_iPartCount += 1
+   return g_iPartCount-1
    
 end function
+'TODO implement this function
+function AddConnection( iFrom as long , iFromType as long , iFromNum as long , iTo as long , iToType as long , iToNum as long) as long
+   return 0
+end function
+
+function SafeText( sInput as string ) as string
+   dim as string sResult
+   for N as long = 0 to len(sInput)-1
+      select case sInput[N]      
+      case 0 to 31,128 to 255 : sResult += "%"+hex(sInput[N],2)
+      case else
+         sResult += chr(sInput[N])
+      end select
+   next N
+   return sResult
+end function      
 
 'TODO: now check the remainder tokens, clutch/studs
 
@@ -197,52 +314,78 @@ function LegoScriptToLDraw( sScript as string ) as string
       loop
                   
       for N as long = 0 to iTokCnt-1
-         print "{"+sToken(N)+"}";
+         print "{"+SafeText(sToken(N))+"}";
       next N
       print
       
       dim as long iCurToken=0 , iLeft=ecNotFound , iRight=ecNotFound      
       do          
-         #define ParserError( _text ) print "Error: ";_text;" at '";sStatement;"'" : sResult="" : exit while
+         #define ParserError( _text ) color 12:print "Error: ";SafeText(_text);" at '";SafeText(sStatement);"'" : sResult="" : color 7: exit while
+         #define ParserWarning( _text ) color 14:print "Warning: ";SafeText(_text);" at '";SafeText(sStatement);"'":color 7
          #define sRelToken(_N) sToken(iCurToken+(_N))
          #define sCurToken sToken(iCurToken)
-         var iName=ecNotFound      
+         var iName=ecNotFound
          
-         if IsTokenNumeric( sCurToken ) then                     
+         'if the first token is a primative (DAT) name then it's a declaration
+         if IsPrimative( sCurToken ) then
             #define sPart sCurToken
             #define sName sRelToken(1)
-            if iCurToken >= iTokCnt then ParserError( "Expected part name, got end of statement" )
-            iName = FindName( sName )
+            if len(sName)=0 orelse iCurToken >= iTokCnt then ParserError( "Expected part name, got end of statement" )
+            if IsValidPartName( sName )=false then ParserError("'"+sName+"' is not a valid part name")
+            iName = FindPartName( sName )
             if iName >= 0 then ParserError( "Name already exists" )            
             iName = AddPartName( sName , sPart  )            
-            iCurToken += 2
-            
-         else
+            if iName >=0 andalso g_tPart(iName).bFoundPart = 0 then ParserWarning("'"+sPart+"' primative not found")
+            iCurToken += 2            
+         else 'otherwise it must be an existing part name
             #define sName sCurToken
-            iName = FindName( sName )
+            if IsValidPartName( sName )=false then ParserError("'"+sName+"' is not a valid primative or part name")
+            iName = FindPartName( sName )
             if iName < 0 then ParserError( "part name not declared" )
             iCurToken += 1
-         end if
+         end if         
+         'if there's no more parameters than it's just a part declaration
          
-         'just a part declaration
-         if iCurToken = iTokCnt then exit do
-         do 
-            if iCurToken = iTokCnt then                
-               if iLeft < 0 then ParserError("premature end of statement")
-               iRight = iName
-               print iLeft,iRight
-               exit do,do
-            end if
-            iCurToken += 1
-            if sRelToken(-1)[0]=asc("=") then                
-               if iLeft < 0 then 
-                  iLeft = iName
-               else
-                  ParserError("expected end of statement, got "+sCurToken)
+         'print ,iLeft , iRight , iCurToken ; iTokCnt
+         if iCurToken = iTokCnt then 
+            if iLeft<0 then exit do
+            ParserError("missing operands in the right side")
+         end if
+         'otherwise it's a processed block (assignment?)
+         'so read tokens to add characteristics
+         
+         'first for the LEFT side then for the RIGHT side
+         if iLeft < 0 then iLeft = iName else iRight = iName
+         if iLeft = iRight then ParserError("a part can't connect to itself")
+                           
+         with g_tPart(iName)
+            do 
+               if iCurToken = iTokCnt then                
+                  if iLeft < 0 then ParserError("premature end of statement")
+                  iRight = iName
+                  print iLeft,iRight
+                  exit do,do
                end if
-               continue do,do
-            end if         
-         loop
+               iCurToken += 1
+               var sToken = sRelToken(-1)
+               'parse characteristic
+               select case sToken[0]
+               case asc("="): 'assignment token
+                  if iRight >= 0 then               
+                     ParserError("expected end of statement, got '"+sToken+"'")
+                  end if
+                  continue do,do
+               case asc("#"): 'color token #nn #RGB #RRGGBB
+                  if .iColor >= 0 then ParserError("color attribute was already set for part '"+.sName+"'")
+                  var iColor = ParseColor( sToken )
+                  if iColor < 0 then
+                     ParserError("Invalid color format '"+sToken+"'")
+                  end if
+                  .iColor = iColor                  
+               case else
+               end select
+            loop
+         end with
       loop
       
       if iStNext=0 then exit while else iStStart = iStNext+1      
@@ -255,11 +398,25 @@ function LegoScriptToLDraw( sScript as string ) as string
    
 end function
 
-dim as string sText
-var sScript = _
-"3001 B1;" _
-"B1 s7 = 3001 B2 c1;    ;" _
-"B2 s7=3001 B3 c1;"
+dim as string sText,sScript
+var sCmd = command()
+if len(sCmd) then
+   var f = freefile()
+   if open(sCmd for binary access read as #f) then
+      print "Failed to open '"+sCmd+"'"
+      sleep : system
+   end if
+   sScript = space(lof(f))
+   get #f,,sScript : close #f
+else   
+   print ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> in memory script <<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
+   sScript = _
+      "3001 B1;" _
+      "B1 #2 s7 = 3001 B2 c1;    ;" _
+      "B2 s7=3001 B3 c1;" _
+      "B3 #3 s1 = 3001 B4 c3;" _
+      "B3 #FFF s7 = 3002 B5 c3;"
+end if
 print LegoScriptToLDraw(sScript)
 
 #if 0
