@@ -55,11 +55,14 @@ enum ErrorCodes
    ecNotFound       = -999
    ecFailedToLoad
    ecFailedToParse
+   ecNumberOverflow
+   ecNotANumber
    ecAlreadyExist
    ecSuccess        = 0
-end enum   
+end enum
 
 type PartStructLS
+   tLocation   as SnapPV
    sName       as string
    sPrimative  as string
    iColor      as long
@@ -71,18 +74,19 @@ type PartConnLS
    iRightPart as long
    iLeftNum   as short
    iRightNum  as short
-   iLeftType  as byte   
+   iLeftType  as byte
    iRightType as byte
    bResv(1)   as byte
 end type
-   
+
+const _cPartMin=255 , _cConnMin=255
 static shared as byte g_bSeparators(255)
-static shared as PartStructLS g_tPart(1023)
-static shared as PartConnLS   g_tConn(2047)
+redim shared as PartStructLS g_tPart(_cPartMin)
+redim shared as PartConnLS   g_tConn(_cConnMin)
 static shared as long g_iPartCount , g_iConnCount = 0
 
-scope
-   var sSeparators = !"\9 \r\n"   
+scope 'add separators
+   var sSeparators = !"\9 \r\n/"
    for N as long = 0 to len(sSeparators)-1
       g_bSeparators( sSeparators[N] ) or= stToken
    next N
@@ -94,8 +98,21 @@ end scope
 
 #define ErrInfo( _N ) (_N)
 
-function IsTokenNumeric( sToken as string ) as long
-   for N as long = 0 to len(sToken)-1
+function ReadTokenNumber( sToken as string , iStart as long = 0 ) as long
+   dim as long iResult
+   for N as long = iStart to len(sToken)-1
+      select case sToken[N]
+      case asc("0") to asc("9")
+         iResult = iResult*10+(sToken[N]-asc("0"))
+         if iResult < 0 then return ErrInfo(ecNumberOverflow)
+      case else
+         return ErrInfo(ecNotANumber)
+      end select
+   next N
+   return iResult
+end function
+function IsTokenNumeric( sToken as string , iStart as long = 0 ) as long
+   for N as long = iStart to len(sToken)-1
       if (cuint(sToken[N])-asc("0")) > 9 then return false
    next N
    return true
@@ -196,14 +213,15 @@ function FindModelIndex( sPart as string ) as long
    return *cptr(long ptr,@g_sFilenames[iPos-4])
 end function  
 function LoadPartModel( byref tPart as PartStructLS ) as long
-   with tPart
+   with tPart      
       if .iModelIndex >= 0 then return ErrInfo(ecSuccess) 'already loaded
       'load model
       dim as string sModel
       if LoadFile( .sPrimative , sModel ) = 0 then return ErrInfo(ecFailedToLoad) 'part failed to load file
       var pModel = LoadModel( strptr(sModel) , .sPrimative )                      
       if pModel=0 then return ErrInfo(ecFailedToParse)                      'part failed to parse
-      .iModelIndex = pModel->iModelIndex : .sPrimative = ""
+      .iModelIndex = pModel->iModelIndex             
+      .sPrimative = mid(.sPrimative,instrrev(.sPrimative,"\")+1)
       'generate snap if not generated yet
       'var pModel = g_tModels(.iModelIndex).pModel
       if pModel->pData = 0 then   
@@ -220,6 +238,9 @@ function AddPartName( sName as string , sPart as string ) as long
    'skip '0 prefix (as no part name start with a '0')
    'var bPartPrefix =  (sPart[0]=asc("0"))
    'if bPartPrefix then with *Cast_fbStr(sPart) : .pzData += 1 : .iLen -= 1 : end with
+   if (g_iPartCount > ubound(g_tPart)) then
+      redim preserve g_tPart( ubound(g_tPart)+_cPartMin+1 )
+   end if
    
    var iIndex = FindModelIndex( sPart )
    with g_tPart( g_iPartCount )
@@ -236,15 +257,18 @@ function AddPartName( sName as string , sPart as string ) as long
          'if bPartPrefix then with *Cast_fbStr(sPart) : .pzData -= 1 : .iLen += 1 : end with   
       end if
          
-   end with
+   end with   
    
    g_iPartCount += 1
    return g_iPartCount-1
    
 end function
-'TODO implement this function
-function AddConnection( iFrom as long , iFromType as long , iFromNum as long , iTo as long , iToType as long , iToNum as long) as long
-   return 0
+function AddConnection( byref tConn as PartConnLS ) as long
+   if (g_iConnCount > ubound(g_tConn)) then
+      redim preserve g_tConn( ubound(g_tConn)+_cConnMin+1 )
+   end if
+   g_tConn( g_iConnCount ) = tConn : g_iConnCount += 1
+   return g_iConnCount-1
 end function
 
 function SafeText( sInput as string ) as string
@@ -268,7 +292,12 @@ function LegoScriptToLDraw( sScript as string ) as string
    
    'split tokens
    dim as string sStatement, sToken(15), sResult
-   dim as long iStStart=1,iStNext
+   dim as long iStStart=1,iStNext,iLineNumber=1,iTokenLineNumber=1
+   
+   #define TokenLineNumber(_N) (cptr(fbStr ptr,@sToken(_N))->iSize)
+   #define ParserError( _text ) color 12:print "Error: ";SafeText(_text);" at line";TokenLineNumber(iCurToken);" '";SafeText(sStatement);"'" : sResult="" : color 7: exit while
+   #define ParserWarning( _text ) color 14:print "Warning: ";SafeText(_text);" at line";TokenLineNumber(iCurToken);" '";SafeText(sStatement);"'":color 7
+   
    while 1
       'get next statement
       iStNext = instr(iStStart,sScript,";")
@@ -277,9 +306,19 @@ function LegoScriptToLDraw( sScript as string ) as string
          .pzData = cptr(ubyte ptr,strptr(sScript))+iStStart-1
          .iLen = iif(iStNext,iStNext,1+len(sScript))-(iStStart)         
          while .iLen>0 andalso (g_bSeparators(.pzData[0]) and stToken)
+            select case .pzData[0] 'special chars
+            case asc("/"): exit while
+            case asc(!"\n"): iLineNumber += 1
+            case asc(!"\r"): if .pzData[1]=asc(!"\n") then .pzData += 1 : .iLen -= 1 : iLineNumber += 1
+            end select
             .pzData += 1 : .iLen -= 1
          wend
          while .iLen>0 andalso (g_bSeparators(.pzData[.iLen-1]) and stToken)
+            select case .pzData[.iLen-1] 'special chars
+            case asc("/") : exit while
+            case asc(!"\n"): iLineNumber += 1
+            case asc(!"\r"): if .pzData[.iLen]=asc(!"\n") then .iLen -= 1 : iLineNumber += 1
+            end select
             .iLen -= 1
          wend
          if .iLen=0 then 
@@ -292,13 +331,37 @@ function LegoScriptToLDraw( sScript as string ) as string
       'print "["+sStatement+"]"
       var pzStatement = cptr(ubyte ptr,strptr(sStatement))            
       do
+         #define iCurToken iTokCnt-1
+         if iTokCnt > ubound(sToken) then ParserError("Too many tokens")            
          with *cptr(fbStr ptr,@sToken(iTokCnt))
             .pzData = pzStatement+iTokStart
+            'skipping start of next token till a "non token separator" is found
             while (g_bSeparators(.pzData[0]) and stToken)
                if .pzData[0]=0 then exit do
                .pzData += 1 : iTokStart += 1
+               select case .pzData[-1] 'special characters
+               case asc(!"\n")   'new line (LF)
+                  iLineNumber += 1
+               case asc(!"\r")   'new line (CRLF)
+                  if .pzData[0]=asc(!"\n") then .pzData += 1 : iTokStart += 1 : iLineNumber += 1
+               case asc("/")    'escaping (commenting?)
+                  if .pzData[0]=asc("/") then     'comment till EOL
+                     while iTokStart < iTokEnd andalso .pzData[0]<>asc(!"\r") andalso .pzData[0]<>asc(!"\n")
+                        .pzData += 1 : iTokStart += 1
+                     wend
+                  elseif .pzData[0]=asc("*") then 'comment till *\
+                     .pzData += 1 : iTokStart += 1
+                     while iTokStart < iTokEnd andalso .pzData[0]
+                        .pzData += 1 : iTokStart += 1
+                        if .pzData[-1]=asc("*") andalso .pzData[0]=asc("/") then
+                           .pzData += 1 : iTokStart += 1 : exit while
+                        end if
+                     wend
+                  end if
+               end select
                if iTokStart >= iTokEnd then exit do
-            wend                        
+            wend 
+            'locating end/size of current token
             if (g_bSeparators(.pzData[0]) and (not stToken)) then
                .iLen = 1 : iTokStart += 1
             else
@@ -306,22 +369,34 @@ function LegoScriptToLDraw( sScript as string ) as string
                while g_bSeparators(.pzData[.iLen])=0
                   if iTokStart >= iTokEnd then exit while
                   .iLen += 1 : iTokStart += 1
-               wend
+               wend               
             end if
             if .iLen <= 0 then exit do
-            .iSize = .iLen : iTokCnt += 1 
+            .iSize = iLineNumber : iTokCnt += 1 
          end with         
       loop
-                  
+            
+      iStStart = iStNext+1
+      if iTokCnt=0 then if iStNext=0 then exit while else continue while
+      
+      'Display Tokens
       for N as long = 0 to iTokCnt-1
+         if iTokenLineNumber <> TokenLineNumber(N) then 
+            print : iTokenLineNumber = TokenLineNumber(N)
+         end if         
          print "{"+SafeText(sToken(N))+"}";
       next N
       print
       
-      dim as long iCurToken=0 , iLeft=ecNotFound , iRight=ecNotFound      
-      do          
-         #define ParserError( _text ) color 12:print "Error: ";SafeText(_text);" at '";SafeText(sStatement);"'" : sResult="" : color 7: exit while
-         #define ParserWarning( _text ) color 14:print "Warning: ";SafeText(_text);" at '";SafeText(sStatement);"'":color 7
+      'Parse Tokens
+      dim as long iCurToken=0
+      dim as PartConnLS tConn 'expects 0's
+      tConn.iLeftPart = ecNotFound : tConn.iRightPart = ecNotFound
+      
+      #define tLeft(_N)  tConn.iLeft##_N
+      #define tRight(_N) tConn.iRight##_N
+  
+      do 
          #define sRelToken(_N) sToken(iCurToken+(_N))
          #define sCurToken sToken(iCurToken)
          var iName=ecNotFound
@@ -346,50 +421,132 @@ function LegoScriptToLDraw( sScript as string ) as string
          end if         
          'if there's no more parameters than it's just a part declaration
          
-         'print ,iLeft , iRight , iCurToken ; iTokCnt
+         'print ,tLeft(Part) , tRight(Part) , iCurToken ; iTokCnt
          if iCurToken = iTokCnt then 
-            if iLeft<0 then exit do
+            if tLeft(Part)<0 then exit do
             ParserError("missing operands in the right side")
          end if
          'otherwise it's a processed block (assignment?)
          'so read tokens to add characteristics
          
          'first for the LEFT side then for the RIGHT side
-         if iLeft < 0 then iLeft = iName else iRight = iName
-         if iLeft = iRight then ParserError("a part can't connect to itself")
+         if tLeft(Part) < 0 then tLeft(Part) = iName else tRight(Part) = iName
+         if tLeft(Part) = tRight(Part) then ParserError("a part can't connect to itself")
                            
          with g_tPart(iName)
             do 
                if iCurToken = iTokCnt then                
-                  if iLeft < 0 then ParserError("premature end of statement")
-                  iRight = iName
-                  print iLeft,iRight
+                  if tLeft(Part) < 0 then ParserError("premature end of statement")                  
                   exit do,do
                end if
                iCurToken += 1
-               var sToken = sRelToken(-1)
+               var sThisToken = sRelToken(-1)
                'parse characteristic
-               select case sToken[0]
+               select case sThisToken[0]
+               case asc("s"),asc("c"): 'stud/clutch (connector)   (last token from the side)
+                  #define curPart g_tPart(iName)
+                  #define sFullName "'"+curPart.sName+"("+curPart.sPrimative+")'"
+                  if tRight(Part) < 0 then
+                     if tRight(Type) then ParserError("Expected '=', got '"+sThisToken+"'")
+                  else
+                     if tRight(Type) then ParserError("Expected end of statement, got '"+sThisToken+"'")
+                  end if
+                  var iConn = ReadTokenNumber(sThisToken,1)
+                  if iConn <= 0 then ParserError("invalid connector number")                  
+                  if LoadPartModel( g_tPart(iName) ) < 0 then ParserError("failed to load model")
+                  var pModel = g_tModels(curPart.iModelIndex).pModel 
+                  var pSnap = cptr(PartSnap ptr,pModel->pData)
+                                    
+                  with *pSnap
+                     select case sThisToken[0]
+                     case asc("s")
+                        if iConn > .lStudCnt then ParserError("part "+sFullName+" only have " & .lStudCnt   & " studs.")
+                        if tRight(Part) < 0 then tLeft(Type)=spStud : tLeft(Num)=iConn else tRight(Type)=spStud : tRight(Num)=iConn
+                     case asc("c")
+                        if iConn > .lClutchCnt then ParserError("part "+sFullName+" only have " & .lClutchCnt & " clutches.")
+                        if tRight(Part) < 0 then tLeft(Type)=spClutch : tLeft(Num)=iConn else tRight(Type)=spClutch : tRight(Num)=iConn
+                     end select
+                     'printf(!"Studs=%i Clutchs=%i Aliases=%i Axles=%i Axlehs=%i Bars=%i Barhs=%i Pins=%i Pinhs=%i\n", _
+                     '.lStudCnt , .lClutchCnt , .lAliasCnt , .lAxleCnt , .lAxleHoleCnt ,.lBarCnt , .lBarHoleCnt , .lPinCnt , .lPinHoleCnt )
+                  end with
+                  if tLeft(Type) = tRight(Type) then ParserError("same type of connector")
+                     
                case asc("="): 'assignment token
-                  if iRight >= 0 then               
-                     ParserError("expected end of statement, got '"+sToken+"'")
+                  if tRight(Part) >= 0 then               
+                     ParserError("expected end of statement, got '"+sThisToken+"'")
                   end if
                   continue do,do
                case asc("#"): 'color token #nn #RGB #RRGGBB
                   if .iColor >= 0 then ParserError("color attribute was already set for part '"+.sName+"'")
-                  var iColor = ParseColor( sToken )
+                  var iColor = ParseColor( sThisToken )
                   if iColor < 0 then
-                     ParserError("Invalid color format '"+sToken+"'")
+                     ParserError("Invalid color format '"+sThisToken+"'")
                   end if
                   .iColor = iColor                  
                case else
+                  ParserError("Unknown token '"+sThisToken+"'")
                end select
             loop
          end with
       loop
       
-      if iStNext=0 then exit while else iStStart = iStNext+1      
+      AddConnection( tConn )
+      
+      if iStNext=0 then exit while      
    wend
+   
+   if iStNext=0 andalso g_iPartCount>0 then      
+      dim as SnapPV ptr pLeft=any,pRight=any
+      with g_tPart(0)
+         'print .sName , .sPrimative , .iColor
+         printf(!"1 %i %f %f %f 1 0 0 0 1 0 0 0 1 %s\n",.iColor,.tLocation.fPX,.tLocation.fPY,.tLocation.fPZ,.sPrimative)
+      end with
+        
+      for I as long = 0 to g_iConnCount-1
+         with g_tConn(I)
+            'print _
+            '   .iLeftPart  & "{" & .iLeftType  & ":" & .iLeftNum  & "} = " & _
+            '   .iRightPart & "{" & .iRightType & ":" & .iRightNum & "}"
+            'dim as single FromX,FromY,FromZ , ToX,ToY,ToZ
+            var pModel = g_tModels(g_tPart(.iLeftPart).iModelIndex).pModel 
+            var pSnap = cptr(PartSnap ptr,pModel->pData)
+            select case .iLeftType
+            case spStud   : pLeft = pSnap->pStud  +.iLeftNum-1
+            case spClutch : pLeft = pSnap->pClutch+.iLeftNum-1
+            case else     : print "Error"
+            end select
+            pModel = g_tModels(g_tPart(.iRightPart).iModelIndex).pModel 
+            pSnap = cptr(PartSnap ptr,pModel->pData)
+            select case .iRightType
+            case spStud   : pRight = pSnap->pStud  +.iRightNum-1
+            case spClutch : pRight = pSnap->pClutch+.iRightNum-1
+            case else     : print "Error"
+            end select
+            'print pLeft->fPX , pLeft->fPY , pLeft->fPZ
+            'print pRight->fPX , pRight->fPY , pRight->fPZ
+            'type SnapPV
+            '   as single fPX,fPY,fPZ 'position
+            '   as single fVX,fVy,fVZ 'direction vector
+            'end type
+            var ptLocation = @g_tPart(.iLeftPart).tLocation
+            dim as single fPX = ptLocation->fPX - (pLeft->fPX + pRight->fPX)
+            dim as single fPY = ptLocation->fPY + pLeft->fPY + pRight->fPY
+            dim as single fPZ = ptLocation->fPZ + pLeft->fPZ + pRight->fPZ
+            with g_tPart(.iRightPart)
+               if .tLocation.fPX = 0 andalso .tLocation.fPY=0 andalso .tLocation.fPZ=0 then
+                  .tLocation.fPX = fPX : .tLocation.fPY = fPY : .tLocation.fPZ = fPZ
+               elseif abs(.tLocation.fPX-fPX)>.001 orelse abs(.tLocation.fPY-fPY)>.001 orelse abs(.tLocation.fPZ-fPZ)>.001 then
+                  color 12 : print "Impossible Connection detected!" : color 7
+               end if
+               var iColor = iif(.iColor<0,0,.iColor)
+               printf(!"1 %i %f %f %f 1 0 0 0 1 0 0 0 1 %s\n",iColor,fPX,fPY,fPZ,.sPrimative)
+            end with            
+            'puts("1 0 40 -24 -20 1 0 0 0 1 0 0 0 1 3001.dat")
+            'puts("1 0 0 0 0 1 0 0 0 1 0 0 0 1 3001.dat")
+            
+         end with
+      next I
+   end if
          
    clear sToken(0),0,16*sizeof(fbStr) ': erase sToken
    clear sStatement,0,sizeof(fbStr)   ': sStatement = ""   
@@ -410,12 +567,18 @@ if len(sCmd) then
    get #f,,sScript : close #f
 else   
    print ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> in memory script <<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
+   #if 0
    sScript = _
-      "3001 B1;" _
-      "B1 #2 s7 = 3001 B2 c1;    ;" _
-      "B2 s7=3001 B3 c1;" _
-      "B3 #3 s1 = 3001 B4 c3;" _
-      "B3 #FFF s7 = 3002 B5 c3;"
+      !"// part 3024 B1 is of type 'Plate' but was referenced as 'Brick' without a cast.\r\n;" _
+      !"3001 /*Comment*/ B1;" _
+      !"B1 #2 s7 = 3001 B2 c1;    ;" _
+      !"B2 s7=3001 B3 c1;" _
+      !"B3 #3 s1 = 3001 B4 c3;" _
+      !"B3 s8 = 3002 B5 c3;"
+   #endif
+   sScript = _
+     !"3001 B1 #2 s7 = 3001 B2 c1;"  _
+     !"B2 #2 s2 = 3002 B3 c1;"
 end if
 print LegoScriptToLDraw(sScript)
 

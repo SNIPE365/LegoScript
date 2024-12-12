@@ -611,9 +611,10 @@ end function
 'puts("1 0 40 -24 -20 1 0 0 0 1 0 0 0 1 3001.dat")
 'puts("1 0 0 0 0 1 0 0 0 1 0 0 0 1 3001.dat")
 
-#include "LS2LDR.bas"
+'#include "LS2LDR.bas"
 
-'InitSearchWindow()
-'QueryText(sText)
+dim as string sText
+InitSearchWindow()
+QueryText(sText)
 
 sleep
