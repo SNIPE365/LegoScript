@@ -58,156 +58,162 @@
 '-----------------------------------------------------------------------------
 
 var sPath = environ("userprofile")+"\Desktop\LDCAD\"
-
+dim as string sFile
 'pinhole
 '{SNAP_CYL} - <[id=connhole] [gender=F] [caps=none] [secs=R 8 2   R 6 16   R 8 2] [center=true] [slide=true]>
 'not pinhole
 '{SNAP_CYL} - <[gender=F] [caps=none] [secs=R 6 6   A 6 6   R 4 16] [slide=true] [pos=0 24 0]>
 
 '3044a 'Regx for good files = ^1.*\.dat
-'var sFile = "3023.dat"
-'var sFile = "3626cp0p.dat"
-'var sFile = "65826.dat" 'no shadow pin?
-'var sFile = "4274.dat" 'Duplicated Stud (bigger lock compressible cylinder)?? (still wrong stud count?) [!bad orientation?]
-'var sFile = "3749.dat" 'axle+pin (duplicated axles) (no barhole!!) [!bad center?]
-'var sFile = "18651.dat" 'axle+pin (duplicated axles) (the only one of this class with barhole) [!bad orientation?]
-'var sFile = "3024.dat" 'duplicated clutches (CHECK: unknown male)
-'var sFile = "18654.dat" 'pinhole (hollow pin = 2 clutches)
-'var sFile = "32006.dat" 'pinholes+axlehole+clutch (duplicated axlehole both sides???????)
-'var sFile = "4589.dat" ' axlehole with clutch (bigger hollow stud?) (duplicated axlehole both sides?????) [!bad orientation?]
-'var sFile = "87994.dat" 'bar
-'var sFile = "3461.dat" 'have a (king)fat pinhole (maybe add a fat clutch/pinhole class?)
-'var sFile = "967.dat"  'have a (king)pin [??bad center??]
-'var sFile = "3011.dat" 'duplo (extra clutches)
-var sFile = "3001.dat" 'clutches as aliases?
-'var sFile = "3044a.dat" 'square clutches in a grid can slide? (or need hardcoded slide?) 
-
-'var sFile = "4070.dat" '[!bad center]
-'var sFile = "11203.dat" 'inverted tile '[!bad centering! (good test)] {?} '[grid centering?]
-'var sFile = "32124.dat" '(axle holes) [!outside! female round] '[grid centering?]
-'var sFile = "2711.dat" '(grid pinhole!! duplicated clutches (2711+steerend) [!outside! female round] '[!bad orientation]
-
-'var sFile = "78329.dat"
-'var sFile = "axlehole.dat"
-'var sFile = "steerend.dat"
-'var sFile = sPath+"\LDraw\parts\17715.dat" (removed??)
-'var sFile = "15588.dat" 'alias of 48092 (need extra aliases clutches?)
-'var sFile = "48092.dat"
-'var sFile = "stud.dat"
-'var sFile = "18651.dat" '(big axle that could have one extra virtual axle?) [!bad orientation!]
-''var sFile = "3703.dat" '(included shadow over a grid... TODO: implement!) (SNAP_INCL)
-''var sFile = "3003.dat" 'Shadow: SNAP_INCL
-''var sFile = "3004.dat" 'Shadow: SNAP_INCL (name ref? duplicated clutches? (ignore?) TODO!)
-'var sFile = "4531.dat" 'Shadow: SNAP_* (hinges, TODO: later implement)
-'var sFile = "3673.dat" 'Shadow: SNAP_CLEAR (extra pin, missing barhole?) [!good orientation?!]
-'var sFile = "3002.dat" 'same class of piece as 3001.dat
-'var sFile = "3022.dat" 'same class of piece as 3001.dat
-'var sFile = "2431.dat" 'tile
-'var sFile = "35459.dat" 'tile
-'var sFile = "32530.dat" 'OK 6 clutches , 2 pinholes
-'var sFile = "3865.dat" 'baseplate
-
-'var sFile = "168315a.dat" 'sticker
-'var sFile = "3001s01.dat" 'subpart of 3001.dat
-'var sFile = "connhole.dat" 'subpart
-'var sFile = "t01i3261.dat" 'subpart
-'var sFile = "connect.dat" 'subpart
-'var sFile = "axle.dat" 'subpart
-'var sFile = "C:\Users\greg\Desktop\LDCAD\examples\5510.mpd"
-
-#if 1
-   'var sFile = sPath+"\LDraw\parts\3001.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3002.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3003.dat"     'FINE (duplicated clutches from two subparts)
-   'var sFile = sPath+"\LDraw\parts\3004.dat"     'FINE (duplicated clutches
-   'var sFile = sPath+"\LDraw\parts\3005.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3006.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3007.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3008.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3009.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3010.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3011.dat"     'THE 59 LOOKS A LITTLE SUS BUT WHEN I TESTED I LDACAD IT SEEMS FINE
-   'var sFile = sPath+"\LDraw\parts\3018.dat"     'FINE (huge stud/clutch)
-   'var sFile = sPath+"\LDraw\parts\3020.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3021.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3022.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3023.dat"     'FINE plate
-   'var sFile = sPath+"\LDraw\parts\3026.dat"     'FINE (144 studs 259 clutches)
-   'var sFile = sPath+"\LDraw\parts\3027.dat"     'FINE plate
-   'var sFile = sPath+"\LDraw\parts\3030.dat"     'FINE plate
-   'var sFile = sPath+"\LDraw\parts\3031.dat"     'FINE plate
-   'var sFile = sPath+"\LDraw\parts\3032.dat"     'FINE plate
-   'var sFile = sPath+"\LDraw\parts\3033.dat"     'FINE plate
-   'var sFile = sPath+"\LDraw\parts\3034.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3035.dat"     'FINE plate
-   'var sFile = sPath+"\LDraw\parts\3036.dat"     'FINE plate
-   'var sFile = sPath+"\LDraw\parts\3037.dat"     'FINE (missing shadow for the clutch holes?)
-   'var sFile = sPath+"\LDraw\parts\3038.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3039.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\18654.dat"    'should be 20x20x20 but maybe it has a slightly thinner diameter compared to a 1x1 round brick
-   'var sFile = sPath+"\LDraw\parts\3062bp02.dat" 'FINE (A caps?)
-   'var sFile = sPath+"\LDraw\parts\4588.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3040.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3041.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3042.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3043.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3044.dat"     'FINE (special clutch) [!Center! mismatch]
-   'var sFile = sPath+"\LDraw\parts\3045.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3046.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3048.dat"      'FINE (special clutch) (TODO: (ignore) male grid of square clutches????)
-   'var sFile = sPath+"\LDraw\parts\3049.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3058.dat"     'FINE (combination of aliases) [!Center?! mismatch]
-   'var sFile = sPath+"\LDraw\parts\3062.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3063.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3065.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3066.dat"     'FINE (slide clutch defined as 8 clutches)
-   'var sFile = sPath+"\LDraw\parts\3067.dat"     'FINE (slide clutch)
-   'var sFile = sPath+"\LDraw\parts\3068.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3069.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3070.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3082.dat"     'THIS APPEARS TO BE WRONG, IT LOOKS LIKE ITS 2 LDU thick by 39 LDU tall including the nub and 32 LDU WIDE 
-   'var sFile = sPath+"\LDraw\parts\3109.dat"     'FINE (subpart? shadow does not account holes)
-   'var sFile = sPath+"\LDraw\parts\3110.dat"     '(subpart) this appears to be 20 LDU tall by 32 LDU wide by 72 LDU long
-   'var sFile = sPath+"\LDraw\parts\3111.dat"     '(no shadow) actually right :) (need further review on the subparts of this)
-   'var sFile = sPath+"\LDraw\parts\3112.dat"     '(no shadow) actually right :) (need further review on the subparts of this)
-   'var sFile = sPath+"\LDraw\parts\3127.dat"     '(size? mega wrong :D)
-   'var sFile = sPath+"\LDraw\parts\3130.dat"     'FINE (miss many shadow info)
-   'var sFile = sPath+"\LDraw\parts\3131.dat"     'FINE (miss many shadow info)
-   'var sFile = sPath+"\LDraw\parts\3134.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3135.dat"     '45 LDU not 100 LDU [!center! mismatch]
-   'var sFile = sPath+"\LDraw\parts\3136.dat"      'cool, fine (different size studs?)
-   'var sFile = sPath+"\LDraw\parts\3137.dat"     'FINE (check shadow?)
-   'var sFile = sPath+"\LDraw\parts\3139.dat"     'FINE (no shadow info)
-   'var sFile = sPath+"\LDraw\parts\3144.dat"     'damn this is actaully right (male grid (to be ignored?), two caps)
-   'var sFile = sPath+"\LDraw\parts\3145.dat"     '(TODO: 3 sided connections, missing some?) I cant move that finley in ldcad but 122.96 LDU looks correct as well as 69.28
-   'var sFile = sPath+"\LDraw\parts\3148.dat"     'FINE (TODO: hinge)
-   'var sFile = sPath+"\LDraw\parts\3149.dat"     'FINE (TODO: hinges)
-   'var sFile = sPath+"\LDraw\parts\3160.dat"     'width and depdth is fine, heigh seems kinda insaneley precise.
-   'var sFile = sPath+"\LDraw\parts\3161.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3167.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3176.dat"     'FINE (resume checking from here)
-   'var sFile = sPath+"\LDraw\parts\3190.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3191.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3192.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3193.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3194.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3195.dat"     'FINE
-   'var sFile = sPath+"\LDraw\parts\3200.dat"     'part doesn't exist but stop here (so at 3200)
+scope 
+   'sFile = "3023.dat"
+   'sFile = "3626cp0p.dat"
+   'sFile = "65826.dat" 'no shadow pin?
+   'sFile = "4274.dat" 'Duplicated Stud (bigger lock compressible cylinder)?? (still wrong stud count?) [!bad orientation?]
+   'sFile = "3749.dat" 'axle+pin (duplicated axles) (no barhole!!) [!bad center?]
+   'sFile = "18651.dat" 'axle+pin (duplicated axles) (the only one of this class with barhole) [!bad orientation?]
+   'sFile = "3024.dat" 'duplicated clutches (CHECK: unknown male)
+   'sFile = "18654.dat" 'pinhole (hollow pin = 2 clutches)
+   'sFile = "32006.dat" 'pinholes+axlehole+clutch (duplicated axlehole both sides???????)
+   'sFile = "4589.dat" ' axlehole with clutch (bigger hollow stud?) (duplicated axlehole both sides?????) [!bad orientation?]
+   'sFile = "87994.dat" 'bar
+   'sFile = "3461.dat" 'have a (king)fat pinhole (maybe add a fat clutch/pinhole class?)
+   'sFile = "967.dat"  'have a (king)pin [??bad center??]
+   'sFile = "3011.dat" 'duplo (extra clutches)
+   'sFile = "3001.dat" 'clutches as aliases?
+   'sFile = "3044a.dat" 'square clutches in a grid can slide? (or need hardcoded slide?) 
+   
+   'sFile = "4070.dat" '[!bad center]
+   'sFile = "11203.dat" 'inverted tile '[!bad centering! (good test)] {?} '[grid centering?]
+   'sFile = "32124.dat" '(axle holes) [!outside! female round] '[grid centering?]
+   'sFile = "2711.dat" '(grid pinhole!! duplicated clutches (2711+steerend) [!outside! female round] '[!bad orientation]
+   
+   'sFile = "78329.dat"
+   'sFile = "axlehole.dat"
+   'sFile = "steerend.dat"
+   'sFile = sPath+"\LDraw\parts\17715.dat" (removed??)
+   'sFile = "15588.dat" 'alias of 48092 (need extra aliases clutches?)
+   'sFile = "48092.dat"
+   'sFile = "stud.dat"
+   'sFile = "18651.dat" '(big axle that could have one extra virtual axle?) [!bad orientation!]
+   ''sFile = "3703.dat" '(included shadow over a grid... TODO: implement!) (SNAP_INCL)
+   ''sFile = "3003.dat" 'Shadow: SNAP_INCL
+   ''sFile = "3004.dat" 'Shadow: SNAP_INCL (name ref? duplicated clutches? (ignore?) TODO!)
+   'sFile = "4531.dat" 'Shadow: SNAP_* (hinges, TODO: later implement)
+   'sFile = "3673.dat" 'Shadow: SNAP_CLEAR (extra pin, missing barhole?) [!good orientation?!]
+   'sFile = "3002.dat" 'same class of piece as 3001.dat
+   'sFile = "3022.dat" 'same class of piece as 3001.dat
+   'sFile = "2431.dat" 'tile
+   'sFile = "35459.dat" 'tile
+   'sFile = "32530.dat" 'OK 6 clutches , 2 pinholes
+   'sFile = "3865.dat" 'baseplate
+   
+   'sFile = "168315a.dat" 'sticker
+   'sFile = "3001s01.dat" 'subpart of 3001.dat
+   'sFile = "connhole.dat" 'subpart
+   'sFile = "t01i3261.dat" 'subpart
+   'sFile = "connect.dat" 'subpart
+   'sFile = "axle.dat" 'subpart
+   'sFile = "C:\Users\greg\Desktop\LDCAD\examples\5510.mpd"
+end scope
+scope
+   'sFile = sPath+"\LDraw\parts\3001.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3002.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3003.dat"     'FINE (duplicated clutches from two subparts)
+   'sFile = sPath+"\LDraw\parts\3004.dat"     'FINE (duplicated clutches
+   'sFile = sPath+"\LDraw\parts\3005.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3006.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3007.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3008.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3009.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3010.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3011.dat"     'THE 59 LOOKS A LITTLE SUS BUT WHEN I TESTED I LDACAD IT SEEMS FINE
+   'sFile = sPath+"\LDraw\parts\3018.dat"     'FINE (huge stud/clutch)
+   'sFile = sPath+"\LDraw\parts\3020.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3021.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3022.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3023.dat"     'FINE plate
+   'sFile = sPath+"\LDraw\parts\3026.dat"     'FINE (144 studs 259 clutches)
+   'sFile = sPath+"\LDraw\parts\3027.dat"     'FINE plate
+   'sFile = sPath+"\LDraw\parts\3030.dat"     'FINE plate
+   'sFile = sPath+"\LDraw\parts\3031.dat"     'FINE plate
+   'sFile = sPath+"\LDraw\parts\3032.dat"     'FINE plate
+   'sFile = sPath+"\LDraw\parts\3033.dat"     'FINE plate
+   'sFile = sPath+"\LDraw\parts\3034.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3035.dat"     'FINE plate
+   'sFile = sPath+"\LDraw\parts\3036.dat"     'FINE plate
+   'sFile = sPath+"\LDraw\parts\3037.dat"     'FINE (missing shadow for the clutch holes?)
+   'sFile = sPath+"\LDraw\parts\3038.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3039.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\18654.dat"    'should be 20x20x20 but maybe it has a slightly thinner diameter compared to a 1x1 round brick
+   'sFile = sPath+"\LDraw\parts\3062bp02.dat" 'FINE (A caps?)
+   'sFile = sPath+"\LDraw\parts\4588.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3040.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3041.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3042.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3043.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3044.dat"     'FINE (special clutch) [!Center! mismatch]
+   'sFile = sPath+"\LDraw\parts\3045.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3046.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3048.dat"      'FINE (special clutch) (TODO: (ignore) male grid of square clutches????)
+   'sFile = sPath+"\LDraw\parts\3049.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3058.dat"     'FINE (combination of aliases) [!Center?! mismatch]
+   'sFile = sPath+"\LDraw\parts\3062.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3063.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3065.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3066.dat"     'FINE (slide clutch defined as 8 clutches)
+   'sFile = sPath+"\LDraw\parts\3067.dat"     'FINE (slide clutch)
+   'sFile = sPath+"\LDraw\parts\3068.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3069.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3070.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3082.dat"     'THIS APPEARS TO BE WRONG, IT LOOKS LIKE ITS 2 LDU thick by 39 LDU tall including the nub and 32 LDU WIDE 
+   'sFile = sPath+"\LDraw\parts\3109.dat"     'FINE (subpart? shadow does not account holes)
+   'sFile = sPath+"\LDraw\parts\3110.dat"     '(subpart) this appears to be 20 LDU tall by 32 LDU wide by 72 LDU long
+   'sFile = sPath+"\LDraw\parts\3111.dat"     '(no shadow) actually right :) (need further review on the subparts of this)
+   'sFile = sPath+"\LDraw\parts\3112.dat"     '(no shadow) actually right :) (need further review on the subparts of this)
+   'sFile = sPath+"\LDraw\parts\3127.dat"     '(size? mega wrong :D)
+   'sFile = sPath+"\LDraw\parts\3130.dat"     'FINE (miss many shadow info)
+   'sFile = sPath+"\LDraw\parts\3131.dat"     'FINE (miss many shadow info)
+   'sFile = sPath+"\LDraw\parts\3134.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3135.dat"     '45 LDU not 100 LDU [!center! mismatch]
+   'sFile = sPath+"\LDraw\parts\3136.dat"      'cool, fine (different size studs?)
+   'sFile = sPath+"\LDraw\parts\3137.dat"     'FINE (check shadow?)
+   'sFile = sPath+"\LDraw\parts\3139.dat"     'FINE (no shadow info)
+   'sFile = sPath+"\LDraw\parts\3144.dat"     'damn this is actaully right (male grid (to be ignored?), two caps)
+   'sFile = sPath+"\LDraw\parts\3145.dat"     '(TODO: 3 sided connections, missing some?) I cant move that finley in ldcad but 122.96 LDU looks correct as well as 69.28
+   'sFile = sPath+"\LDraw\parts\3148.dat"     'FINE (TODO: hinge)
+   'sFile = sPath+"\LDraw\parts\3149.dat"     'FINE (TODO: hinges)
+   'sFile = sPath+"\LDraw\parts\3160.dat"     'width and depdth is fine, heigh seems kinda insaneley precise.
+   'sFile = sPath+"\LDraw\parts\3161.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3167.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3176.dat"     'FINE (resume checking from here)
+   'sFile = sPath+"\LDraw\parts\3190.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3191.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3192.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3193.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3194.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3195.dat"     'FINE
+   'sFile = sPath+"\LDraw\parts\3200.dat"     'part doesn't exist but stop here (so at 3200)
     
-   'var sFile = sPath+"\LDraw\parts\3461.dat"     'height should be 20 not 24, width and depth is fine (24 both on part/subparts)
-#endif   
-
-'var sFile = sPath+"\LDraw\p\stud4.dat"
-'var sFile = sPath+"\LDraw\p\4-4edge.dat"
-
-'var sFile = sPath+"LDraw\models\car.ldr"
-'var sFile = sPath+"\examples\5580.mpd"
-
-'var sFile = sPath+"LDraw\digital-bricks.de parts not in LDRAW\12892.dat"
+   'sFile = sPath+"\LDraw\parts\3461.dat"     'height should be 20 not 24, width and depth is fine (24 both on part/subparts)
+end scope
+scope
+   'sFile = sPath+"\LDraw\p\stud4.dat"
+   'sFile = sPath+"\LDraw\p\4-4edge.dat"
+   
+   'sFile = sPath+"LDraw\models\car.ldr"
+   'sFile = sPath+"\examples\5580.mpd"
+   
+   'sFile = sPath+"LDraw\digital-bricks.de parts not in LDRAW\12892.dat"
+   
+   'crashing due to fallback additions
+   '#include "CrashTest.bi"
+end scope
 
 dim as string sModel
 
 #if 1 '1 = Load File , 0 = Load From clipboard
+   if len(sFile)=0 then sFile=command(1)
    if instr(sFile,"\")=0 andalso instr(sFile,"/")=0 then FindFile(sFile)
    printf(!"Model: '%s'\n",sFile)
    if LoadFile( sFile , sModel ) = 0 then
@@ -216,22 +222,28 @@ dim as string sModel
    end if
    var pModel = LoadModel( strptr(sModel) , sFile )
 #else
-   sModel = GetClipboard() 
+   sModel = command(1)
    if instr(sModel,".dat") then
       for N as long = 0 to len(sModel)
          if sModel[N]=13 then sModel[N]=32
       next N
-   else 'if there isnt a model in the clipboard, then load this:
-      sModel = _    
-      "1 1 -40 24 20 1 0 0 0 1 0 0 0 1 3001.dat" EOL _
-      "1 1 0 0 0 1 0 0 0 1 0 0 0 1 3001.dat" EOL _      
-      ' ------------------------------------------------------
-      
-      'sModel = _ 'all of lines belo should end with EOL _
-      '   "1 4 0 0 0 1 0 0 0 1 0 0 0 1 30068.dat"    EOL _
-      '   "1 1 0 -10 0 1 0 0 0 1 0 0 0 1 18654.dat"  EOL _
-      ' ------------------------------------------------------
-   end if   
+   else
+      sModel = GetClipboard() 
+      if instr(sModel,".dat") then
+         for N as long = 0 to len(sModel)
+            if sModel[N]=13 then sModel[N]=32
+         next N
+      else 'if there isnt a model in the clipboard, then load this:
+         sModel = _    
+         "1 2 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 3024.dat" EOL _         
+         ' ------------------------------------------------------
+         
+         'sModel = _ 'all of lines belo should end with EOL _
+         '   "1 4 0 0 0 1 0 0 0 1 0 0 0 1 30068.dat"    EOL _
+         '   "1 1 0 -10 0 1 0 0 0 1 0 0 0 1 18654.dat"  EOL _
+         ' ------------------------------------------------------
+      end if
+   end if
    var pModel = LoadModel( strptr(sModel) , "CopyPaste.ldr" )
 #endif
 
@@ -240,7 +252,7 @@ InitOpenGL()
 'glPolygonMode( GL_FRONT_AND_BACK, GL_LINE )
 
 dim as single fRotationX = 120 , fRotationY = 20
-dim as single fPositionX , fPositionY , fZoom = -3
+dim as single fPositionX , fPositionY , fPositionZ , fZoom = -3
 dim as long iWheel , iPrevWheel
 
 var iModel = glGenLists( 1 )
@@ -275,6 +287,7 @@ end with
 
 dim as PartSnap tSnap
 SnapModel( pModel , tSnap )
+#ifdef DebugShadow
 with tSnap   
    printf(!"Studs=%i Clutchs=%i Aliases=%i Axles=%i Axlehs=%i Bars=%i Barhs=%i Pins=%i Pinhs=%i\n", _
    .lStudCnt , .lClutchCnt , .lAliasCnt , .lAxleCnt , .lAxleHoleCnt ,.lBarCnt , .lBarHoleCnt , .lPinCnt , .lPinHoleCnt )
@@ -291,16 +304,27 @@ with tSnap
       end with
    next N
 end with
+#endif
 
-puts("")
-puts("3001 B1 s7 = 3001 B2 c1;")
-puts("1 0 40 -24 -20 1 0 0 0 1 0 0 0 1 3001.dat")
-puts("1 0 0 0 0 1 0 0 0 1 0 0 0 1 3001.dat")
+'puts("")
+'puts("3001 B1 s7 = 3001 B2 c1;")
+'puts("1 0 40 -24 -20 1 0 0 0 1 0 0 0 1 3001.dat")
+'puts("1 0 0 0 0 1 0 0 0 1 0 0 0 1 3001.dat")
 
 dim as double dRot = timer
 dim as boolean bBoundingBox
 dim as boolean bLeftPressed,bRightPressed,bWheelPressed
 dim as long iFps
+
+'DrawLimitsCube( .xMin-1,.xMax+1 , .yMin-1,.yMax+1 , .zMin-1,.zMax+1 )
+with tSz   
+   fPositionX = 0 '((.xMin + .xMax)\-2)-.xMin
+   fPositionY = (.yMin + .yMax)\-2
+   'printf(!"\nzmin=%f zmax=%f\n",.zMin,.zMax)
+   fPositionZ = (.zMax-.zMin) 'abs(.zMax)-abs(.zMin)
+   'fPositionZ = abs(iif(abs(.zMin)>abs(.zMax),.zMin,.zMax))
+   fPositionZ = sqr(fPositionZ)*-40
+end with
 
 do
    
@@ -314,7 +338,7 @@ do
    glLightfv(GL_LIGHT0, GL_POSITION, @lightPos(0))
    
    'g_zFar
-   glTranslatef( -fPositionX , fPositionY , 80*fZoom ) '/-5)
+   glTranslatef( -fPositionX , fPositionY , fPositionZ*(fZoom+4) ) '80*fZoom ) '/-5)
    
    glRotatef fRotationY , -1.0 , 0.0 , 0
    glRotatef fRotationX , 0   , -1.0 , 0
@@ -328,15 +352,16 @@ do
    glCallList(	iModel )   
    glEnable( GL_LIGHTING )
    
-   
+   #ifdef DebugShadow
    dim as PartSnap tSnap = any
-   static as byte bOnce
+   static as byte bOnce   
    'if bOnce=0 then
       'SnapModel( pModel , tSnap , 2 )
       'bOnce=1
    'else
       SnapModel( pModel , tSnap , true )
    'end if
+   #endif
 
    #if 0
       glEnable( GL_POLYGON_STIPPLE )
@@ -406,6 +431,8 @@ do
          case fb.SC_TAB
             bBoundingBox = not bBoundingBox
          end select
+      case fb.EVENT_WINDOW_CLOSE
+         exit do
       end select
    wend
                

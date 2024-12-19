@@ -29,6 +29,10 @@ redim shared as ModelList g_tModels(0)
 g_sFilenames = chr(0)
 g_sFilesToLoad = chr(0)
 
+#ifndef GiveUp
+  #define GiveUp(_N) sleep: end (_N)
+#endif
+
 #include "Modules\ParserFunctions.bas"
 
 sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long = 0)   
@@ -39,7 +43,7 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
       #endif
       if iResu<0 then
          puts _s " error reading '"+sFilename+"' at line " & iLineNum
-         sleep : system         
+         GiveUp(1)
          iFailed = 1 : exit do
       end if
    #endmacro
@@ -556,7 +560,7 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
       #endif
       if iResu<=0 then
          puts _s " error reading '"+sFilename+"' at line " & iLineNum
-         sleep : system         
+         GiveUp(1)
          iFailed = 1 : exit do
       end if
    #endmacro
@@ -817,7 +821,7 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
    RecursionLevel -= 1
    'clean-up
    if iFailed then 'clean-up in case of faillure
-      puts("Faillure?"):sleep:system
+      puts("Faillure?"):GiveUp(1)
       if pT then deallocate(pT): pT=NULL 'deallocate previous buffer
    else         
       'print sFilename,iLastPart
@@ -859,7 +863,7 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
                   print "ERROR: DEPENDENCY NOT FOUND! '"+sFile+"'"
                   print "Model Path: '"+g_sPathList(0)+"'"
                #endif
-               'sleep : system
+               'GiveUp(1)
             loop
          end if         
          
@@ -873,7 +877,7 @@ end function
 #define EOL !"\n"
 
 'print LoadModel( strptr(sModel) , "MyModel.ldr" )
-'sleep ': system
+'GiveUp(1)
 
 #if 0
    dim as string sModel

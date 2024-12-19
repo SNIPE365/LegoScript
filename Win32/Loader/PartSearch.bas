@@ -5,6 +5,10 @@
 #include once "crt.bi"
 #include once "Include\PartPaths.bas"
 
+#ifndef GiveUp
+  #define GiveUp(_N) sleep : end (_N)
+#endif
+
 #macro ForEachPartFlag(_Do)   
    _Do(Donor      ,  0 ) 'what is donor parts
    _Do(Alias      ,  1 ) 'alias to another part
@@ -211,7 +215,7 @@ sub LoadPartNames()
             g_pPartsNames = reallocate( g_pPartsNames , uPartNamesSize+iSize )
             if g_pPartsNames = NULL then
                print "Failed reallocate"
-               sleep : system
+               GiveUp(2)
             end if
             
             with *cptr( SearchPartStruct ptr , g_pPartsNames+uPartNamesSize )

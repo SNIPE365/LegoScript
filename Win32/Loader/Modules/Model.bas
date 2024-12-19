@@ -68,7 +68,7 @@ sub RenderModel( pPart as DATFile ptr , iBorders as long , uCurrentColor as ulon
          with .tParts(N)
             #ifdef DebugPrimitive
                'printf sIdent+"(" & .bType & ") Color=" & .wColour & " (Current=" & hex(uCurrentColor,8) & ")"
-               'sleep
+               'sle ep
             #endif
                         
             if .wColour = c_Main_Colour then 'inherit
@@ -369,7 +369,7 @@ type PartSnap
    as SnapPV ptr pStud,pClutch
 end type
 
-sub SnapAddStud( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) )
+sub SnapAddStud( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) )   
    with tSnap
       for N as long = 0 to iCnt-1
         .lStudCnt += 1
@@ -643,7 +643,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                                     DbgConnect(!"Stud += %i\n",iConCnt)
                                     'var p = pPart
                                     with *pMat
-                                       SnapAddStud( tSnap , iConCnt , type(fPX+.fPosX , fPY+.fPosY , fPZ+.fPosZ) )                                       
+                                       SnapAddStud( tSnap , iConCnt , type(fPX+.fPosX , fPY+.fPosY , fPZ+.fPosZ) )
                                     end with
                                  end if                                 
                                  bSecs -= 1 'stud
@@ -686,10 +686,16 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                                  bSecs -= 1 : iMaybePins=-999 : bSides = 1
                               case sss_Square   
                                  if bDraw=0 then
+                                    if bDidClutch=0 then
+                                       bDidClutch=1
+                                       with *pMat
+                                          SnapAddClutch( tSnap , iConCnt , type(fPX+.fPosX , fPY+.fPosY , fPZ+.fPosZ) )                                       
+                                       end with
+                                    end if
                                     DbgConnect(!"Clutch += %i (Square slide)\n",iConCnt)
                                     DbgConnect(!"BarHole += %i (Square slide)\n",iConCnt*bSides)
                                  end if
-                                 if bDidClutch=0  then bDidClutch=1  : tSnap.lClutchCnt  += iConCnt
+                                 'if bDidClutch=0  then bDidClutch=1  : tSnap.lClutchCnt  += iConCnt
                                  if bDidBarHole=0 then bDidBarHole=1 : tSnap.lBarHoleCnt += iConCnt*bSides
                                  bSecs -= 1 'BARHOLE //bConType = spBarHole: exit for
                               case sss_Round                                 
@@ -706,11 +712,12 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                               end select
                            next I
                            if iMaybePins>0 then 
-                              if bDraw=0 then                                  
+                              if bDraw=0 then
                                  DbgConnect(!"Clutch += %i (round slide from pin?)\n",iConCnt*iMaybePins*bSides )
                                  DbgConnect(!"PinHole += %i (round slide )\n", iConCnt*iMaybePins)
+                                 puts("ERROR: unimplemented clutches were not added")
                               end if
-                              tSnap.lClutchCnt += iConCnt*iMaybePins*bSides 
+                              'tSnap.lClutchCnt += iConCnt*iMaybePins*bSides 
                               tSnap.lPinHoleCnt += iConCnt*iMaybePins : bSecs -= iMaybePins 'PINHOLE
                            end if
                         else 'BARHOLE / CLUTCH / KingPin (fat)
@@ -768,11 +775,17 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                            '#endif
                         case spClutch  
                            'printf(!"Sides=%i\n",bSides)
-                           if bDraw=0 then 
+                           if bDraw=0 then
+                              with *pMat
+                                 SnapAddClutch( tSnap , iConCnt , type(fPX+.fPosX , fPY+.fPosY , fPZ+.fPosZ) )                                       
+                              end with
                               DbgConnect(!"Clutch += %i (Fallback)\n",iConCnt)
+                              if iConCnt > 1 then printf(!"WARNING: %i clutches added as fallback\n",iConCnt)
                               'printf(!"Clutch += %i (Fallback)\n",iConCnt)
                            end if
-                           tSnap.lClutchCnt   += iConCnt '*bSides 
+                           
+                           'tSnap.lClutchCnt   += iConCnt '*bSides 
+                           
                            '#ifndef __Tester
                            'puts("!!! FALLBACK CLUTCH !!!")
                            '#endif

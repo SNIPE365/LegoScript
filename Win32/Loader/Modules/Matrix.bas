@@ -2,6 +2,10 @@
   #error " Don't compile this one"
 #endif  
 
+#ifndef GiveUp
+  #define GiveUp(_N) sleep : end (_N)
+#endif
+
 'type Matrix4x4
 '   m(15) as single
 'end type   
@@ -34,7 +38,7 @@ sub PushAndMultMatrix( pIn as const single ptr )
    g_CurrentMatrix += 1
    if g_CurrentMatrix > 1023 then
       puts("MATRIX STACK OVERFLOW!!!!")
-      sleep : system
+      GiveUp(1)
    end if
          
    'var pOut = cast(Matrix4x4 ptr,@tMatrixStack(g_CurrentMatrix))

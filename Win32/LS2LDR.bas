@@ -1,8 +1,12 @@
+#cmdline "-exx"
+
 #include once "windows.bi"
 #include once "fbgfx.bi"
 
 #define __Main
 #define __NoRender
+
+#define GiveUp(_N) end _N
 
 #include once "Loader\PartSearch.bas"
 #include once "Loader\LoadLDR.bas"   
@@ -451,15 +455,15 @@ function LegoScriptToLDraw( sScript as string ) as string
                   else
                      if tRight(Type) then ParserError("Expected end of statement, got '"+sThisToken+"'")
                   end if
-                  var iConn = ReadTokenNumber(sThisToken,1)
+                  var iConn = ReadTokenNumber(sThisToken,1)                  
                   if iConn <= 0 then ParserError("invalid connector number")                  
                   if LoadPartModel( g_tPart(iName) ) < 0 then ParserError("failed to load model")
                   var pModel = g_tModels(curPart.iModelIndex).pModel 
                   var pSnap = cptr(PartSnap ptr,pModel->pData)
-                                    
+                  
                   with *pSnap
                      select case sThisToken[0]
-                     case asc("s")
+                     case asc("s")                        
                         if iConn > .lStudCnt then ParserError("part "+sFullName+" only have " & .lStudCnt   & " studs.")
                         if tRight(Part) < 0 then tLeft(Type)=spStud : tLeft(Num)=iConn else tRight(Type)=spStud : tRight(Num)=iConn
                      case asc("c")
@@ -496,10 +500,13 @@ function LegoScriptToLDraw( sScript as string ) as string
    wend
    
    if iStNext=0 andalso g_iPartCount>0 then      
+      dim as zstring*256 zTemp=any
       dim as SnapPV ptr pLeft=any,pRight=any
       with g_tPart(0)
          'print .sName , .sPrimative , .iColor
-         printf(!"1 %i %f %f %f 1 0 0 0 1 0 0 0 1 %s\n",.iColor,.tLocation.fPX,.tLocation.fPY,.tLocation.fPZ,.sPrimative)
+         var iColor = iif( .iColor<0 , 16 , .iColor )
+         sprintf(zTemp,!"1 %i %f %f %f 1 0 0 0 1 0 0 0 1 %s\n",iColor,.tLocation.fPX,.tLocation.fPY,.tLocation.fPZ,.sPrimative)
+         sResult += zTemp : printf("%s",zTemp)
       end with
         
       for I as long = 0 to g_iConnCount-1
@@ -530,7 +537,7 @@ function LegoScriptToLDraw( sScript as string ) as string
             'end type
             var ptLocation = @g_tPart(.iLeftPart).tLocation
             dim as single fPX = ptLocation->fPX - (pLeft->fPX + pRight->fPX)
-            dim as single fPY = ptLocation->fPY + pLeft->fPY + pRight->fPY
+            dim as single fPY = ptLocation->fPY + (pLeft->fPY - pRight->fPY)
             dim as single fPZ = ptLocation->fPZ + pLeft->fPZ + pRight->fPZ
             with g_tPart(.iRightPart)
                if .tLocation.fPX = 0 andalso .tLocation.fPY=0 andalso .tLocation.fPZ=0 then
@@ -538,8 +545,9 @@ function LegoScriptToLDraw( sScript as string ) as string
                elseif abs(.tLocation.fPX-fPX)>.001 orelse abs(.tLocation.fPY-fPY)>.001 orelse abs(.tLocation.fPZ-fPZ)>.001 then
                   color 12 : print "Impossible Connection detected!" : color 7
                end if
-               var iColor = iif(.iColor<0,0,.iColor)
-               printf(!"1 %i %f %f %f 1 0 0 0 1 0 0 0 1 %s\n",iColor,fPX,fPY,fPZ,.sPrimative)
+               var iColor = iif(.iColor<0,16,.iColor)
+               sprintf(zTemp,!"1 %i %f %f %f 1 0 0 0 1 0 0 0 1 %s\n",iColor,fPX,fPY,fPZ,.sPrimative)
+               sResult += zTemp : printf("%s",zTemp)               
             end with            
             'puts("1 0 40 -24 -20 1 0 0 0 1 0 0 0 1 3001.dat")
             'puts("1 0 0 0 0 1 0 0 0 1 0 0 0 1 3001.dat")
@@ -556,12 +564,12 @@ function LegoScriptToLDraw( sScript as string ) as string
 end function
 
 dim as string sText,sScript
-var sCmd = command()
+var sCmd = command(), iDump=0
 if len(sCmd) then
-   var f = freefile()
+   var f = freefile() : iDump=1
    if open(sCmd for binary access read as #f) then
       print "Failed to open '"+sCmd+"'"
-      sleep : system
+      GiveUp(2)
    end if
    sScript = space(lof(f))
    get #f,,sScript : close #f
@@ -577,10 +585,34 @@ else
       !"B3 s8 = 3002 B5 c3;"
    #endif
    sScript = _
-     !"3001 B1 #2 s7 = 3001 B2 c1;"  _
-     !"B2 #2 s2 = 3002 B3 c1;"
+     !"003238a P1 #2 c1 = 003238b P2 #4 s1;"
+     
 end if
-print LegoScriptToLDraw(sScript)
+var sModel = LegoScriptToLDraw(sScript)
+if len(sModel) andalso iDump then
+   var sFile = trim( sScript , any !"\r\n" )+".ldr"
+   for N as long = 0 to len(sFile)-1
+      select case sFile[N]
+      case asc("*"),asc(""""),asc("/"),asc("\"),asc("<"),asc(">"),asc(":"),asc("|"),asc("?")
+        sFile[N] = asc("-")
+      case is <32 , is > 127
+         sFile[N] = asc("_")
+      end select
+   next N
+   var f = freefile()
+   open sFile for output as #f
+   print #f,sModel
+   close #f
+end if
+      
+if len(sModel) then
+   'var sParms = """"+sModel+""""
+   'exec(exepath()+"\Loader\ViewModel.exe",sParms)
+   end 0
+else
+   'if iDump=0 then sleep
+   end 255
+end if
 
 #if 0
    print AddPartName( "B3" , "30001" )
@@ -606,4 +638,4 @@ print LegoScriptToLDraw(sScript)
 '   print strptr(g_sFilenames)[g_tModels(N).iFilenameOffset+9]
 'next N
 
-sleep
+
