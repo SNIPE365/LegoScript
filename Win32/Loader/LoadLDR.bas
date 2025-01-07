@@ -234,9 +234,13 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
                         CheckError( "invalid grid Z count" )
                      end if
                      GetFloat( pParm , fStepX , "grid step X" )
+                     #ifndef __Tester
                      if (cint(fStepX)*100) <> cint(fStepX*100) then printf(!"Warning: float grid step X (%f)\n", fStepX)
+                     #endif
                      GetFloat( pParm , fStepZ , "grid step Z" )
+                     #ifndef __Tester
                      if (cint(fStepZ)*100) <> cint(fStepZ*100) then printf(!"Warning: float grid step Z (%f)\n", fStepZ)
+                     #endif
                      '#if (not defined(__Tester)) andalso defined(__DebugShadowLoad)
                      'printf(!"Grid: %ix%i step %g,%g\n",lCntX,lCntZ,fStepX,fStepZ)
                      '#endif
@@ -382,9 +386,13 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
                            CheckError( "Invalid sec shape" )
                         end select
                         GetFloat( pParm , fRad , "Radius" )
+                        #ifndef __Tester
                         if (cint(fRad*100)*100) <> cint(fRad*100*100) then printf(!"Warning: innacurate fixed Radius (%f)\n", fRad)
+                        #endif
                         GetFloat( pParm , fLen , "Length" )
+                        #ifndef __Tester
                         if (cint(fLen)*100) <> cint(fLen*100) then printf(!"Warning: float Length (%f)\n", fLen)
+                        #endif
                         '#if (not defined(__Tester)) andalso defined(__DebugShadowLoad)
                         'printf(!"Shape:(%i)'%s' Rad:%g Len:%g\n",iShapeID,sShape,fRad,fLen)
                         '#endif
@@ -459,9 +467,13 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
                         CheckError( "invalid grid Z count" )
                      end if
                      GetFloat( pParm , fStepX , "grid step X" )
+                     #ifndef __Tester
                      if (cint(fStepX)*100) <> cint(fStepX*100) then printf(!"Warning: float grid step X (%f)\n", fStepX)
+                     #endif
                      GetFloat( pParm , fStepZ , "grid step Z" )
+                     #ifndef __Tester
                      if (cint(fStepZ)*100) <> cint(fStepZ*100) then printf(!"Warning: float grid step Z (%f)\n", fStepZ)
+                     #endif
                      '#if (not defined(__Tester)) andalso defined(__DebugShadowLoad)
                      'printf(!"Grid: %ix%i step %g,%g\n",lCntX,lCntZ,fStepX,fStepZ)
                      '#endif
@@ -863,7 +875,7 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
                   print "ERROR: DEPENDENCY NOT FOUND! '"+sFile+"'"
                   print "Model Path: '"+g_sPathList(0)+"'"
                #endif
-               'GiveUp(1)
+               GiveUp(1)
             loop
          end if         
          

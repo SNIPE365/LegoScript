@@ -64,13 +64,13 @@ enum ErrorCodes
    ecAlreadyExist
    ecSuccess        = 0
 end enum
-
 type PartStructLS
    tLocation   as SnapPV
    sName       as string
    sPrimative  as string
    iColor      as long
    iModelIndex as long
+   bPartCat    as byte
    bFoundPart  as byte
 end type
 type PartConnLS
@@ -215,7 +215,7 @@ function FindModelIndex( sPart as string ) as long
       if g_sFilenames[iPos]=0 then exit do
    loop
    return *cptr(long ptr,@g_sFilenames[iPos-4])
-end function  
+end function
 function LoadPartModel( byref tPart as PartStructLS ) as long
    with tPart      
       if .iModelIndex >= 0 then return ErrInfo(ecSuccess) 'already loaded
@@ -225,7 +225,7 @@ function LoadPartModel( byref tPart as PartStructLS ) as long
       var pModel = LoadModel( strptr(sModel) , .sPrimative )                      
       if pModel=0 then return ErrInfo(ecFailedToParse)                      'part failed to parse
       .iModelIndex = pModel->iModelIndex             
-      .sPrimative = mid(.sPrimative,instrrev(.sPrimative,"\")+1)
+      .sPrimative = mid(.sPrimative,instrrev(.sPrimative,"\")+1)      
       'generate snap if not generated yet
       'var pModel = g_tModels(.iModelIndex).pModel
       if pModel->pData = 0 then   
@@ -233,10 +233,10 @@ function LoadPartModel( byref tPart as PartStructLS ) as long
          var pSnap = cptr(PartSnap ptr,pModel->pData)
          SnapModel( pModel , *pSnap )
       end if
+      .bPartCat = DetectPartCathegory( pModel )
    end with
    return ErrInfo(ecSuccess)
 end function
-   
 function AddPartName( sName as string , sPart as string ) as long   
          
    'skip '0 prefix (as no part name start with a '0')
@@ -585,7 +585,9 @@ else
       !"B3 s8 = 3002 B5 c3;"
    #endif
    sScript = _
-     !"003238a P1 #2 c1 = 003238b P2 #4 s1;"
+     !"3865 BP10 #7 s69 = 3623 P1 c1;" _
+     !"P1 s1 = 3002 B1 #2 c1;"
+     '!"003238a P1 #2 c1 = 003238b P2 #4 s1;"
      
 end if
 var sModel = LegoScriptToLDraw(sScript)
@@ -606,11 +608,14 @@ if len(sModel) andalso iDump then
 end if
       
 if len(sModel) then
-   'var sParms = """"+sModel+""""
-   'exec(exepath()+"\Loader\ViewModel.exe",sParms)
+   var sParms = """"+sModel+""""
+   puts("-----------------")   
+   exec(exepath()+"\Loader\ViewModel.exe",sParms)
+   'sleep
+   puts("-----------------")
    end 0
 else
-   'if iDump=0 then sleep
+   if iDump=0 then sleep
    end 255
 end if
 

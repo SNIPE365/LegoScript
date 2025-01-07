@@ -52,6 +52,15 @@ end type
 
 const cShadowMaxSecs = 8
 
+enum PartCathegory
+   pcNone   
+   pcPlate      'Y = 8+4  , >= 1 clutch , >= 1 stud
+   pcBrick
+   pcBaseplate  'Y = 4+4  , >= 1 stud
+   pcSlab       'Y = 16+4 , >= 1 clutch , >= 1 stud
+   pcOther
+end enum
+
 enum SubpartType
    spUnknown
    spStud
