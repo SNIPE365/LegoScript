@@ -65,22 +65,23 @@ enum ErrorCodes
    ecSuccess        = 0
 end enum
 type PartStructLS
-   tLocation   as SnapPV
-   sName       as string
-   sPrimative  as string
+   tLocation   as SnapPV   'Position/Direction (Model.bas)
+   tSize       as PartSize 'size of the part (Model.bas)
+   sName       as string   'name of the part "B1" , "P1", etc..
+   sPrimative  as string   '.dat model path for part
    iColor      as long
-   iModelIndex as long
-   bPartCat    as byte
+   iModelIndex as long     'g_tModels(Index) (LoadrLDR.bas) (ModelList at Structs.bas)
+   bPartCat    as byte     'enum PartCathegory
    bFoundPart  as byte
 end type
 type PartConnLS
-   iLeftPart  as long
-   iRightPart as long
+   iLeftPart  as long    'g_tPart(index)
+   iRightPart as long    'g_tPart(index)
    iLeftNum   as short
    iRightNum  as short
    iLeftType  as byte
    iRightType as byte
-   bResv(1)   as byte
+   bResv(1)   as byte    'padding
 end type
 
 const _cPartMin=255 , _cConnMin=255
@@ -221,8 +222,10 @@ function LoadPartModel( byref tPart as PartStructLS ) as long
       if .iModelIndex >= 0 then return ErrInfo(ecSuccess) 'already loaded
       'load model
       dim as string sModel
-      if LoadFile( .sPrimative , sModel ) = 0 then return ErrInfo(ecFailedToLoad) 'part failed to load file
-      var pModel = LoadModel( strptr(sModel) , .sPrimative )                      
+      if LoadFile( .sPrimative , sModel ) = 0 then 'LoadLDR::LoadFile
+         return ErrInfo(ecFailedToLoad) 'part failed to load file
+      end if
+      var pModel = LoadModel( strptr(sModel) , .sPrimative ) 'LoadLDR::LoadModel
       if pModel=0 then return ErrInfo(ecFailedToParse)                      'part failed to parse
       .iModelIndex = pModel->iModelIndex             
       .sPrimative = mid(.sPrimative,instrrev(.sPrimative,"\")+1)      
@@ -233,7 +236,10 @@ function LoadPartModel( byref tPart as PartStructLS ) as long
          var pSnap = cptr(PartSnap ptr,pModel->pData)
          SnapModel( pModel , *pSnap )
       end if
-      .bPartCat = DetectPartCathegory( pModel )
+      'calculate model size
+      SizeModel( pModel , .tSize ) 'Model::SizeModel
+      'deteact part cathegory
+      .bPartCat = DetectPartCathegory( pModel ) 'Model::DetectPartCathegory
    end with
    return ErrInfo(ecSuccess)
 end function
@@ -585,8 +591,11 @@ else
       !"B3 s8 = 3002 B5 c3;"
    #endif
    sScript = _
-     !"3865 BP10 #7 s69 = 3623 P1 c1;" _
-     !"P1 s1 = 3002 B1 #2 c1;"
+     !"3865 BP10 #7 s69 = 3002 B1 c1;" _
+     !"B1 s1 = 3002 B2 #2 c5;" _
+     !"B2 s1 = 3002 B3 #3 c6;" _
+     !"B3 c5 = 3021 B4 #4 s1;" _ '71752
+     !"B4 c1 = 3002 B5 #5 s6;"    'collision
      '!"003238a P1 #2 c1 = 003238b P2 #4 s1;"
      
 end if
