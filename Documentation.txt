@@ -1,0 +1,72 @@
+[ LS2LDR.bas ]
+
+type PartStructLS
+	structure for a Part in Lego Script
+		tLocation   -> position/direction of the part
+		sName       -> name of the part "B1" , "P1", etc..
+		sPrimative  -> .dat model path for part
+		iColor      -> RGB if >= 0x1000000 otherwise from list
+		iModelIndex -> g_tModels(Index) of the loaded model (LoadrLDR.bas)
+		bPartCat    -> PartCathegory ( pcBrick , pcPlace , ... ) (Structs.bas)
+		bFoundPart  -> if part is already found/loaded
+
+type PartConnLS 
+	structure for Part connections in Lego Script
+		iLeftPart   -> index for "from" part g_tPart()
+		iRightPart  -> index for "to"   part g_tPart()
+		iLeftNum    -> index of connection (clutch#,stud#)
+		iRightNum   -> index of connection (clutch#,stud#)
+		iLeftType   -> SubpartType ( spStud , spClutch ,... ) (Structs.bas)
+		iRightType  -> SubpartType ( spStud , spClutch ,... ) (Structs.bas)
+
+g_bSeparators()
+	array with character -> separator type (stToken,stOperator)
+
+g_tPart()
+	dynamic array with Lego Script parts (PartStructLS)
+g_tConn()
+	dynamic array with Parts connections (PartConnLS)
+	
+ReadTokenNumber()
+	gets positive number from string returns <0 with error code
+IsTokenNumeric()
+	check if the string only contain number digits (true/false)
+IsPrimative()
+	check if a string is a valid primative name [a-z,0-9,_]
+IsValidPartName()
+	check if string is a valid part name [a-z,A-Z,0-9,_]
+ParseColor()
+	parse color text to integer (#RRGGBB #0RGB #RGB #0...9999)
+FindPartName()
+	find index of lego part by name (S1,C1,...)
+FindModelIndex()
+	Find model index from primative name "3001" "3024" ...
+	searches in the g_sFilename that contains loaded model names
+LoadPartModel()
+	Load a part model from the part struct (if not loaded already)
+	loads snap information into g_tModels(Index).pData
+	initializes tPart.iModelIndex and tPart.bPartCat
+AddPartName()
+	Add part name to the g_tPart list 
+	if primative exists then gets its index
+	otherwise just queues to load the primative later
+AddConnection()
+	Add a connection between two parts from a (PartConnLS) struct
+	add it to the g_tConn() connection list
+
+SafeText()
+	URL encode text, changing any non ascii/visible characters
+	changes improper characters to %NN
+	returns a new string instead of modifying input string
+
+
+	
+
+
+	
+		
+		
+		
+	
+
+
