@@ -66,7 +66,6 @@ enum ErrorCodes
 end enum
 type PartStructLS
    tLocation   as SnapPV   'Position/Direction (Model.bas)
-   tSize       as PartSize 'size of the part (Model.bas)
    sName       as string   'name of the part "B1" , "P1", etc..
    sPrimative  as string   '.dat model path for part
    iColor      as long
@@ -234,10 +233,10 @@ function LoadPartModel( byref tPart as PartStructLS ) as long
       if pModel->pData = 0 then   
          pModel->pData = new PartSnap
          var pSnap = cptr(PartSnap ptr,pModel->pData)
-         SnapModel( pModel , *pSnap )
+         SnapModel( pModel , *pSnap )         
       end if
       'calculate model size
-      SizeModel( pModel , .tSize ) 'Model::SizeModel
+      'SizeModel( pModel , .tSize ) 'Model::SizeModel
       'deteact part cathegory
       .bPartCat = DetectPartCathegory( pModel ) 'Model::DetectPartCathegory
    end with
@@ -503,8 +502,7 @@ function LegoScriptToLDraw( sScript as string ) as string
       AddConnection( tConn )
       
       if iStNext=0 then exit while      
-   wend
-   
+   wend   
    if iStNext=0 andalso g_iPartCount>0 then      
       dim as zstring*256 zTemp=any
       dim as SnapPV ptr pLeft=any,pRight=any
@@ -522,7 +520,7 @@ function LegoScriptToLDraw( sScript as string ) as string
             '   .iRightPart & "{" & .iRightType & ":" & .iRightNum & "}"
             'dim as single FromX,FromY,FromZ , ToX,ToY,ToZ
             var pModel = g_tModels(g_tPart(.iLeftPart).iModelIndex).pModel 
-            var pSnap = cptr(PartSnap ptr,pModel->pData)
+            var pSnap = cptr(PartSnap ptr,pModel->pData)            
             select case .iLeftType
             case spStud   : pLeft = pSnap->pStud  +.iLeftNum-1
             case spClutch : pLeft = pSnap->pClutch+.iLeftNum-1
@@ -545,12 +543,33 @@ function LegoScriptToLDraw( sScript as string ) as string
             dim as single fPX = ptLocation->fPX - (pLeft->fPX + pRight->fPX)
             dim as single fPY = ptLocation->fPY + (pLeft->fPY - pRight->fPY)
             dim as single fPZ = ptLocation->fPZ + pLeft->fPZ + pRight->fPZ
-            with g_tPart(.iRightPart)
+            var iRightPart_ = .iRightPart
+            with g_tPart(iRightPart_)
                if .tLocation.fPX = 0 andalso .tLocation.fPY=0 andalso .tLocation.fPZ=0 then
                   .tLocation.fPX = fPX : .tLocation.fPY = fPY : .tLocation.fPZ = fPZ
                elseif abs(.tLocation.fPX-fPX)>.001 orelse abs(.tLocation.fPY-fPY)>.001 orelse abs(.tLocation.fPZ-fPZ)>.001 then
                   color 12 : print "Impossible Connection detected!" : color 7
                end if
+               dim as PartSize tPart = any  : tPart = pModel->tSize
+               tPart.xMin += .tLocation.fPX : tPart.xMax += .tLocation.fPX
+               tPart.yMin =1+.tLocation.fPY : tPart.yMax += .tLocation.fPY
+               tPart.zMin =1+.tLocation.fPZ : tPart.zMax += .tLocation.fPZ
+               for N as long = 0 to g_iPartCount-1
+                  if N = iRightPart_ then continue for
+                  if .tLocation.fPX = 0 andalso .tLocation.fPY=0 andalso .tLocation.fPZ=0 then
+                     continue for
+                  end if
+                  with g_tPart(N)                     
+                     dim as PartSize tChk = any
+                     tChk = g_tModels(g_tPart(N).iModelIndex).pModel->tSize                     
+                     tChk.xMin += .tLocation.fPX : tChk.xMax += .tLocation.fPX
+                     tChk.yMin =1+.tLocation.fPY : tChk.yMax += .tLocation.fPY
+                     tChk.zMin =1+.tLocation.fPZ : tChk.zMax += .tLocation.fPZ
+                     if CheckCollision( tPart , tChk ) then
+                        color 12: printf(!"Collision! between part %s and %s\n",g_tPart(iRightPart_).sName,.sName): color 7
+                     end if
+                  end with
+               next N               
                var iColor = iif(.iColor<0,16,.iColor)
                sprintf(zTemp,!"1 %i %f %f %f 1 0 0 0 1 0 0 0 1 %s\n",iColor,fPX,fPY,fPZ,.sPrimative)
                sResult += zTemp : printf("%s",zTemp)               
@@ -594,7 +613,7 @@ else
      !"3865 BP10 #7 s69 = 3002 B1 c1;" _
      !"B1 s1 = 3002 B2 #2 c5;" _
      !"B2 s1 = 3002 B3 #3 c6;" _
-     !"B3 c5 = 3021 B4 #4 s1;" _ '71752
+     !"B3 c5 = 3021 B4 #4 s1;" _ '71752 '3021
      !"B4 c1 = 3002 B5 #5 s6;"    'collision
      '!"003238a P1 #2 c1 = 003238b P2 #4 s1;"
      

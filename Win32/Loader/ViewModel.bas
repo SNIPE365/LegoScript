@@ -1,6 +1,6 @@
 #define __Main
 '#define __Tester
-#define DebugShadow
+'#define DebugShadow
 '#define ColorizePrimatives
 '#define RenderOptionals
 
@@ -18,6 +18,7 @@
 #include "Modules\Model.bas"
 
 ' TODO make the GUI window so that it can be part of LS in GUI/CLI mode but also part of the lego game.
+' TODO CheckModelCollision()
 
 'https://www.melkert.net/LDCad/tech/meta
 
@@ -170,7 +171,7 @@ scope
    'sFile = sPath+"\LDraw\parts\3082.dat"     'THIS APPEARS TO BE WRONG, IT LOOKS LIKE ITS 2 LDU thick by 39 LDU tall including the nub and 32 LDU WIDE 
    'sFile = sPath+"\LDraw\parts\3109.dat"     'FINE (subpart? shadow does not account holes)
    'sFile = sPath+"\LDraw\parts\3110.dat"     '(subpart) this appears to be 20 LDU tall by 32 LDU wide by 72 LDU long
-   'sFile = sPath+"\LDraw\parts\3111.dat"     '(no shadow) actually right :) (need further review on the subparts of this)
+   sFile = sPath+"\LDraw\parts\3111.dat"     '(no shadow) actually right :) (need further review on the subparts of this)
    'sFile = sPath+"\LDraw\parts\3112.dat"     '(no shadow) actually right :) (need further review on the subparts of this)
    'sFile = sPath+"\LDraw\parts\3127.dat"     '(size? mega wrong :D)
    'sFile = sPath+"\LDraw\parts\3130.dat"     'FINE (miss many shadow info)
@@ -204,11 +205,14 @@ scope
    
    'sFile = sPath+"LDraw\models\car.ldr"
    'sFile = sPath+"\examples\5580.mpd"
+   sFile = exePath+"\..\Collision.ldr"
    
    'sFile = sPath+"LDraw\digital-bricks.de parts not in LDRAW\12892.dat"
    
    'crashing due to fallback additions
    '#include "CrashTest.bi"
+   'sFile = sPath+"LDraw\models\pyramid.ldr"
+   'sFile = sPath+"\examples\8891-towTruck.mpd"
 end scope
 scope 
    #if 0
@@ -266,16 +270,26 @@ InitOpenGL()
 dim as single fRotationX = 120 , fRotationY = 20
 dim as single fPositionX , fPositionY , fPositionZ , fZoom = -3
 dim as long iWheel , iPrevWheel
+dim as long g_DrawCount = pModel->iPartCount , g_CurDraw = -1
 
-var iModel = glGenLists( 1 )
+var iModel   = glGenLists( 1 )
 glNewList( iModel ,  GL_COMPILE ) 'GL_COMPILE_AND_EXECUTE
 RenderModel( pModel , false )
+glEndList()
+var iBorders = glGenLists( 2 )
+glNewList( iBorders ,  GL_COMPILE )
 RenderModel( pModel , true )
 glEndList()
+glNewList( iBorders+1 ,  GL_COMPILE )
+RenderModel( pModel , true , , -2 )
+glEndList()
+
 
 dim as single xMid,yMid,zMid , g_zFar
 dim as PartSize tSz
-SizeModel( pModel , tSz )
+dim as long g_PartCount , g_CurPart = -1
+
+SizeModel( pModel , tSz , , g_PartCount )
 with tSz
    xMid = (.xMin+.xMax)/2
    yMid = (.yMin+.yMax)/2
@@ -297,10 +311,12 @@ with tSz
    
 end with
 
+printf(!"Parts: %i\n",g_PartCount)
+
+#ifdef DebugShadow
 dim as PartSnap tSnap
 SnapModel( pModel , tSnap )
-#ifdef DebugShadow
-with tSnap   
+with tSnap
    printf(!"Studs=%i Clutchs=%i Aliases=%i Axles=%i Axlehs=%i Bars=%i Barhs=%i Pins=%i Pinhs=%i\n", _
    .lStudCnt , .lClutchCnt , .lAliasCnt , .lAxleCnt , .lAxleHoleCnt ,.lBarCnt , .lBarHoleCnt , .lPinCnt , .lPinHoleCnt )
    puts("---------- stud ----------")
@@ -359,9 +375,15 @@ do
    with tSz
       'glTranslatef( (.xMin+.xMax)/-2  , (.yMin+.yMax)/-2 , (.zMin+.zMax)/-2 )
    end with
-   
+      
    glDisable( GL_LIGHTING )
-   glCallList(	iModel )   
+   if g_CurDraw < 0 then
+      glCallList(	iModel )   
+   else
+      RenderModel( pModel , false , , g_CurDraw )      
+   end if
+   glCallList(	iBorders-(g_CurDraw>=0) )   
+
    glEnable( GL_LIGHTING )
    
    #ifdef DebugShadow
@@ -391,7 +413,7 @@ do
          'glutSolidSphere( 6 , 18 , 7 ) 'male round (.5,.5,N\2)
          glutSolidCube(6) 'male square (1,1,N)
          glPopMatrix()
-      #endif   
+      #endif
       #if 0
          glPushMatrix()
          glTranslatef( 10 , -2f , 0 )
@@ -411,10 +433,20 @@ do
    #endif
    
    if bBoundingBox then         
-      glColor4f(0,1,0,.25)
+      glEnable( GL_POLYGON_STIPPLE )
+      static as ulong aStipple(32-1)
+      dim as long iMove = (timer*8) and 7
+      for iY as long = 0 to 31         
+         var iN = iif(iY and 1,&h1414141414141414ll,&h4141414141414141ll)         
+         aStipple(iY) = iN shr ((iY+iMove) and 7)
+      next iY
+      glPolygonStipple(	cptr(glbyte ptr,@aStipple(0)) )
+      'glColor4f(0,1,0,.25)
+      if (iMove and 2) then glColor4f(1,0,0,1) else glColor4f(0,0,0,1)
       with tSz
          DrawLimitsCube( .xMin-1,.xMax+1 , .yMin-1,.yMax+1 , .zMin-1,.zMax+1 )
       end with   
+      glDisable( GL_POLYGON_STIPPLE )
    end if
    
    glPopMatrix()
@@ -439,6 +471,41 @@ do
          if e.button = fb.BUTTON_LEFT   then bLeftPressed  = false
          if e.button = fb.BUTTON_RIGHT  then bRightPressed = false      
       case fb.EVENT_KEY_PRESS
+         select case e.ascii
+         case 8
+            if bBoundingBox then
+               g_CurPart = -1
+               printf(!"g_CurPart = %i    \r",g_CurPart)
+               dim as PartSize tSzTemp
+               SizeModel( pModel , tSzTemp , g_CurPart )
+               tSz = tSzTemp
+            else
+               g_CurDraw = -1
+               printf(!"g_CurDraw = %i    \r",g_CurDraw)
+            end if               
+         case asc("="),asc("+")
+            if bBoundingBox then
+               g_CurPart = ((g_CurPart+2) mod (g_PartCount+1))-1
+               printf(!"g_CurPart = %i    \r",g_CurPart)
+               dim as PartSize tSzTemp
+               SizeModel( pModel , tSzTemp , g_CurPart )
+               tSz = tSzTemp
+            else
+               g_CurDraw = ((g_CurDraw+2) mod (g_DrawCount+1))-1
+               printf(!"g_CurDraw = %i    \r",g_CurDraw)
+            end if
+         case asc("-"),asc("_")
+            if bBoundingBox then
+               g_CurPart = ((g_CurPart+g_PartCount+1) mod (g_PartCount+1))-1
+               printf(!"g_CurPart = %i    \r",g_CurPart)
+               dim as PartSize tSzTemp
+               SizeModel( pModel , tSzTemp , g_CurPart )
+               tSz = tSzTemp
+            else
+               g_CurDraw = ((g_CurDraw+g_DrawCount+1) mod (g_DrawCount+1))-1
+               printf(!"g_CurDraw = %i    \r",g_CurDraw)
+            end if               
+         end select
          select case e.scancode
          case fb.SC_TAB
             bBoundingBox = not bBoundingBox

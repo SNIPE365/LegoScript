@@ -153,12 +153,21 @@ type PartStruct
    end union
 end type
 
+const fUnused = -1234567
+
+type PartSize
+   as single xMin = fUnused , xMax = fUnused
+   as single yMin = fUnused , yMax = fUnused
+   as single zMin = fUnused , zMax = fUnused
+end type
+
 type DATFile
   iModelIndex     as long
   iPartCount      as long                  'number of parts in this file
-  fSizeX          as single     'X Size
-  fSizeY          as single     'Y Size
-  fSizeZ          as single     'Z Size
+  tSize           as PartSize
+  'fSizeX          as single     'X Size
+  'fSizeY          as single     'Y Size
+  'fSizeZ          as single     'Z Size
   'this info is filled dynamically based on studs/clutches etc... (also including the shadow info)
   iShadowCount    as long                  'number of entries in the shadow dynamic array
   paShadow        as ShadowStruct ptr

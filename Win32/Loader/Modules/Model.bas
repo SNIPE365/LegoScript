@@ -55,15 +55,18 @@ function GetPartName( pPart as DATFile ptr ) as string
 end function
 
 #ifndef __NoRender
-sub RenderModel( pPart as DATFile ptr , iBorders as long , uCurrentColor as ulong = &h70605040 , uCurrentEdge as ulong = 0 DebugPrimParm )
+sub RenderModel( pPart as DATFile ptr , iBorders as long , uCurrentColor as ulong = &h70605040 , lDrawPart as long = -1 , uCurrentEdge as ulong = 0 DebugPrimParm )
    if uCurrentColor = &h70605040 then uCurrentColor = g_Colours(c_Blue) : uCurrentEdge = g_EdgeColours(c_Blue)
    
    var uEdge = uCurrentEdge
    static as integer iOnce
+   
            
    with *pPart      
       'for M as long = 0 to 1
       for N as long = 0 to .iPartCount-1
+         dim as byte bDoDraw
+         if (lDrawPart<0 orelse lDrawPart=N) then bDoDraw = 1
          dim as ulong uColor = any', uEdge = any
          with .tParts(N)
             #ifdef DebugPrimitive
@@ -92,53 +95,54 @@ sub RenderModel( pPart as DATFile ptr , iBorders as long , uCurrentColor as ulon
             '   if .bType<>2 and .bType<>5 then continue for
             'end if
             select case .bType
-            case 1                  
+            case 1
                'continue for
                'uEdge = rgb(rnd*255,rnd*255,rnd*255)
                uEdge = ((uColor and &hFEFEFE) shr 1) or (uColor and &hFF000000)
                'g_EdgeColours(.wColour)
                var T1 = ._1
                with T1
-                  var pSubPart = g_tModels(.lModelIndex).pModel
-                  var sName = *cptr(zstring ptr,strptr(g_sFilenames)+g_tModels(.lModelIndex).iFilenameOffset+6)
+                  if bDoDraw then
+                     var pSubPart = g_tModels(.lModelIndex).pModel
+                     var sName = *cptr(zstring ptr,strptr(g_sFilenames)+g_tModels(.lModelIndex).iFilenameOffset+6)
+                                          
+                     '1 16 0 0 0 1 0 0 0 8 0 0 0 1 axlehole.dat
+   
+                     #ifdef DebugPrimitive
+                     Puts _
+                        " fX:" & .fX & " fY:" & .fY & " fZ:" & .fZ & _
+                        " fA:" & .fA & " fB:" & .fB & " fC:" & .fC & _
+                        " fD:" & .fD & " fE:" & .fE & " fF:" & .fF & _
+                        " fG:" & .fG & " fH:" & .fH & " fI:" & .fI & " '" & sName & "'"                     
+                     #endif
                                        
-                  '1 16 0 0 0 1 0 0 0 8 0 0 0 1 axlehole.dat
-
-                  #ifdef DebugPrimitive
-                  Puts _
-                     " fX:" & .fX & " fY:" & .fY & " fZ:" & .fZ & _
-                     " fA:" & .fA & " fB:" & .fB & " fC:" & .fC & _
-                     " fD:" & .fD & " fE:" & .fE & " fF:" & .fF & _
-                     " fG:" & .fG & " fH:" & .fH & " fI:" & .fI & " '" & sName & "'"                     
-                  #endif
-                                    
-                  'MultiplyMatrixVector( @.fX ) 
-               
-                  dim as single fMatrix(15) = { _
-                    .fA*cScale , .fD*cScale , .fG*cScale , 0 , _ 'X scale ,    ?    ,    ?    
-                    .fB*cScale , .fE*cScale , .fH*cScale , 0 , _ '  ?     , Y Scale ,    ?    
-                    .fC*cScale , .fF*cScale , .fI*cScale , 0 , _ '  ?     ,    ?    , Z Scale 
-                    .fX*cScale , .fY*cScale , .fZ*cScale , 1 }   ' X Pos  ,  Y Pos  ,  Z Pos  
+                     'MultiplyMatrixVector( @.fX ) 
                   
-                  'if sName = "axle.dat" then fMatrix(4) *= 2
-                  PushAndMultMatrix( @fMatrix(0) )
-                  
-                  #ifdef ColorizePrimatives
-                  if iBorders=0 then
-                     select case GetSubPartType( sName )
-                     case spStud   : uColor = &hFF4488FF                        
-                     case spClutch : uColor = &hFF1122FF
-                     case spAxle   : uColor = &hFF44FF88
-                     end select
-                  end if
-                  #endif
-                  
-                  RenderModel( pSubPart , iBorders , uColor , uEdge DebugPrimIdent )
-                  PopMatrix()
-                  
+                     dim as single fMatrix(15) = { _
+                       .fA*cScale , .fD*cScale , .fG*cScale , 0 , _ 'X scale ,    ?    ,    ?    
+                       .fB*cScale , .fE*cScale , .fH*cScale , 0 , _ '  ?     , Y Scale ,    ?    
+                       .fC*cScale , .fF*cScale , .fI*cScale , 0 , _ '  ?     ,    ?    , Z Scale 
+                       .fX*cScale , .fY*cScale , .fZ*cScale , 1 }   ' X Pos  ,  Y Pos  ,  Z Pos  
+                     
+                     'if sName = "axle.dat" then fMatrix(4) *= 2
+                     PushAndMultMatrix( @fMatrix(0) )
+                     
+                     #ifdef ColorizePrimatives
+                     if iBorders=0 then
+                        select case GetSubPartType( sName )
+                        case spStud   : uColor = &hFF4488FF                        
+                        case spClutch : uColor = &hFF1122FF
+                        case spAxle   : uColor = &hFF44FF88
+                        end select
+                     end if
+                     #endif
+                     
+                     RenderModel( pSubPart , iBorders , uColor , iif(lDrawPart=-2,-2,-1) , uEdge DebugPrimIdent )
+                     PopMatrix()
+                  end if                  
                end with               
             case 2               
-               if iBorders=0 then continue for
+               if iBorders=0 andalso lDrawPart <> N then continue for
                'glPushMatrix() : glMultMatrixf( @fMatrix(0) )
                
                var T2 = ._2               
@@ -152,8 +156,14 @@ sub RenderModel( pPart as DATFile ptr , iBorders as long , uCurrentColor as ulon
                      " fX1:" & .fX1 & " fY1:" & .fY1 & " fZ1:" & .fZ1 & _
                      " fX2:" & .fX2 & " fY2:" & .fY2 & " fZ2:" & .fZ2
                   #endif
-                  
-                  glColor4ubv( cast(ubyte ptr,@uEdge) )
+                                    
+                  if lDrawPart = -2 then
+                     var uEdge2 = uEdge
+                     cast(ubyte ptr,@uEdge2)[3] shr= 2
+                     glColor4ubv( cast(ubyte ptr,@uEdge2) )
+                  else
+                     glColor4ubv( cast(ubyte ptr,@uEdge) )
+                  end if
                                     
                   glBegin GL_LINES                  
                   glVertex3f .fX1*cScale , .FY1*cScale , .fZ1*cScale
@@ -161,7 +171,7 @@ sub RenderModel( pPart as DATFile ptr , iBorders as long , uCurrentColor as ulon
                   glEnd
                end with
             case 3
-               if iBorders then continue for
+               if iBorders orelse bDoDraw=0 then continue for
                var T3 = ._3               
                MultiplyMatrixVector( @T3.fX1 ) 
                MultiplyMatrixVector( @T3.fX2 )
@@ -187,7 +197,7 @@ sub RenderModel( pPart as DATFile ptr , iBorders as long , uCurrentColor as ulon
                   glEnd
                end with
             case 4               
-               if iBorders then continue for
+               if iBorders orelse bDoDraw=0 then continue for
                var T4 = ._4               
                MultiplyMatrixVector( @T4.fX1 ) 
                MultiplyMatrixVector( @T4.fX2 )
@@ -214,7 +224,7 @@ sub RenderModel( pPart as DATFile ptr , iBorders as long , uCurrentColor as ulon
                end with
             case 5
                'continue for
-               if iBorders=0 then continue for
+               if iBorders=0 orelse bDoDraw=0 then continue for
                var T5 = ._5               
                MultiplyMatrixVector( @T5.fX1 ) 
                MultiplyMatrixVector( @T5.fX2 )               
@@ -246,29 +256,29 @@ sub RenderModel( pPart as DATFile ptr , iBorders as long , uCurrentColor as ulon
 end sub
 #endif
 
-type PartSize
-   as single xMin , xMax
-   as single yMin , yMax
-   as single zMin , zMax
-end type
 static shared as long g_TotalLines , g_TotalOptis , g_TotalTrigs , g_TotalQuads
-sub SizeModel( pPart as DATFile ptr , tSize as PartSize , pRoot as DATFile ptr = NULL )
+sub SizeModel( pPart as DATFile ptr , tSize as PartSize , iPartWanted as long = -1 , byref iPartNum as long = -1 , pRoot as DATFile ptr = NULL )
    
    if pRoot = NULL then pRoot = pPart
    
    #macro CheckZ( _Var ) 
-      if .fX##_Var > tSize.xMax then tSize.xMax = .fX##_Var 
-      if .fX##_Var < tSize.xMin then tSize.xMin = .fX##_Var
-      
-      if .fY##_Var > tSize.yMax then tSize.yMax = .fY##_Var 
-      if .fY##_Var < tSize.yMin then tSize.yMin = .fY##_Var
-      
-      if .fZ##_Var > tSize.zMax then tSize.zMax = .fZ##_Var 
-      if .fZ##_Var < tSize.zMin then tSize.zMin = .fZ##_Var      
+      if bWantSize then
+         if tSize.xMax=fUnused orelse .fX##_Var > tSize.xMax then tSize.xMax = .fX##_Var 
+         if tSize.xMin=fUnused orelse .fX##_Var < tSize.xMin then tSize.xMin = .fX##_Var
+         
+         if tSize.yMax=fUnused orelse .fY##_Var > tSize.yMax then tSize.yMax = .fY##_Var 
+         if tSize.yMin=fUnused orelse .fY##_Var < tSize.yMin then tSize.yMin = .fY##_Var
+         
+         if tSize.zMax=fUnused orelse .fZ##_Var > tSize.zMax then tSize.zMax = .fZ##_Var 
+         if tSize.zMin=fUnused orelse .fZ##_Var < tSize.zMin then tSize.zMin = .fZ##_Var      
+      end if
    #endmacro
         
    with *pPart            
+      
       for N as long = 0 to .iPartCount-1         
+         if pRoot = pPart then iPartNum += 1       
+         var bWantSize = (iPartWanted<0) orelse (iPartWanted=iPartNum)
          with .tParts(N)            
             select case .bType
             case 1                 
@@ -294,7 +304,7 @@ sub SizeModel( pPart as DATFile ptr , tSize as PartSize , pRoot as DATFile ptr =
                      end select
                   #endif
                   
-                  SizeModel( pSubPart , tSize , pRoot )
+                  SizeModel( pSubPart , tSize , iPartWanted , iPartNum , pRoot )
                   PopMatrix()                  
                end with               
             case 2               
@@ -451,11 +461,12 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
    #endif
    if pRoot = NULL then pRoot = pPart        
    with *pPart
-      if .fSizeZ=0 then
+      if .tSize.zMax = .tSize.zMin then
          dim as PartSize tSz : SizeModel( pPart , tSz )
-         .fSizeX = tSz.xMax - tSz.xMin
-         .fSizeY = tSz.yMax - tSz.yMin
-         .fSizeZ = tSz.zMax - tSz.zMin
+         .tSize = tSz
+         '.fSizeX = tSz.xMax - tSz.xMin
+         '.fSizeY = tSz.yMax - tSz.yMin
+         '.fSizeZ = tSz.zMax - tSz.zMin
       end if
       if .iShadowCount then
          #ifndef __Tester
@@ -961,3 +972,13 @@ function DetectPartCathegory( pPart as DATFile ptr ) as byte
    return pcOther
 end function
 
+function CheckCollision ( tA as PartSize , tB as PartSize ) as byte    
+   ' Check X overlap
+   if tA.xMax < tB.xMin orelse tA.xMin > tB.xMax then return false        
+   ' Check Y overlap
+   if tA.yMax < tB.yMin orelse tA.yMin > tB.yMax then return false    
+   ' Check Z overlap
+   IF tA.zMax < tB.zMin orelse tA.zMin > tB.zMax then return false
+   ' If we get here, all three axes overlap
+   return true
+end function
