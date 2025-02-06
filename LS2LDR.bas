@@ -13,6 +13,10 @@
 #include once "Loader\Modules\Matrix.bas"
 #include once "Loader\Modules\Model.bas"
 
+'TODO: apply the rotation to the position vector for the stud/clutch
+
+const PI = atn(1)*4
+
 #if 0
    var sFile = "3001.dat"
    dim as string sModel
@@ -65,12 +69,13 @@ enum ErrorCodes
    ecSuccess        = 0
 end enum
 type PartStructLS
-   tLocation   as SnapPV   'Position/Direction (Model.bas)
-   sName       as string   'name of the part "B1" , "P1", etc..
-   sPrimative  as string   '.dat model path for part
+   tLocation   as SnapPV    'Position/Direction (Model.bas)
+   tMatrix     as Matrix4x4 'Part Matrix (matrix.bas)
+   sName       as string    'name of the part "B1" , "P1", etc..
+   sPrimative  as string    '.dat model path for part
    iColor      as long
-   iModelIndex as long     'g_tModels(Index) (LoadrLDR.bas) (ModelList at Structs.bas)
-   bPartCat    as byte     'enum PartCathegory
+   iModelIndex as long      'g_tModels(Index) (LoadrLDR.bas) (ModelList at Structs.bas)
+   bPartCat    as byte      'enum PartCathegory
    bFoundPart  as byte
 end type
 type PartConnLS
@@ -102,8 +107,9 @@ end scope
 
 #define ErrInfo( _N ) (_N)
 
-function ReadTokenNumber( sToken as string , iStart as long = 0 ) as long
-   dim as long iResult
+function ReadTokenNumber( sToken as string , iStart as long = 0 , bSigned as long = false ) as long
+   dim as long iResult, iSign = 1
+   if bSigned andalso sToken[iStart] = asc("-") then iStart += 1 : iSign = -1
    for N as long = iStart to len(sToken)-1
       select case sToken[N]
       case asc("0") to asc("9")
@@ -113,7 +119,7 @@ function ReadTokenNumber( sToken as string , iStart as long = 0 ) as long
          return ErrInfo(ecNotANumber)
       end select
    next N
-   return iResult
+   return iResult*iSign
 end function
 function IsTokenNumeric( sToken as string , iStart as long = 0 ) as long
    for N as long = iStart to len(sToken)-1
@@ -408,7 +414,7 @@ function LegoScriptToLDraw( sScript as string ) as string
       do 
          #define sRelToken(_N) sToken(iCurToken+(_N))
          #define sCurToken sToken(iCurToken)
-         var iName=ecNotFound
+         var iName=ecNotFound, bExisting = false
          
          'if the first token is a primative (DAT) name then it's a declaration
          if IsPrimative( sCurToken ) then
@@ -426,7 +432,7 @@ function LegoScriptToLDraw( sScript as string ) as string
             if IsValidPartName( sName )=false then ParserError("'"+sName+"' is not a valid primative or part name")
             iName = FindPartName( sName )
             if iName < 0 then ParserError( "part name not declared" )
-            iCurToken += 1
+            iCurToken += 1 : bExisting = true
          end if         
          'if there's no more parameters than it's just a part declaration
          
@@ -485,7 +491,25 @@ function LegoScriptToLDraw( sScript as string ) as string
                      ParserError("expected end of statement, got '"+sThisToken+"'")
                   end if
                   continue do,do
+               case asc("x"): 'Y angle for this piece
+                  if bExisting then 
+                     ParserError("Can't define attributes for existing parts")
+                  end if
+                  .tLocation.fAX = ReadTokenNumber( sThisToken , 1 , true )*(PI/180)
+               case asc("y"): 'Y angle for this piece
+                  if bExisting then 
+                     ParserError("Can't define attributes for existing parts")
+                  end if
+                  .tLocation.fAY = ReadTokenNumber( sThisToken , 1 , true )*(PI/180)
+               case asc("z"): 'Y angle for this piece
+                  if bExisting then 
+                     ParserError("Can't define attributes for existing parts")
+                  end if
+                  .tLocation.fAZ = ReadTokenNumber( sThisToken , 1 , true )*(PI/180)
                case asc("#"): 'color token #nn #RGB #RRGGBB
+                  if bExisting then 
+                     ParserError("Can't define attributes for existing parts")
+                  end if
                   if .iColor >= 0 then ParserError("color attribute was already set for part '"+.sName+"'")
                   var iColor = ParseColor( sThisToken )
                   if iColor < 0 then
@@ -505,16 +529,30 @@ function LegoScriptToLDraw( sScript as string ) as string
    wend   
    
    'generate LDRAW and check collisions
-   if iStNext=0 andalso g_iPartCount>0 then      
+   if iStNext=0 andalso g_iPartCount>0 then
+      '------------------------------------------------------------------------
+      '------------------------ first part positioning ------------------------
+      '------------------------------------------------------------------------
       dim as zstring*256 zTemp=any
       dim as SnapPV ptr pLeft=any,pRight=any
       with g_tPart(0)
          'print .sName , .sPrimative , .iColor
-         var iColor = iif( .iColor<0 , 16 , .iColor )
-         sprintf(zTemp,!"1 %i %f %f %f 1 0 0 0 1 0 0 0 1 %s\n",iColor,.tLocation.fPX,.tLocation.fPY,.tLocation.fPZ,.sPrimative)
+         var iColor = iif( .iColor<0 , 16 , .iColor ) , psPrimative = @.sPrimative
+         var fPX = .tLocation.fPX , fPY = .tLocation.fPY , fPZ = .tLocation.fPZ
+         .tMatrix = g_tIdentityMatrix
+         if .tLocation.fAX then MatrixRotateX( .tMatrix , .tMatrix , .tLocation.fAX )
+         if .tLocation.fAY then MatrixRotateY( .tMatrix , .tMatrix , .tLocation.fAY )
+         if .tLocation.fAZ then MatrixRotateZ( .tMatrix , .tMatrix , .tLocation.fAZ )
+         with .tMatrix
+            sprintf(zTemp,!"1 %i %f %f %f %g %g %g %g %g %g %g %g %g %s\n",iColor,fPX,fPY,fPZ, _
+               .m(0),.m(1),.m(2),.m(4),.m(5),.m(6),.m(8),.m(9),.m(10) , *psPrimative )
+         end with
          sResult += zTemp : printf("%s",zTemp)
-      end with
-        
+      end with      
+      '------------------------------------------------------------------------
+      '--------------- later parts are relative to some other part ------------
+      '---------- so process all connections to get the relative parts --------
+      '------------------------------------------------------------------------
       for I as long = 0 to g_iConnCount-1
          with g_tConn(I)
             'print _
@@ -545,7 +583,7 @@ function LegoScriptToLDraw( sScript as string ) as string
             dim as single fPX = ptLocation->fPX - (pLeft->fPX + pRight->fPX)
             dim as single fPY = ptLocation->fPY + (pLeft->fPY - pRight->fPY)
             dim as single fPZ = ptLocation->fPZ + pLeft->fPZ + pRight->fPZ
-            var iRightPart_ = .iRightPart
+            var pLeftPart = @g_tPart(.iLeftPart) , iRightPart_ = .iRightPart
             with g_tPart(iRightPart_)
                if .tLocation.fPX = 0 andalso .tLocation.fPY=0 andalso .tLocation.fPZ=0 then
                   .tLocation.fPX = fPX : .tLocation.fPY = fPY : .tLocation.fPZ = fPZ
@@ -563,6 +601,7 @@ function LegoScriptToLDraw( sScript as string ) as string
                tPart.yMin = tPart.yMin+.1+.tLocation.fPY : tPart.yMax = tPart.yMax-.1+.tLocation.fPY
                tPart.zMin = tPart.zMin+.1+.tLocation.fPZ : tPart.zMax = tPart.zMax-.1+.tLocation.fPZ               
                   
+               #if 0
                for N as long = 0 to g_iPartCount-1
                   if N = iRightPart_ then continue for
                   if .tLocation.fPX = 0 andalso .tLocation.fPY=0 andalso .tLocation.fPZ=0 then
@@ -579,9 +618,19 @@ function LegoScriptToLDraw( sScript as string ) as string
                         color 12: printf(!"Collision! between part %s and %s\n",g_tPart(iRightPart_).sName,.sName): color 7
                      end if
                   end with
-               next N               
-               var iColor = iif(.iColor<0,16,.iColor)
-               sprintf(zTemp,!"1 %i %f %f %f 1 0 0 0 1 0 0 0 1 %s\n",iColor,fPX,fPY,fPZ,.sPrimative)
+               next N
+               #endif
+               
+               .tMatrix = pLeftPart->tMatrix
+               if .tLocation.fAX then MatrixRotateX( .tMatrix , .tMatrix , .tLocation.fAX )
+               if .tLocation.fAY then MatrixRotateY( .tMatrix , .tMatrix , .tLocation.fAY )
+               if .tLocation.fAZ then MatrixRotateZ( .tMatrix , .tMatrix , .tLocation.fAZ )
+               
+               var iColor = iif(.iColor<0,16,.iColor), psPrimative = @.sPrimative
+               with .tMatrix
+                  sprintf(zTemp,!"1 %i %f %f %f %g %g %g %g %g %g %g %g %g %s\n",iColor,fPX,fPY,fPZ, _
+                     .m(0),.m(1),.m(2),.m(4),.m(5),.m(6),.m(8),.m(9),.m(10) , *psPrimative )
+               end with
                sResult += zTemp : printf("%s",zTemp)               
             end with            
             'puts("1 0 40 -24 -20 1 0 0 0 1 0 0 0 1 3001.dat")
@@ -620,11 +669,11 @@ else
       !"B3 s8 = 3002 B5 c3;"
    #endif
    sScript = _
-     !"3865 BP10 #7 s69 = 3002 B1 c1;" _
-     !"B1 s1 = 3002 B2 #2 c5;" _
-     !"B2 s1 = 3002 B3 #3 c6;" _
-     !"B3 c5 = 3021 B4 #4 s1;" _ '71752 '3021
-     !"B4 c1 = 3002 B5 #5 s6;"    'collision
+     !"3865 BP10 #7 s69 = 3001p11 B1 y-90 c1;" _
+     !"B1 s1 = 3001p11 B2 #2 y90 c5;" _
+     !"B2 s1 = 3001p11 B3 #3 c6;" _
+     !"B3 c5 = 3001p11 B4 #4 s1;" _ '71752 '3021
+     !"B4 c1 = 3001p11 B5 #5 s6;"    'collision
      '!"003238a P1 #2 c1 = 003238b P2 #4 s1;"
      
 end if
@@ -647,7 +696,7 @@ end if
       
 if len(sModel) then
    var sParms = """"+sModel+""""
-   puts("-----------------")   
+   puts("-----------------")
    exec(exepath()+"\Loader\ViewModel.exe",sParms)
    'sleep
    puts("-----------------")

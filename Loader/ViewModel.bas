@@ -437,6 +437,7 @@ do
       glDisable( GL_POLYGON_STIPPLE )
    #endif
    
+   glDepthMask (GL_FALSE)
    if bBoundingBox then
       glColor4f(0,1,0,.25)
       with tSz
@@ -446,7 +447,7 @@ do
    
    var iCollisions = ubound(atCollision)
    if iCollisions then
-      glEnable( GL_POLYGON_STIPPLE )
+      glEnable( GL_POLYGON_STIPPLE )      
       static as ulong aStipple(32-1)
       dim as long iMove = (timer*8) and 7
       for iY as long = 0 to 31         
@@ -460,8 +461,9 @@ do
             DrawLimitsCube( .xMin-1,.xMax+1 , .yMin-1,.yMax+1 , .zMin-1,.zMax+1 )
          end with
       next I
-      glDisable( GL_POLYGON_STIPPLE )
+      glDisable( GL_POLYGON_STIPPLE )      
    end if
+   glDepthMask (GL_TRUE)
    
    'glPopMatrix()
             

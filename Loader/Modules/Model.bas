@@ -520,7 +520,7 @@ end sub
 
 type SnapPV
    as float fPX,fPY,fPZ 'position
-   as float fVX,fVy,fVZ 'direction vector
+   as float fAX,fAY,fAZ 'direction vector
 end type
 type PartSnap
    lStudCnt     as long
