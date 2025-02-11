@@ -87,9 +87,10 @@ end sub
 sub PopMatrix()
    if g_CurrentMatrix>0 then g_CurrentMatrix -= 1
 end sub   
-sub MultiplyMatrixVector( pVec as single ptr )
+sub MultiplyMatrixVector( pVec as single ptr , pMatrix as Matrix4x4 ptr = 0 )
    dim as single fX = pVec[0] , fY = pVec[1] , fZ = pVec[2]
-   with tMatrixStack(g_CurrentMatrix)
+   if pMatrix=0 then pMatrix = @tMatrixStack(g_CurrentMatrix)
+   with *pMatrix
       pVec[0] = .m(0) * fX + .m(4) * fY + .m( 8) * fZ + .m(12)
       pVec[1] = .m(1) * fX + .m(5) * fY + .m( 9) * fZ + .m(13)
       pVec[2] = .m(2) * fX + .m(6) * fY + .m(10) * fZ + .m(14)

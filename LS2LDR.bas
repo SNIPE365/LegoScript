@@ -13,7 +13,8 @@
 #include once "Loader\Modules\Matrix.bas"
 #include once "Loader\Modules\Model.bas"
 
-'TODO: apply the rotation to the position vector for the stud/clutch
+'TODO: apply the rotation to the position vector for the stud/clutch (ongoing)
+'TODO (11/02/2025): must rotate the matrix for the part based on the shadow stud/clutch not just the vector
 
 const PI = atn(1)*4
 
@@ -94,209 +95,7 @@ redim shared as PartStructLS g_tPart(_cPartMin)
 redim shared as PartConnLS   g_tConn(_cConnMin)
 static shared as long g_iPartCount , g_iConnCount = 0
 
-scope 'add separators
-   var sSeparators = !"\9 \r\n/"
-   for N as long = 0 to len(sSeparators)-1
-      g_bSeparators( sSeparators[N] ) or= stToken
-   next N
-   var sOperators  = !"="
-   for N as long = 0 to len(sOperators)-1
-      g_bSeparators( sOperators[N] ) or= stOperator
-   next N
-end scope
-
-#define ErrInfo( _N ) (_N)
-
-function ReadTokenNumber( sToken as string , iStart as long = 0 , bSigned as long = false ) as long
-   dim as long iResult, iSign = 1
-   if bSigned andalso sToken[iStart] = asc("-") then iStart += 1 : iSign = -1
-   for N as long = iStart to len(sToken)-1
-      select case sToken[N]
-      case asc("0") to asc("9")
-         iResult = iResult*10+(sToken[N]-asc("0"))
-         if iResult < 0 then return ErrInfo(ecNumberOverflow)
-      case else
-         return ErrInfo(ecNotANumber)
-      end select
-   next N
-   return iResult*iSign
-end function
-function IsTokenNumeric( sToken as string , iStart as long = 0 ) as long
-   for N as long = iStart to len(sToken)-1
-      if (cuint(sToken[N])-asc("0")) > 9 then return false
-   next N
-   return true
-end function
-function IsPrimative( sToken as string ) as long
-   if len(sToken)=0 then return false
-   for N as long = 0 to len(sToken)-1
-      select case sToken[0]
-      case asc("a") to asc("z"),asc("0") to asc("9"),asc("_")
-         rem valid chars for primatives
-      case else
-         return false
-      end select
-   next N
-   return true
-end function
-function IsValidPartName( sToken as string ) as long   
-   if len(sToken)=0 then return false
-   select case sToken[0]
-   case asc("A") to asc("Z")
-      rem valid initial chars for part names
-   case else
-      return false
-   end select
-   for N as long = 1 to len(sToken)-1
-      select case sToken[N]
-      case asc("A") to asc("Z"),asc("a") to asc("z")
-         rem valid chars for part names
-      case asc("0") to asc("9"),asc("_")
-         rem valid chars for part names
-      case else
-         return false
-      end select
-   next N
-   return true 
-end function
-
-function ParseColor( sToken as string ) as long
-   var iLen = len(sToken), bHasHex = false, iTokenStart = 1
-   if iLen < 1 orelse sToken[0] <> asc("#") then return ErrInfo(ecFailedToParse)
-   dim as ulong uColor
-   if (iLen-iTokenStart) = 6 then '#RRGGBB
-      for N as long = iTokenStart to iLen-1
-         select case sToken[N]
-         case asc("0") to asc("9"): uColor = uColor*16+sToken[N]-asc("0")
-         case asc("a") to asc("f"): uColor = uColor*16+sToken[N]-asc("a")+10
-         case asc("A") to asc("F"): uColor = uColor*16+sToken[N]-asc("A")+10
-         case else: return ErrInfo(ecFailedToParse)
-         end select
-      next N
-      return uColor+&h1000000
-   elseif (iLen-iTokenStart) = 4 then '#0RGB
-      if sToken[iTokenStart]=asc("0") then
-         iTokenStart += 1 : bHasHex = true
-      end if
-   end if
-   if (iLen-iTokenStart) = 3 then '#RGB
-      if sToken[iTokenStart]=asc("0") then bHasHex = 1
-      for N as long = iTokenStart to iLen-1
-         select case sToken[N]
-         case asc("0") to asc("9"): uColor = uColor*256+(((sToken[N]-asc("0")   )*255)\15)
-         case asc("a") to asc("f"): uColor = uColor*256+(((sToken[N]-asc("a")+10)*255)\15) : bHasHex = 1
-         case asc("A") to asc("F"): uColor = uColor*256+(((sToken[N]-asc("A")+10)*255)\15) : bHasHex = 1
-         case else: return ErrInfo(ecFailedToParse)
-         end select
-      next N
-      if bHasHex then return uColor+&h1000000
-   end if
-   'decimal color index
-   uColor = 0
-   for N as long = iTokenStart to iLen-1
-      select case sToken[N]
-      case asc("0") to asc("9"): uColor = uColor*10+sToken[N]-asc("0")
-      case else: return ErrInfo(ecFailedToParse)
-      end select      
-      if uColor > 10999 then return ErrInfo(ecFailedToParse)
-   next N
-   return uColor
-end function
-
-function FindPartName( sName as string ) as long
-   if len(sName) < 1 then return ErrInfo(ecNotFound)
-   for N as long = 0 to g_iPartCount-1
-      with g_tPart(N)
-         if .sName = sName then return N
-      end with
-   next N
-   return ErrInfo(ecNotFound)
-end function
-function FindModelIndex( sPart as string ) as long
-   'g_sFilenames '/255{Index}/0'Name'/0'
-   var iPos = instr(g_sFilenames,"\"+lcase(sPart)+".dat")-1
-   if iPos<0 then return ErrInfo(ecNotFound)   
-   do 
-      iPos -= 1
-      if g_sFilenames[iPos]=0 then exit do
-   loop
-   return *cptr(long ptr,@g_sFilenames[iPos-4])
-end function
-function LoadPartModel( byref tPart as PartStructLS ) as long
-   with tPart      
-      if .iModelIndex >= 0 then return ErrInfo(ecSuccess) 'already loaded
-      'load model
-      dim as string sModel
-      if LoadFile( .sPrimative , sModel ) = 0 then 'LoadLDR::LoadFile
-         return ErrInfo(ecFailedToLoad) 'part failed to load file
-      end if
-      var pModel = LoadModel( strptr(sModel) , .sPrimative ) 'LoadLDR::LoadModel
-      if pModel=0 then return ErrInfo(ecFailedToParse)                      'part failed to parse
-      .iModelIndex = pModel->iModelIndex             
-      .sPrimative = mid(.sPrimative,instrrev(.sPrimative,"\")+1)      
-      'generate snap if not generated yet
-      'var pModel = g_tModels(.iModelIndex).pModel
-      if pModel->pData = 0 then   
-         pModel->pData = new PartSnap
-         var pSnap = cptr(PartSnap ptr,pModel->pData)
-         SnapModel( pModel , *pSnap )         
-      end if
-      'calculate model size
-      'SizeModel( pModel , .tSize ) 'Model::SizeModel
-      'deteact part cathegory
-      .bPartCat = DetectPartCathegory( pModel ) 'Model::DetectPartCathegory
-   end with
-   return ErrInfo(ecSuccess)
-end function
-function AddPartName( sName as string , sPart as string ) as long   
-         
-   'skip '0 prefix (as no part name start with a '0')
-   'var bPartPrefix =  (sPart[0]=asc("0"))
-   'if bPartPrefix then with *Cast_fbStr(sPart) : .pzData += 1 : .iLen -= 1 : end with
-   if (g_iPartCount > ubound(g_tPart)) then
-      redim preserve g_tPart( ubound(g_tPart)+_cPartMin+1 )
-   end if
-   
-   var iIndex = FindModelIndex( sPart )
-   with g_tPart( g_iPartCount )
-      .sName      = sName
-      .sPrimative = sPart+".dat"
-      .iModelIndex = -1 : .iColor = -1
-      
-      if iIndex < 0 then         
-         'if bPartPrefix then with *Cast_fbStr(sPart) : .pzData -= 1 : .iLen += 1 : end with
-         .bFoundPart = FindFile(.sPrimative)<>0 'part name not found
-      else
-         .bFoundPart = true 'part found previously
-         .iModelIndex = iIndex
-         'if bPartPrefix then with *Cast_fbStr(sPart) : .pzData -= 1 : .iLen += 1 : end with   
-      end if
-         
-   end with   
-   
-   g_iPartCount += 1
-   return g_iPartCount-1
-   
-end function
-function AddConnection( byref tConn as PartConnLS ) as long
-   if (g_iConnCount > ubound(g_tConn)) then
-      redim preserve g_tConn( ubound(g_tConn)+_cConnMin+1 )
-   end if
-   g_tConn( g_iConnCount ) = tConn : g_iConnCount += 1
-   return g_iConnCount-1
-end function
-
-function SafeText( sInput as string ) as string
-   dim as string sResult
-   for N as long = 0 to len(sInput)-1
-      select case sInput[N]      
-      case 0 to 31,128 to 255 : sResult += "%"+hex(sInput[N],2)
-      case else
-         sResult += chr(sInput[N])
-      end select
-   next N
-   return sResult
-end function      
+#include "LSModules\LSFunctions.bas"
 
 'TODO: now check the remainder tokens, clutch/studs
 
@@ -313,6 +112,7 @@ function LegoScriptToLDraw( sScript as string ) as string
    #define ParserError( _text ) color 12:print "Error: ";SafeText(_text);" at line";TokenLineNumber(iCurToken);" '";SafeText(sStatement);"'" : sResult="" : color 7: exit while
    #define ParserWarning( _text ) color 14:print "Warning: ";SafeText(_text);" at line";TokenLineNumber(iCurToken);" '";SafeText(sStatement);"'":color 7
    
+   'Parsing LS and generate connections
    while 1
       'get next statement
       iStNext = instr(iStStart,sScript,";")
@@ -491,7 +291,7 @@ function LegoScriptToLDraw( sScript as string ) as string
                      ParserError("expected end of statement, got '"+sThisToken+"'")
                   end if
                   continue do,do
-               case asc("x"): 'Y angle for this piece
+               case asc("x"): 'X angle for this piece
                   if bExisting then 
                      ParserError("Can't define attributes for existing parts")
                   end if
@@ -501,7 +301,7 @@ function LegoScriptToLDraw( sScript as string ) as string
                      ParserError("Can't define attributes for existing parts")
                   end if
                   .tLocation.fAY = ReadTokenNumber( sThisToken , 1 , true )*(PI/180)
-               case asc("z"): 'Y angle for this piece
+               case asc("z"): 'Z angle for this piece
                   if bExisting then 
                      ParserError("Can't define attributes for existing parts")
                   end if
@@ -535,16 +335,21 @@ function LegoScriptToLDraw( sScript as string ) as string
       '------------------------------------------------------------------------
       dim as zstring*256 zTemp=any
       dim as SnapPV ptr pLeft=any,pRight=any
+      dim as single tVec3(2) = any
+      #define _fPX tVec3(0)
+      #define _fPY tVec3(1)
+      #define _fPZ tVec3(2)
       with g_tPart(0)
          'print .sName , .sPrimative , .iColor
          var iColor = iif( .iColor<0 , 16 , .iColor ) , psPrimative = @.sPrimative
-         var fPX = .tLocation.fPX , fPY = .tLocation.fPY , fPZ = .tLocation.fPZ
+                  
+         _fPX = .tLocation.fPX : _fPY = .tLocation.fPY : _fPZ = .tLocation.fPZ         
          .tMatrix = g_tIdentityMatrix
          if .tLocation.fAX then MatrixRotateX( .tMatrix , .tMatrix , .tLocation.fAX )
          if .tLocation.fAY then MatrixRotateY( .tMatrix , .tMatrix , .tLocation.fAY )
-         if .tLocation.fAZ then MatrixRotateZ( .tMatrix , .tMatrix , .tLocation.fAZ )
+         if .tLocation.fAZ then MatrixRotateZ( .tMatrix , .tMatrix , .tLocation.fAZ )         
          with .tMatrix
-            sprintf(zTemp,!"1 %i %f %f %f %g %g %g %g %g %g %g %g %g %s\n",iColor,fPX,fPY,fPZ, _
+            sprintf(zTemp,!"1 %i %f %f %f %g %g %g %g %g %g %g %g %g %s\n",iColor,_fPX,_fPY,_fPZ, _
                .m(0),.m(1),.m(2),.m(4),.m(5),.m(6),.m(8),.m(9),.m(10) , *psPrimative )
          end with
          sResult += zTemp : printf("%s",zTemp)
@@ -580,14 +385,29 @@ function LegoScriptToLDraw( sScript as string ) as string
             '   as single fVX,fVy,fVZ 'direction vector
             'end type
             var ptLocation = @g_tPart(.iLeftPart).tLocation
-            dim as single fPX = ptLocation->fPX - (pLeft->fPX + pRight->fPX)
-            dim as single fPY = ptLocation->fPY + (pLeft->fPY - pRight->fPY)
-            dim as single fPZ = ptLocation->fPZ + pLeft->fPZ + pRight->fPZ
             var pLeftPart = @g_tPart(.iLeftPart) , iRightPart_ = .iRightPart
+                                    
             with g_tPart(iRightPart_)
+               
+               .tMatrix = pLeftPart->tMatrix
+               if .tLocation.fAX then MatrixRotateX( .tMatrix , .tMatrix , .tLocation.fAX )
+               if .tLocation.fAY then MatrixRotateY( .tMatrix , .tMatrix , .tLocation.fAY )
+               if .tLocation.fAZ then MatrixRotateZ( .tMatrix , .tMatrix , .tLocation.fAZ )
+               
+               _fPX = pLeft->fPX : _fPY = pLeft->fPY : _fPZ = pLeft->fPZ               
+               if pLeft->pMatOrg then MultiplyMatrixVector( @tVec3(0) , pLeft->pMatOrg )
+               MultiplyMatrixVector( @tVec3(0) , @pLeftPart->tMatrix )
+               dim as single tVec3R(2) = { pRight->fPX , pRight->fPY , pRight->fPZ }
+               if pRight->pMatOrg then MultiplyMatrixVector( @tVec3R(0) , pRight->pMatOrg )
+               MultiplyMatrixVector( @tVec3R(0) , @.tMatrix )
+               
+               _fPX = ptLocation->fPX - (_fPX + tVec3R(0)) '.fPX
+               _fPY = ptLocation->fPY + (_fPY - tVec3R(1)) '.fPY
+               _fPZ = ptLocation->fPZ + (_fpZ + tVec3R(2)) '.fPZ
+               
                if .tLocation.fPX = 0 andalso .tLocation.fPY=0 andalso .tLocation.fPZ=0 then
-                  .tLocation.fPX = fPX : .tLocation.fPY = fPY : .tLocation.fPZ = fPZ
-               elseif abs(.tLocation.fPX-fPX)>.001 orelse abs(.tLocation.fPY-fPY)>.001 orelse abs(.tLocation.fPZ-fPZ)>.001 then
+                  .tLocation.fPX = _fPX : .tLocation.fPY = _fPY : .tLocation.fPZ = _fPZ
+               elseif abs(.tLocation.fPX-_fPX)>.001 orelse abs(.tLocation.fPY-_fPY)>.001 orelse abs(.tLocation.fPZ-_fPZ)>.001 then
                   color 12 : print "Impossible Connection detected!" : color 7
                end if
                dim as PartSize tPart = any  : tPart = pModel->tSize
@@ -620,15 +440,10 @@ function LegoScriptToLDraw( sScript as string ) as string
                   end with
                next N
                #endif
-               
-               .tMatrix = pLeftPart->tMatrix
-               if .tLocation.fAX then MatrixRotateX( .tMatrix , .tMatrix , .tLocation.fAX )
-               if .tLocation.fAY then MatrixRotateY( .tMatrix , .tMatrix , .tLocation.fAY )
-               if .tLocation.fAZ then MatrixRotateZ( .tMatrix , .tMatrix , .tLocation.fAZ )
-               
+                                             
                var iColor = iif(.iColor<0,16,.iColor), psPrimative = @.sPrimative
                with .tMatrix
-                  sprintf(zTemp,!"1 %i %f %f %f %g %g %g %g %g %g %g %g %g %s\n",iColor,fPX,fPY,fPZ, _
+                  sprintf(zTemp,!"1 %i %f %f %f %g %g %g %g %g %g %g %g %g %s\n",iColor,_fPX,_fPY,_fPZ, _
                      .m(0),.m(1),.m(2),.m(4),.m(5),.m(6),.m(8),.m(9),.m(10) , *psPrimative )
                end with
                sResult += zTemp : printf("%s",zTemp)               
@@ -668,12 +483,13 @@ else
       !"B3 #3 s1 = 3001 B4 c3;" _
       !"B3 s8 = 3002 B5 c3;"
    #endif
+   
    sScript = _
-     !"3865 BP10 #7 s69 = 3001p11 B1 y-90 c1;" _
-     !"B1 s1 = 3001p11 B2 #2 y90 c5;" _
+     !"3865 BP10 #7 s69 = 3001p11 B1 y90 c1;" _ '4070 (side stud) (87087 have shadow problems)
+     !"B1 s1 = 3001p11 B2 #2 c5;" _
      !"B2 s1 = 3001p11 B3 #3 c6;" _
      !"B3 c5 = 3001p11 B4 #4 s1;" _ '71752 '3021
-     !"B4 c1 = 3001p11 B5 #5 s6;"    'collision
+     !"B4 c1 = 4070 B5 #5 y180 s2;"    'collision
      '!"003238a P1 #2 c1 = 003238b P2 #4 s1;"
      
 end if

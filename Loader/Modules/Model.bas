@@ -521,6 +521,7 @@ end sub
 type SnapPV
    as float fPX,fPY,fPZ 'position
    as float fAX,fAY,fAZ 'direction vector
+   as Matrix4x4 ptr pMatOrg
 end type
 type PartSnap
    lStudCnt     as long
@@ -535,20 +536,32 @@ type PartSnap
    as SnapPV ptr pStud,pClutch
 end type
 
-sub SnapAddStud( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) )   
+sub SnapAddStud( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0)  , pMatOrg as Matrix4x4 ptr )
    with tSnap
       for N as long = 0 to iCnt-1
         .lStudCnt += 1
         .pStud = reallocate(.pStud,sizeof(tPV)*.lStudCnt)
-        .pStud[.lStudCnt-1] = tPV
+         if pMatOrg then 
+            tPV.pMatOrg = allocate( sizeof(Matrix4x4) )
+            *tPV.pMatOrg = *pMatOrg
+         else
+            tPV.pMatOrg = 0
+         end if
+         .pStud[.lStudCnt-1] = tPV        
       next N
    end with
 end sub
-sub SnapAddClutch( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) )
+sub SnapAddClutch( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) , pMatOrg as Matrix4x4 ptr )
    with tSnap
       for N as long = 0 to iCnt-1
         .lClutchCnt += 1
         .pClutch = reallocate(.pClutch,sizeof(tPV)*.lClutchCnt)
+        if pMatOrg then 
+            tPV.pMatOrg = allocate( sizeof(Matrix4x4) )
+            *tPV.pMatOrg = *pMatOrg
+         else
+            tPV.pMatOrg = 0
+         end if
         .pClutch[.lClutchCnt-1] = tPV
       next N
    end with
@@ -653,17 +666,19 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                   if iPrevRec>.bRecurse then iIdent -= 2
                   iPrevRec=.bRecurse '4
                   
+                  dim as Matrix4x4 ptr pMatOrg = NULL
+                  dim as single fMatrix(15) = { _                           
+                    .fOri(0) , .fOri(3) , .fOri(6) , 0 , _ 'X scale ,    0?   ,   0?    , 0 
+                    .fOri(1) , .fOri(4),  .fOri(7) , 0 , _ '  0?    , Y Scale ,   0?    , 0 
+                    .fOri(2) , .fOri(5) , .fOri(8) , 0 , _ '  0?    ,    0?   , Z Scale , 0 
+                      0      ,    0    ,    0     , 1 }
+                    '-.fPosX  ,  -.fPosY , -.fPosZ  , 1 }   ' X Pos  ,  Y Pos  ,  Z Pos  , 1
+                  if .bFlagOriMat then pMatOrg = cptr(Matrix4x4 ptr,@fMatrix(0))
+                  
                   #ifndef __Tester                   
                   #ifndef __NoRender
-                  if bDraw then
-                     
-                     if .bFlagOriMat then                        
-                        dim as single fMatrix(15) = { _                           
-                          .fOri(0) , .fOri(3) , .fOri(6) , 0 , _ 'X scale ,    0?   ,   0?    , 0 
-                          .fOri(1) , .fOri(4),  .fOri(7) , 0 , _ '  0?    , Y Scale ,   0?    , 0 
-                          .fOri(2) , .fOri(5) , .fOri(8) , 0 , _ '  0?    ,    0?   , Z Scale , 0 
-                            0      ,    0    ,    0     , 1 }
-                          '-.fPosX  ,  -.fPosY , -.fPosZ  , 1 }   ' X Pos  ,  Y Pos  ,  Z Pos  , 1 
+                  if bDraw then                     
+                     if .bFlagOriMat then
                         PushAndMultMatrix( @fMatrix(0) )
                         #ifndef __Tester
                         puts("Origin!")
@@ -817,7 +832,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                                     DbgConnect(!"Stud += %i\n",iConCnt)
                                     'var p = pPart
                                     with *pMat
-                                       SnapAddStud( tSnap , iConCnt , type(fPX+.fPosX , fPY+.fPosY , fPZ+.fPosZ) )
+                                       SnapAddStud( tSnap , iConCnt , type(fPX+.fPosX , fPY+.fPosY , fPZ+.fPosZ) , pMatOrg )
                                     end with
                                  end if                                 
                                  bSecs -= 1 'stud
@@ -865,7 +880,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                                     if bDidClutch=0 then
                                        bDidClutch=1
                                        with *pMat
-                                          SnapAddClutch( tSnap , iConCnt , type(fPX+.fPosX , fPY+.fPosY , fPZ+.fPosZ) )                                       
+                                          SnapAddClutch( tSnap , iConCnt , type(fPX+.fPosX , fPY+.fPosY , fPZ+.fPosZ) , pMatOrg )
                                        end with
                                     end if
                                     DbgConnect(!"Clutch += %i (Square slide)\n",iConCnt)
@@ -926,7 +941,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                                        with *pMat                                       
                                           for iGX as long = 0 to xCnt
                                              for iGZ as long = 0 to zCnt
-                                                SnapAddClutch( tSnap , 1 , type(fPX+.fPosX+iGX*pG->xStep , fPY+.fPosY , fPZ+.fPosZ+iGZ*pG->zStep) )
+                                                SnapAddClutch( tSnap , 1 , type(fPX+.fPosX+iGX*pG->xStep , fPY+.fPosY , fPZ+.fPosZ+iGZ*pG->zStep) , pMatOrg )
                                              next igZ
                                           next iGX
                                        end with
@@ -959,7 +974,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                            'printf(!"Sides=%i\n",bSides)
                            if bDraw=0 then
                               with *pMat
-                                 SnapAddClutch( tSnap , iConCnt , type(fPX+.fPosX , fPY+.fPosY , fPZ+.fPosZ) )                                       
+                                 SnapAddClutch( tSnap , iConCnt , type(fPX+.fPosX , fPY+.fPosY , fPZ+.fPosZ) , pMatOrg )
                               end with
                               DbgConnect(!"Clutch += %i (Fallback)\n",iConCnt)
                               #ifndef __Tester
