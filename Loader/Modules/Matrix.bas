@@ -96,6 +96,14 @@ sub MultiplyMatrixVector( pVec as single ptr , pMatrix as Matrix4x4 ptr = 0 )
       pVec[2] = .m(2) * fX + .m(6) * fY + .m(10) * fZ + .m(14)
    end with
 end sub
+function IsMatrixIdentity() as boolean
+   with tMatrixStack( g_CurrentMatrix )
+      for N as long = 0 to 15
+         if abs(.m(N)-g_tIdentityMatrix.m(N)) > .0001 then return false
+      next N      
+   end with
+   return true
+end function   
 
 sub MultMatrix4x4WithVector3x3( tmOut as Matrix4x4 , tmIn as Matrix4x4 , pIn as const single ptr )
    var pCur = cast(single ptr,@tmIn)               
@@ -116,6 +124,8 @@ sub MultMatrix4x4WithVector3x3( tmOut as Matrix4x4 , tmIn as Matrix4x4 , pIn as 
    next row
    
 end sub
+#define MultMatrix4x4( _Out , _In , _pMul ) MultMatrix4x4WithVector3x3( _Out , _In , cptr(const single ptr,(_pMul)) )
+
 sub MatrixRotateX( tmOut as Matrix4x4 , tmIn as Matrix4x4 , fAngle as single )      
    dim as single sMat(15) = { _
       1 ,      0       ,      0      , 0 , _
@@ -142,6 +152,18 @@ sub MatrixRotateZ( tmOut as Matrix4x4 , tmIn as Matrix4x4 , fAngle as single )
           0       ,      0       , 0 , 1 _
    }   
    MultMatrix4x4WithVector3x3( tmOut , tmIn , @sMat(0) )
+end sub
+
+sub PrintCurrentMatrix()
+   with tMatrixStack( g_CurrentMatrix )
+      var pMat = @.m(0)
+      for Y as long = 0 to 3
+         for X as long = 0 to 3
+            printf("%s%.1f",space(1-(*pMat>=0)-(abs(*pMat)<10)),*pMat) : pMat += 1
+         next X
+         puts("")
+      next Y
+   end with
 end sub
 
 #ifndef __NoRender

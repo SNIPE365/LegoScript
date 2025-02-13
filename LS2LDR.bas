@@ -344,7 +344,7 @@ function LegoScriptToLDraw( sScript as string ) as string
          var iColor = iif( .iColor<0 , 16 , .iColor ) , psPrimative = @.sPrimative
                   
          _fPX = .tLocation.fPX : _fPY = .tLocation.fPY : _fPZ = .tLocation.fPZ         
-         .tMatrix = g_tIdentityMatrix
+         .tMatrix = g_tIdentityMatrix         
          if .tLocation.fAX then MatrixRotateX( .tMatrix , .tMatrix , .tLocation.fAX )
          if .tLocation.fAY then MatrixRotateY( .tMatrix , .tMatrix , .tLocation.fAY )
          if .tLocation.fAZ then MatrixRotateZ( .tMatrix , .tMatrix , .tLocation.fAZ )         
@@ -390,15 +390,26 @@ function LegoScriptToLDraw( sScript as string ) as string
             with g_tPart(iRightPart_)
                
                .tMatrix = pLeftPart->tMatrix
+               with *(pLeft->pMatOrg)
+                  '.fPosX = 0
+                  '.fPosY = 100
+                  '.fPosZ = 0
+               end with
+               'if pLeft->pMatOrg then MultMatrix4x4( .tMatrix , .tMatrix , pLeft->pMatOrg )
+               'if pRight->pMatOrg then MultMatrix4x4( .tMatrix , .tMatrix , pRight->pMatOrg )
                if .tLocation.fAX then MatrixRotateX( .tMatrix , .tMatrix , .tLocation.fAX )
                if .tLocation.fAY then MatrixRotateY( .tMatrix , .tMatrix , .tLocation.fAY )
                if .tLocation.fAZ then MatrixRotateZ( .tMatrix , .tMatrix , .tLocation.fAZ )
                
                _fPX = pLeft->fPX : _fPY = pLeft->fPY : _fPZ = pLeft->fPZ               
-               if pLeft->pMatOrg then MultiplyMatrixVector( @tVec3(0) , pLeft->pMatOrg )
+               'if pLeft->pMatOrg then MultiplyMatrixVector( @tVec3(0) , pLeft->pMatOrg )
                MultiplyMatrixVector( @tVec3(0) , @pLeftPart->tMatrix )
+               tVec3(0) += pLeftPart->tMatrix.fPosX
+               tVec3(1) += pLeftPart->tMatrix.fPosY
+               tVec3(2) += pLeftPart->tMatrix.fPosZ
+               
                dim as single tVec3R(2) = { pRight->fPX , pRight->fPY , pRight->fPZ }
-               if pRight->pMatOrg then MultiplyMatrixVector( @tVec3R(0) , pRight->pMatOrg )
+               'if pRight->pMatOrg then MultiplyMatrixVector( @tVec3R(0) , pRight->pMatOrg )
                MultiplyMatrixVector( @tVec3R(0) , @.tMatrix )
                
                _fPX = ptLocation->fPX - (_fPX + tVec3R(0)) '.fPX
@@ -422,29 +433,31 @@ function LegoScriptToLDraw( sScript as string ) as string
                tPart.zMin = tPart.zMin+.1+.tLocation.fPZ : tPart.zMax = tPart.zMax-.1+.tLocation.fPZ               
                   
                #if 0
-               for N as long = 0 to g_iPartCount-1
-                  if N = iRightPart_ then continue for
-                  if .tLocation.fPX = 0 andalso .tLocation.fPY=0 andalso .tLocation.fPZ=0 then
-                     continue for
-                  end if
-                  with g_tPart(N)                     
-                     dim as PartSize tChk = any
-                     tChk = g_tModels(g_tPart(N).iModelIndex).pModel->tSize                     
-                     if (tChk.yMin-(-4)) < .0001 then tChk.yMin = 0                     
-                     tChk.xMin = tChk.xMin+.1+.tLocation.fPX : tChk.xMax = tChk.xMax-.1+.tLocation.fPX
-                     tChk.yMin = tChk.yMin+.1+.tLocation.fPY : tChk.yMax = tChk.yMax-.1+.tLocation.fPY
-                     tChk.zMin = tChk.zMin+.1+.tLocation.fPZ : tChk.zMax = tChk.zMax-.1+.tLocation.fPZ
-                     if CheckCollision( tPart , tChk ) then
-                        color 12: printf(!"Collision! between part %s and %s\n",g_tPart(iRightPart_).sName,.sName): color 7
+                  for N as long = 0 to g_iPartCount-1
+                     if N = iRightPart_ then continue for
+                     if .tLocation.fPX = 0 andalso .tLocation.fPY=0 andalso .tLocation.fPZ=0 then
+                        continue for
                      end if
-                  end with
-               next N
+                     with g_tPart(N)                     
+                        dim as PartSize tChk = any
+                        tChk = g_tModels(g_tPart(N).iModelIndex).pModel->tSize                     
+                        if (tChk.yMin-(-4)) < .0001 then tChk.yMin = 0                     
+                        tChk.xMin = tChk.xMin+.1+.tLocation.fPX : tChk.xMax = tChk.xMax-.1+.tLocation.fPX
+                        tChk.yMin = tChk.yMin+.1+.tLocation.fPY : tChk.yMax = tChk.yMax-.1+.tLocation.fPY
+                        tChk.zMin = tChk.zMin+.1+.tLocation.fPZ : tChk.zMax = tChk.zMax-.1+.tLocation.fPZ
+                        if CheckCollision( tPart , tChk ) then
+                           color 12: printf(!"Collision! between part %s and %s\n",g_tPart(iRightPart_).sName,.sName): color 7
+                        end if
+                     end with
+                  next N
                #endif
                                              
                var iColor = iif(.iColor<0,16,.iColor), psPrimative = @.sPrimative
+               'nearest = roundf(val * 100) / 100
                with .tMatrix
+                  #define r(_i) (roundf(.m(_i)*100000)/100000)
                   sprintf(zTemp,!"1 %i %f %f %f %g %g %g %g %g %g %g %g %g %s\n",iColor,_fPX,_fPY,_fPZ, _
-                     .m(0),.m(1),.m(2),.m(4),.m(5),.m(6),.m(8),.m(9),.m(10) , *psPrimative )
+                     r(0),r(1),r(2),r(4),r(5),r(6),r(8),r(9),r(10) , *psPrimative )
                end with
                sResult += zTemp : printf("%s",zTemp)               
             end with            
@@ -484,13 +497,18 @@ else
       !"B3 s8 = 3002 B5 c3;"
    #endif
    
+   #if 0
    sScript = _
      !"3865 BP10 #7 s69 = 3001p11 B1 y90 c1;" _ '4070 (side stud) (87087 have shadow problems)
      !"B1 s1 = 3001p11 B2 #2 c5;" _
      !"B2 s1 = 3001p11 B3 #3 c6;" _
      !"B3 c5 = 3001p11 B4 #4 s1;" _ '71752 '3021
-     !"B4 c1 = 4070 B5 #5 y180 s2;"    'collision
+     !"B4 c1 = 4070 B5 #5 s2;"    'collision
      '!"003238a P1 #2 c1 = 003238b P2 #4 s1;"
+   #endif
+   
+   sScript = _ 
+      !"87087 B1 s1 = 87087 B2 #2 x-90 c1;"
      
 end if
 var sModel = LegoScriptToLDraw(sScript)
