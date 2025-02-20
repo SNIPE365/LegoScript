@@ -2,6 +2,8 @@
   #error " Don't compile this one"
 #endif  
 
+'TODO (20/02/2025) - Create a free index list, so that holes in the array and string can be reused
+
 '#cmdline "-gen gcc -O 3"
 #include once "crt.bi"
 #include once "vbcompat.bi"
@@ -890,6 +892,26 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
    return pT
    
 end function
+
+sub FreeModel( byref pPart as DATFile ptr )
+   if pPart = 0 then exit sub
+   with *pPart      
+      if .iModelIndex < 0 then exit sub
+      with g_tModels(.iModelIndex)              
+         var iPosEnd = instr(.iFilenameOffset+5,g_sFilenames,chr(255))         
+         if iPosEnd=0 then 
+            cptr(uinteger ptr,@g_sFilenames)[1] = .iFilenameOffset 'crop from end            
+         else 'TODO: WORKAROUND: clean the deleted part so it wont be found (need to compact them later)
+            memset( strptr(g_sFilenames)+.iFilenameOffset , 0 , (iPosEnd-.iFilenameOffset)-2 )
+         end if         
+         .iFilenameOffset = - 1 : .pModel = 0
+      end with      
+      if .paShadow then deallocate(.paShadow) : .paShadow = 0      
+      if .pData    then deallocate(.pData)    : .pData    = 0   
+      .iModelIndex = -1
+   end with   
+   Deallocate( pPart ) : pPart = NULL   
+end sub   
 
 #define EOL !"\n"
 

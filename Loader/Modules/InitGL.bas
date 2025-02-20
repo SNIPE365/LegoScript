@@ -36,14 +36,16 @@
    
 #endif
 
-const ScrWid=640,ScrHei=480
+'const ScrWid=640,ScrHei=480
 
-sub InitOpenGL()   
+function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    
    'screencontrol( fb.SET_GL_NUM_SAMPLES , 4 )
    'screencontrol( fb.SET_GL_DEPTH_BITS , 24 )
    'screencontrol( fb.SET_GL_COLOR_BITS , 32 )
    screenres ScrWid,ScrHei,32,,fb.GFX_OPENGL' or fb.GFX_MULTISAMPLE      
+   dim as HWND hwndGFX
+   screencontrol fb.GET_WINDOW_HANDLE , *cptr(uinteger ptr,@hwndGFX)   
    
    '' ReSizeGLScene
    glViewport 0, 0, ScrWid, ScrHei                  '' Reset The Current Viewport
@@ -103,7 +105,7 @@ sub InitOpenGL()
     
     glEnable(GL_COLOR_MATERIAL)
     glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE)        
-    
-    
+        
+    return hwndGFX
 
-end sub
+end function
