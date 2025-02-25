@@ -1,4 +1,4 @@
-#define __Main
+#define __Main "LegoScript"
 
 #include once "windows.bi"
 #include once "win\commctrl.bi"
@@ -29,6 +29,8 @@ enum Accelerators
    acToggleMenu
 end enum
 
+#define GiveUp(_N) return false
+
 #include "Loader\LoadLDR.bas"
 #include "Loader\Include\Colours.bas"
 #include "Loader\Modules\Clipboard.bas"
@@ -37,6 +39,7 @@ end enum
 #include "Loader\Modules\Normals.bas"
 #include "Loader\Modules\Matrix.bas"
 #include "Loader\Modules\Model.bas"
+#include "LS2LDR.bas"
 
 dim shared as hwnd CTL(wcLast-1)     'controls
 dim shared as hinstance APPINSTANCE  'instance
@@ -57,6 +60,13 @@ namespace Viewer
    dim shared as string g_sGfxFile , g_sFileName
    dim shared as any ptr g_Mutex
    
+   function LoadMemory( sContents as string , sName as string = "Unnamed.ls" ) as boolean
+      MutexLock( g_Mutex )
+         g_sGfxFile = sContents : g_sFileName = sName
+         g_LoadFile = 1
+      Mutexunlock( g_Mutex )
+      return true
+   end function      
    function LoadFile( sFile as string ) as boolean
       dim as boolean bLoadResult = FALSE
       MutexLock( g_Mutex )
@@ -182,6 +192,7 @@ namespace Viewer
                   if iBorders >=0 then glDeleteLists( iBorders , 2 ) : iBorders = -1
                end if 
                g_TotalLines = 0 : g_TotalOptis = 0 : g_TotalTrigs = 0 : g_TotalQuads = 0
+               static as string sPrevFilename
                pModel = LoadModel( strptr(g_sGfxFile) , g_sFileName )
                g_sGfxFile = "" : if pModel = NULL then exit do 'failed to load
                iModel   = glGenLists( 1 )
@@ -195,11 +206,15 @@ namespace Viewer
                glNewList( iBorders+1 ,  GL_COMPILE )
                RenderModel( pModel , true , , -2 )
                glEndList()
-                               
-               fZoom = -3 : fRotationX = 120 : fRotationY = 20
-               iWheel = 0 : iPrevWheel = 0
                
-               g_DrawCount = pModel->iPartCount
+               var bResetAttributes = sPrevFilename <> g_sFileName
+               if bResetAttributes then
+                  fZoom = -3 : fRotationX = 120 : fRotationY = 20
+                  iWheel = 0 : iPrevWheel = 0 
+                  sPrevFilename = g_sFileName
+               end if
+               
+               g_PartCount = 0 : g_DrawCount = pModel->iPartCount
                g_CurPart = -1 : g_CurDraw = -1
                SizeModel( pModel , tSz , , g_PartCount )
                with tSz
@@ -219,10 +234,12 @@ namespace Viewer
                      g_TotalLines , g_TotalOptis , g_TotalTrigs , g_TotalQuads , _
                      g_TotalLines*2+g_TotalOptis*2+g_TotalTrigs*3+g_TotalQuads*4 _
                   )
-                  fPositionX = 0 '((.xMin + .xMax)\-2)-.xMin
-                  fPositionY = (.yMin + .yMax)\-2
-                  fPositionZ = (.zMax-.zMin) 'abs(.zMax)-abs(.zMin)
-                  fPositionZ = sqr(fPositionZ)*-40
+                  if bResetAttributes then
+                     fPositionX = 0 '((.xMin + .xMax)\-2)-.xMin
+                     fPositionY = (.yMin + .yMax)\-2
+                     fPositionZ = (.zMax-.zMin) 'abs(.zMax)-abs(.zMin)
+                     fPositionZ = sqr(fPositionZ)*-40
+                  end if
                end with
                               
                CheckCollisionModel( pModel , atCollision() )
@@ -377,6 +394,23 @@ namespace Menu
    end function
 end namespace
 
+function LoadFileIntoEditor( sFile as string ) as boolean
+   var f = freefile()
+   if open(sFile for input as #f) then
+      MessageBox( CTL(wcMain) , !"Failed to open:\n\n'"+sFile+"'" , NULL , MB_ICONERROR )
+      return false
+   end if
+   dim as string sLine,sScript
+   while not eof(f)
+      line input #f, sLine : sScript += sLine+!"\r\n"
+   wend
+   close #f
+   SetWindowText( CTL(wcEdit) , sScript ) 
+   sLine="":sScript=""
+   g_CurrentFilePath = sFile
+   return true
+end function
+
 declare sub File_SaveAs()
 '**************** Main Menu Layout **************
 sub File_New()
@@ -407,20 +441,7 @@ sub File_Open()
       .Flags = OFN_FILEMUSTEXIST or OFN_PATHMUSTEXIST or OFN_NOCHANGEDIR
       if GetOpenFileName( @tOpen ) = 0 then exit sub      
       print "["+*.lpstrFile+"]"
-      var f = freefile()
-      if open(*.lpstrFile for input as #f) then
-         MessageBox( CTL(wcMain) , !"Failed to open:\n\n'"+*.lpstrFile+"'" , NULL , MB_ICONERROR )
-         exit sub
-      end if
-      dim as string sLine,sScript
-      while not eof(f)
-         line input #f, sLine : sScript += sLine+!"\r\n"
-      wend
-      close #f
-      SetWindowText( CTL(wcEdit) , sScript ) 
-      sLine="":sScript=""
-      g_CurrentFilePath = *.lpstrFile
-      
+      LoadFileIntoEditor( *.lpstrFile )
    end with
 end sub
 sub File_Save()
@@ -433,8 +454,8 @@ sub File_Save()
       puts("Failed to retrieve text content...")
       exit sub  
    end if
-   print iMaxLen
-   print sScript
+   'print iMaxLen
+   'print sScript
    var f = freefile()
    if open(g_CurrentFilePath for output as #f) then
       MessageBox( CTL(wcMain) , !"Failed to save:\n\n'"+g_CurrentFilePath+"'" , NULL , MB_ICONERROR )
@@ -515,20 +536,39 @@ function CreateMainMenu() as HMENU
    return hMenu
 end function
 
+sub Button_Compile()
+   var iMaxLen = GetWindowTextLength( CTL(wcEdit) )
+   var sScript = space(iMaxLen)
+   if GetWindowText( CTL(wcEdit) , strptr(sScript) , iMaxLen+1 )<>iMaxLen then 
+      puts("Failed to retrieve text content...")
+      exit sub  
+   end if   
+   
+   dim as string sOutput, sError
+   sOutput = LegoScriptToLDraw( sScript , sError )
+   SetWindowText( CTL(wcOutput) , iif(len(sOutput),sOutput,sError) )
+   if len(sOutput) then
+      if lcase(right(g_CurrentFilePath,3)) = ".ls" then
+         Viewer.LoadMemory( sOutput , left(g_CurrentFilePath,len(g_CurrentFilePath)-3)+".ldr" )
+      else
+         Viewer.LoadMemory( sOutput , g_CurrentFilePath+".ldr" )
+      end if
+   end if
+   
+end sub
+
 sub ProcessAccelerator( iID as long )
    select case iID
    case acToggleMenu
       SetMenu( CTL(wcMain) , iif( GetMenu(CTL(wcMain)) , NULL , g_WndMenu ) )
    end select
 end sub
-
 function CreateMainAccelerators() as HACCEL
    static as ACCEL AccelList(...) = { _
       ( FSHIFT or FVIRTKEY , VK_SPACE , acToggleMenu ) _
    }
    return CreateAcceleratorTable( @AccelList(0) , ubound(AccelList)+1 )
 end function
-
 sub DockGfxWindow()
    dim as RECT RcWnd=any,RcGfx=any,RcCli=any
    GetWindowRect( g_GfxHwnd , @RcGfx )
@@ -591,16 +631,16 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
     const cLabelStyle = cStyle
     const cStatStyle = cStyle or SBARS_SIZEGRIP
     
-    const cTxtStyle =  cStyle or WS_VSCROLL or ES_MULTILINE
-    const cErrStyle =  cStyle or WS_VSCROLL or ES_MULTILINE or ES_READONLY
+    const cTxtStyle =  cStyle or WS_HSCROLL or WS_VSCROLL or ES_MULTILINE or ES_WANTRETURN
+    const cErrStyle =  cStyle or WS_HSCROLL or WS_VSCROLL or ES_MULTILINE or ES_READONLY
     const RichStyle = cStyle or ES_READONLY or ES_AUTOVSCROLL or WS_VSCROLL or ES_MULTILINE
     
     const cBrd = WS_EX_CLIENTEDGE
     
     ' **** Creating a Control ****
-    CreateControl( wcButton , null , "button"        , "Execute"      , cStyle      , 10 ,   8 ,  80 ,  24 )        
+    CreateControl( wcButton , null , "button"        , "Compile"      , cStyle      , 10 ,   8 ,  80 ,  24 )        
     CreateControl( wcEdit   , cBrd , "edit"          , ""             , cTxtStyle   , 10 ,  40 , 620 , 240 )
-    CreateControl( wcOutput , cBrd , "edit"          , ""             , cErrStyle   , 10 , 280 , 620 , 200 )
+    CreateControl( wcOutput , cBrd , "edit"          , ""             , cErrStyle   , 10 , 280 , 620 , 176 )
     CreateControl( wcStatus , null , STATUSCLASSNAME , "Status"       , cStatStyle  ,  0 ,   0 ,   0 ,   0 )
     
     ' **** Creating a font ****
@@ -626,7 +666,9 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
     CloseHandle( hEventGfxReady )
     if g_GfxHwnd = 0 then return -1 'failed
     
-    ResizeMainWindow( true )    
+    ResizeMainWindow( true )
+    LoadFileIntoEditor( exePath+"\sample.ls" )
+    return 0
           
    case WM_MENUSELECT 'track newest menu handle/item/state
       var iID = cuint(LOWORD(wParam)) , fuFlags = cuint(HIWORD(wParam)) , hMenu = cast(HMENU,lParam) 
@@ -651,8 +693,7 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
       case BN_CLICKED 'button click
          select case wID
          case wcButton
-            Viewer.LoadFile( exepath()+"\Collision.ldr" )
-            'puts("Button click!")
+            Button_Compile()            
          end select
       end select      
       

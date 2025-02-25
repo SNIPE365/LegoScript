@@ -1,17 +1,20 @@
-#cmdline "-exx"
+#ifndef __Main
+   
+   #cmdline "-exx"
 
-#include once "windows.bi"
-#include once "fbgfx.bi"
+   #include once "windows.bi"
+   #include once "fbgfx.bi"
 
-#define __Main
-#define __NoRender
+   #define __Main "LS2LDR"
+   #define __NoRender
+   #define __Standalone
+   #define GiveUp(_N) end _N
 
-#define GiveUp(_N) end _N
-
-#include once "Loader\PartSearch.bas"
-#include once "Loader\LoadLDR.bas"   
-#include once "Loader\Modules\Matrix.bas"
-#include once "Loader\Modules\Model.bas"
+   #include once "Loader\PartSearch.bas"
+   #include once "Loader\LoadLDR.bas"   
+   #include once "Loader\Modules\Matrix.bas"
+   #include once "Loader\Modules\Model.bas"
+#endif
 
 'TODO: apply the rotation to the position vector for the stud/clutch (ongoing)
 'TODO (11/02/2025): must rotate the matrix for the part based on the shadow stud/clutch not just the vector
@@ -23,7 +26,7 @@ const PI = atn(1)*4
    dim as string sModel
    FindFile(sFile)
    if LoadFile( sFile , sModel ) = 0 then
-      print "Failed to load '"+sFile+"'"
+      puts("Failed to load '"+sFile+"'")
       sleep : system
    end if
 
@@ -99,7 +102,7 @@ static shared as long g_iPartCount , g_iConnCount = 0
 
 'TODO: now check the remainder tokens, clutch/studs
 
-function LegoScriptToLDraw( sScript as string ) as string
+function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as string
    
    '<PartCode> <PartName> <PartPosition> =
    '<PartName> <PartPosition> =
@@ -107,10 +110,21 @@ function LegoScriptToLDraw( sScript as string ) as string
    'split tokens
    dim as string sStatement, sToken(15), sResult
    dim as long iStStart=1,iStNext,iLineNumber=1,iTokenLineNumber=1
+   sOutput = "" : g_iPartCount = 0 : g_iConnCount = 0
    
    #define TokenLineNumber(_N) (cptr(fbStr ptr,@sToken(_N))->iSize)
-   #define ParserError( _text ) color 12:print "Error: ";SafeText(_text);" at line";TokenLineNumber(iCurToken);" '";SafeText(sStatement);"'" : sResult="" : color 7: exit while
-   #define ParserWarning( _text ) color 14:print "Warning: ";SafeText(_text);" at line";TokenLineNumber(iCurToken);" '";SafeText(sStatement);"'":color 7
+   
+   #ifdef __Standalone
+      #define ParserError( _text ) color 12:print "Error: ";SafeText(_text);" at line";TokenLineNumber(iCurToken);" '";SafeText(sStatement);"'" : sResult="" : color 7: exit while
+      #define ParserWarning( _text ) color 14:print "Warning: ";SafeText(_text);" at line";TokenLineNumber(iCurToken);" '";SafeText(sStatement);"'":color 7
+      #define LinkerError( _text ) color 12 : print "Error: ";_text; : sResult="" : color 7
+      #define LinkerWarning( _text ) color 14 : print "Warning: ";_text;
+   #else
+      #define ParserError( _text ) sOutput += "Error: " & SafeText(_text) & " at line" & TokenLineNumber(iCurToken) & " '" & SafeText(sStatement) & !"'\r\n" : sResult="" : exit while
+      #define ParserWarning( _text ) sOutput += "Warning: " & SafeText(_text) & " at line" & TokenLineNumber(iCurToken) & " '" & SafeText(sStatement) & !"'\r\n"
+      #define LinkerError( _text ) sOutput += "Error: " & _text & !"\r\n" : sResult=""
+      #define LinkerWarning( _text ) sOutput += "Warning: " & _text & !"\r\n" 
+   #endif
    
    'Parsing LS and generate connections
    while 1
@@ -195,13 +209,15 @@ function LegoScriptToLDraw( sScript as string ) as string
       if iTokCnt=0 then if iStNext=0 then exit while else continue while
       
       'Display Tokens
+      #ifdef __Standalone
       for N as long = 0 to iTokCnt-1
          if iTokenLineNumber <> TokenLineNumber(N) then 
-            print : iTokenLineNumber = TokenLineNumber(N)
+            puts("") : iTokenLineNumber = TokenLineNumber(N)
          end if         
-         print "{"+SafeText(sToken(N))+"}";
+         printf("%s","{"+SafeText(sToken(N))+"}")
       next N
-      print
+      puts("")
+      #endif
       
       'Parse Tokens
       dim as long iCurToken=0
@@ -349,11 +365,14 @@ function LegoScriptToLDraw( sScript as string ) as string
          if .tLocation.fAY then MatrixRotateY( .tMatrix , .tMatrix , .tLocation.fAY )
          if .tLocation.fAZ then MatrixRotateZ( .tMatrix , .tMatrix , .tLocation.fAZ )         
          with .tMatrix
-            sprintf(zTemp,!"1 %i %f %f %f %g %g %g %g %g %g %g %g %g %s\n",iColor,_fPX,_fPY,_fPZ, _
+            sprintf(zTemp,!"1 %i %f %f %f %g %g %g %g %g %g %g %g %g %s\r\n",iColor,_fPX,_fPY,_fPZ, _
                .m(0),.m(1),.m(2),.m(4),.m(5),.m(6),.m(8),.m(9),.m(10) , *psPrimative )
          end with
-         sResult += zTemp : printf("%s",zTemp)
-      end with      
+         sResult += zTemp 
+         #ifdef __Standalone
+         printf("%s",zTemp)
+         #endif
+      end with
       '------------------------------------------------------------------------
       '--------------- later parts are relative to some other part ------------
       '---------- so process all connections to get the relative parts --------
@@ -369,14 +388,14 @@ function LegoScriptToLDraw( sScript as string ) as string
             select case .iLeftType
             case spStud   : pLeft = pSnap->pStud  +.iLeftNum-1
             case spClutch : pLeft = pSnap->pClutch+.iLeftNum-1
-            case else     : print "Error"
+            case else     : puts("Error")
             end select
             pModel = g_tModels(g_tPart(.iRightPart).iModelIndex).pModel 
             pSnap = cptr(PartSnap ptr,pModel->pData)
             select case .iRightType
             case spStud   : pRight = pSnap->pStud  +.iRightNum-1
             case spClutch : pRight = pSnap->pClutch+.iRightNum-1
-            case else     : print "Error"
+            case else     : puts("Error")
             end select
             'print pLeft->fPX , pLeft->fPY , pLeft->fPZ
             'print pRight->fPX , pRight->fPY , pRight->fPZ
@@ -395,22 +414,22 @@ function LegoScriptToLDraw( sScript as string ) as string
                   '.fPosY = 100
                   '.fPosZ = 0
                end with
-               'if pLeft->pMatOrg then MultMatrix4x4( .tMatrix , .tMatrix , pLeft->pMatOrg )
-               'if pRight->pMatOrg then MultMatrix4x4( .tMatrix , .tMatrix , pRight->pMatOrg )
+               : if pLeft->pMatOrg then MultMatrix4x4( .tMatrix , .tMatrix , pLeft->pMatOrg )
+               : if pRight->pMatOrg then MultMatrix4x4( .tMatrix , .tMatrix , pRight->pMatOrg )
                if .tLocation.fAX then MatrixRotateX( .tMatrix , .tMatrix , .tLocation.fAX )
                if .tLocation.fAY then MatrixRotateY( .tMatrix , .tMatrix , .tLocation.fAY )
                if .tLocation.fAZ then MatrixRotateZ( .tMatrix , .tMatrix , .tLocation.fAZ )
                
                _fPX = pLeft->fPX : _fPY = pLeft->fPY : _fPZ = pLeft->fPZ               
                'if pLeft->pMatOrg then MultiplyMatrixVector( @tVec3(0) , pLeft->pMatOrg )
-               MultiplyMatrixVector( @tVec3(0) , @pLeftPart->tMatrix )
+               'MultiplyMatrixVector( @tVec3(0) , @pLeftPart->tMatrix )
                tVec3(0) += pLeftPart->tMatrix.fPosX
                tVec3(1) += pLeftPart->tMatrix.fPosY
                tVec3(2) += pLeftPart->tMatrix.fPosZ
                
                dim as single tVec3R(2) = { pRight->fPX , pRight->fPY , pRight->fPZ }
                'if pRight->pMatOrg then MultiplyMatrixVector( @tVec3R(0) , pRight->pMatOrg )
-               MultiplyMatrixVector( @tVec3R(0) , @.tMatrix )
+               'MultiplyMatrixVector( @tVec3R(0) , @.tMatrix )
                
                _fPX = ptLocation->fPX - (_fPX + tVec3R(0)) '.fPX
                _fPY = ptLocation->fPY + (_fPY - tVec3R(1)) '.fPY
@@ -419,7 +438,7 @@ function LegoScriptToLDraw( sScript as string ) as string
                if .tLocation.fPX = 0 andalso .tLocation.fPY=0 andalso .tLocation.fPZ=0 then
                   .tLocation.fPX = _fPX : .tLocation.fPY = _fPY : .tLocation.fPZ = _fPZ
                elseif abs(.tLocation.fPX-_fPX)>.001 orelse abs(.tLocation.fPY-_fPY)>.001 orelse abs(.tLocation.fPZ-_fPZ)>.001 then
-                  color 12 : print "Impossible Connection detected!" : color 7
+                  LinkerError( "Impossible Connection detected!" )
                end if
                dim as PartSize tPart = any  : tPart = pModel->tSize
                var iIdx = .iModelIndex
@@ -446,7 +465,9 @@ function LegoScriptToLDraw( sScript as string ) as string
                         tChk.yMin = tChk.yMin+.1+.tLocation.fPY : tChk.yMax = tChk.yMax-.1+.tLocation.fPY
                         tChk.zMin = tChk.zMin+.1+.tLocation.fPZ : tChk.zMax = tChk.zMax-.1+.tLocation.fPZ
                         if CheckCollision( tPart , tChk ) then
-                           color 12: printf(!"Collision! between part %s and %s\n",g_tPart(iRightPart_).sName,.sName): color 7
+                           dim as zstring*128 zMessage = any
+                           sprintf(zMessage,!"Collision! between part %s and %s",g_tPart(iRightPart_).sName,.sName)
+                           LinkerWarning( zMessage )
                         end if
                      end with
                   next N
@@ -456,10 +477,13 @@ function LegoScriptToLDraw( sScript as string ) as string
                'nearest = roundf(val * 100) / 100
                with .tMatrix
                   #define r(_i) (roundf(.m(_i)*100000)/100000)
-                  sprintf(zTemp,!"1 %i %f %f %f %g %g %g %g %g %g %g %g %g %s\n",iColor,_fPX,_fPY,_fPZ, _
+                  sprintf(zTemp,!"1 %i %f %f %f %g %g %g %g %g %g %g %g %g %s\r\n",iColor,_fPX,_fPY,_fPZ, _
                      r(0),r(1),r(2),r(4),r(5),r(6),r(8),r(9),r(10) , *psPrimative )
                end with
-               sResult += zTemp : printf("%s",zTemp)               
+               sResult += zTemp 
+               #ifdef __Standalone
+               printf("%s",zTemp)
+               #endif
             end with            
             'puts("1 0 40 -24 -20 1 0 0 0 1 0 0 0 1 3001.dat")
             'puts("1 0 0 0 0 1 0 0 0 1 0 0 0 1 3001.dat")
@@ -469,11 +493,16 @@ function LegoScriptToLDraw( sScript as string ) as string
    end if
          
    clear sToken(0),0,16*sizeof(fbStr) ': erase sToken
-   clear sStatement,0,sizeof(fbStr)   ': sStatement = ""   
+   clear sStatement,0,sizeof(fbStr)   ': sStatement = ""
    
+   redim as PartStructLS g_tPart(_cPartMin)
+   redim as PartConnLS g_tConn(_cConnMin)
+      
    return sResult
    
 end function
+
+#ifdef __Standalone
 
 dim as string sText,sScript
 var sCmd = command(), iDump=0
@@ -507,8 +536,14 @@ else
      '!"003238a P1 #2 c1 = 003238b P2 #4 s1;"
    #endif
    
-   sScript = _ 
-      !"87087 B1 s1 = 87087 B2 #2 x-90 c1;"
+   'sScript = _ 
+   '   !"87087 B1 s1 = 87087 B2 #2 x-90 c1;"
+   sScript = _
+      "3865 BP10 #7 s69 = 3001p11 B1 c1;" _
+      "B1 s1 = 3001p11 B2 #2 c5;" _
+      "B2 s1 = 3001p11 B3 #3 c6;" _
+      "B3 c5 = 3001p11 B4 #4 s1;" _
+      "B4 c1 = 4070 B5 #5 s2;" 
      
 end if
 var sModel = LegoScriptToLDraw(sScript)
@@ -563,4 +598,4 @@ end if
 'for N as long = 0 to ubound(g_tModels)       
 '   print strptr(g_sFilenames)[g_tModels(N).iFilenameOffset+9]
 'next N
-
+#endif

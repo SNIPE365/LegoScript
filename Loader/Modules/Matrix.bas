@@ -33,7 +33,7 @@ dim shared as Matrix4x4 g_tIdentityMatrix = ( _
      0, 0, 0, 1 } _
 )
 tMatrixStack( 0 ) = g_tIdentityMatrix
-sub PushAndMultMatrix( pIn as const single ptr )
+function PushAndMultMatrix( pIn as const single ptr ) as boolean
    var pCur = cast(single ptr,@tMatrixStack(g_CurrentMatrix))
    g_CurrentMatrix += 1
    if g_CurrentMatrix > 1023 then
@@ -54,9 +54,9 @@ sub PushAndMultMatrix( pIn as const single ptr )
             pCur[row + 3 * 4] * piN[3 + col * 4]
       next col
    next row   
-   
-end sub
-sub MultCurrentMatrix( pIn as const single ptr )
+   return true
+end function
+function MultCurrentMatrix( pIn as const single ptr ) as boolean
    var pCur = cast(single ptr,@tMatrixStack(g_CurrentMatrix))   
    if g_CurrentMatrix >= 1023 then
       puts("MATRIX STACK OVERFLOW!!!!")
@@ -78,8 +78,9 @@ sub MultCurrentMatrix( pIn as const single ptr )
    next row 
    
    memcpy( pCur , pOut , 16*sizeof(single) )
+   return true
    
-end sub
+end function
 sub PushIdentityMatrix()
    g_CurrentMatrix += 1   
    tMatrixStack( g_CurrentMatrix ) = g_tIdentityMatrix 'tMatrixStack( 0 )

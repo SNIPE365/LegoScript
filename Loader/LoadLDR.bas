@@ -37,7 +37,7 @@ g_sFilesToLoad = chr(0)
 
 #include "Modules\ParserFunctions.bas"
 
-sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long = 0)   
+function LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long = 0) as boolean
    
    #macro CheckError(_s , _separator... )
       #if len( #_separator )
@@ -85,7 +85,7 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
          printf(!"[%s] was referenced in a shadow file, but was not found\n",sShadowFile)
       end if
       'printf(!"[%s] does NOT have shadow\n",sShadowFile)
-      exit sub
+      return false
    end if     
    
    dim as string sContent
@@ -563,9 +563,11 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
       if iFailed then
          printf("ERROR: Failed to load shadow file '%s'\n",sFilename)
       end if
+      return iFailed=0
    end if
+   return false
 
-end sub
+end function
 
 function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex as long = -1 , iLoadDependencies as byte = 1 ) as DATFile ptr   
    #macro CheckError(_s , _separator... )
@@ -582,7 +584,7 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
       while *pFile <> asc(!"\n")
          select case *pFile
          case 0                    : exit do 'last line of file so we're done SUCCESS
-         case asc("\r"),9,asc(" ") 'skipping spaces/tabs/CR
+         case asc(!"\r"),9,asc(" ") 'skipping spaces/tabs/CR
          case else
             puts " expect end of line in '"+sFilename+"' at line " & iLineNum
             iFailed = 1 : exit do
