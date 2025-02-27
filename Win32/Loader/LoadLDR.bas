@@ -2,6 +2,8 @@
   #error " Don't compile this one"
 #endif  
 
+'TODO (20/02/2025) - Create a free index list, so that holes in the array and string can be reused
+
 '#cmdline "-gen gcc -O 3"
 #include once "crt.bi"
 #include once "vbcompat.bi"
@@ -35,7 +37,7 @@ g_sFilesToLoad = chr(0)
 
 #include "Modules\ParserFunctions.bas"
 
-sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long = 0)   
+function LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long = 0) as boolean
    
    #macro CheckError(_s , _separator... )
       #if len( #_separator )
@@ -83,7 +85,7 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
          printf(!"[%s] was referenced in a shadow file, but was not found\n",sShadowFile)
       end if
       'printf(!"[%s] does NOT have shadow\n",sShadowFile)
-      exit sub
+      return false
    end if     
    
    dim as string sContent
@@ -561,9 +563,11 @@ sub LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long 
       if iFailed then
          printf("ERROR: Failed to load shadow file '%s'\n",sFilename)
       end if
+      return iFailed=0
    end if
+   return false
 
-end sub
+end function
 
 function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex as long = -1 , iLoadDependencies as byte = 1 ) as DATFile ptr   
    #macro CheckError(_s , _separator... )
@@ -580,7 +584,7 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
       while *pFile <> asc(!"\n")
          select case *pFile
          case 0                    : exit do 'last line of file so we're done SUCCESS
-         case asc("\r"),9,asc(" ") 'skipping spaces/tabs/CR
+         case asc(!"\r"),9,asc(" ") 'skipping spaces/tabs/CR
          case else
             puts " expect end of line in '"+sFilename+"' at line " & iLineNum
             iFailed = 1 : exit do
@@ -629,6 +633,11 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
             pNew->iShadowCount = 0
             pNew->pData = NULL
             pNew->paShadow = NULL
+            with pNew->tSize
+               .xMin = fUnused : .xMax = fUnused
+               .yMin = fUnused : .yMax = fUnused
+               .zMin = fUnused : .zMax = fUnused
+            end with
             'clear pNew->tInfo , 0 , sizeof(pNew->tInfo)
          end if
          pT = pNew
@@ -684,20 +693,20 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
             var iOffset = instr(g_sFilenames,chr(0)+sFileL)
             
             #if 0
-            if iLastPart = 0 andalso RecursionLevel=1 then 'no parts were added so this 
-               pt->tParts(iLastPart).wColour = 16 'inherit color
-               pt->tParts(iLastPart).bType = 1 'subfile
-               with pt->tParts(iLastPart)._1                  
-                  .fX = 0 : .fY = 0 : .fZ = 0
-                  .fA = 1 : .fB = 0 : .fC = 0
-                  .fD = 0 : .fE = 1 : .fF = 0
-                  .fG = 0 : .fH = 0 : .fI = 0 'ident matrix                   
-                  .lModelIndex = g_ModelCount 'so the current count is the new model index               
-                  g_sFilenames += chr(255)+mkl(g_ModelCount)+chr(0)+sFileL 'add the index to it along the lowercase name to loaded list                                 
-                  redim preserve g_tModels( g_ModelCount ) : g_ModelCount += 1
-               end with                   
-               iLastPart += 1
-            end if
+               if iLastPart = 0 andalso RecursionLevel=1 then 'no parts were added so this 
+                  pt->tParts(iLastPart).wColour = 16 'inherit color
+                  pt->tParts(iLastPart).bType = 1 'subfile
+                  with pt->tParts(iLastPart)._1                  
+                     .fX = 0 : .fY = 0 : .fZ = 0
+                     .fA = 1 : .fB = 0 : .fC = 0
+                     .fD = 0 : .fE = 1 : .fF = 0
+                     .fG = 0 : .fH = 0 : .fI = 0 'ident matrix                   
+                     .lModelIndex = g_ModelCount 'so the current count is the new model index               
+                     g_sFilenames += chr(255)+mkl(g_ModelCount)+chr(0)+sFileL 'add the index to it along the lowercase name to loaded list                                 
+                     redim preserve g_tModels( g_ModelCount ) : g_ModelCount += 1
+                  end with                   
+                  iLastPart += 1
+               end if
             #endif
             
             'print sFilename, iLineNum & " lines and " & iLastPart & " parts were read Rec: " & RecursionLevel
@@ -885,6 +894,26 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
    return pT
    
 end function
+
+sub FreeModel( byref pPart as DATFile ptr )
+   if pPart = 0 then exit sub
+   with *pPart      
+      if .iModelIndex < 0 then exit sub
+      with g_tModels(.iModelIndex)              
+         var iPosEnd = instr(.iFilenameOffset+5,g_sFilenames,chr(255))         
+         if iPosEnd=0 then 
+            cptr(uinteger ptr,@g_sFilenames)[1] = .iFilenameOffset 'crop from end            
+         else 'TODO: WORKAROUND: clean the deleted part so it wont be found (need to compact them later)
+            memset( strptr(g_sFilenames)+.iFilenameOffset , 0 , (iPosEnd-.iFilenameOffset)-2 )
+         end if         
+         .iFilenameOffset = - 1 : .pModel = 0
+      end with      
+      if .paShadow then deallocate(.paShadow) : .paShadow = 0      
+      if .pData    then deallocate(.pData)    : .pData    = 0   
+      .iModelIndex = -1
+   end with   
+   Deallocate( pPart ) : pPart = NULL   
+end sub   
 
 #define EOL !"\n"
 

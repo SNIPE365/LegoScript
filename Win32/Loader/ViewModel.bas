@@ -1,6 +1,6 @@
 #define __Main
 '#define __Tester
-'#define DebugShadow
+#define DebugShadow
 '#define ColorizePrimatives
 '#define RenderOptionals
 
@@ -17,8 +17,11 @@
 #include "Modules\Matrix.bas"
 #include "Modules\Model.bas"
 
-' TODO make the GUI window so that it can be part of LS in GUI/CLI mode but also part of the lego game.
-' TODO CheckModelCollision()
+' TODO: make the GUI window so that it can be part of LS in GUI/CLI mode but also part of the lego game.
+' TODO: we need now the full polygon collision to detect better if the bounding boxes collide
+' TODO: change the collision bounding boxes, to line markers that extend outside the model
+' TODO: handle the case where viewing a part file instead of a model file (as subparts shouldnt be checked for collision)
+' TODO: models with submodels shouldnt ignore the collision when it's a submodel (need to detect when?)
 
 'https://www.melkert.net/LDCad/tech/meta
 
@@ -171,7 +174,7 @@ scope
    'sFile = sPath+"\LDraw\parts\3082.dat"     'THIS APPEARS TO BE WRONG, IT LOOKS LIKE ITS 2 LDU thick by 39 LDU tall including the nub and 32 LDU WIDE 
    'sFile = sPath+"\LDraw\parts\3109.dat"     'FINE (subpart? shadow does not account holes)
    'sFile = sPath+"\LDraw\parts\3110.dat"     '(subpart) this appears to be 20 LDU tall by 32 LDU wide by 72 LDU long
-   sFile = sPath+"\LDraw\parts\3111.dat"     '(no shadow) actually right :) (need further review on the subparts of this)
+   'sFile = sPath+"\LDraw\parts\3111.dat"     '(no shadow) actually right :) (need further review on the subparts of this)
    'sFile = sPath+"\LDraw\parts\3112.dat"     '(no shadow) actually right :) (need further review on the subparts of this)
    'sFile = sPath+"\LDraw\parts\3127.dat"     '(size? mega wrong :D)
    'sFile = sPath+"\LDraw\parts\3130.dat"     'FINE (miss many shadow info)
@@ -205,7 +208,7 @@ scope
    
    'sFile = sPath+"LDraw\models\car.ldr"
    'sFile = sPath+"\examples\5580.mpd"
-   sFile = exePath+"\..\Collision.ldr"
+   'sFile = exePath+"\..\Collision.ldr"
    
    'sFile = sPath+"LDraw\digital-bricks.de parts not in LDRAW\12892.dat"
    
@@ -222,8 +225,8 @@ scope
    "15587.dat" '?????   
    "15625.dat" "18870.dat" 'probabily slab
    #endif
-   'sFile = "24326.dat"
-   '"2441.dat","2612.dat","2628.dat","2629.dat","27261.dat","2726c01.dat","2726c02.dat","274.dat","289.dat","30036.dat","30042.dat","30065.dat","30157b.dat","30234.dat","30303.dat","30303pa0.dat","30527c01.dat","30527c02.dat","30527c03.dat","32739.dat","33088.dat","33121.dat","33122.dat","33286.dat","35327.dat","35473.dat","36840.dat","37720a.dat","3788.dat","3960.dat","3960p01.dat","3960p02.dat","3960p03.dat","3960p04.dat","3960p05.dat","3960p06.dat","3960p07.dat","3960p08.dat","3960p09.dat","3960p0a.dat","3960p0b.dat","3960p0c.dat","3960p0d.dat","3960p0e.dat","3960p0f.dat","3960p0g.dat","3960p0h.dat","3960p0i.dat","3960pa0.dat","3960pa1.dat","3960pb0.dat","3960pb1.dat","3960pb2.dat","3960pb3.dat","3960pb4.dat","3960pb5.dat","3960pb9.dat","3960pbc.dat","3960pf1.dat","3960pf2.dat","3960ph0.dat","3960pm0.dat","3960ps1.dat","3960ps2.dat","3960ps3.dat","3960ps4.dat","3960ps5.dat","3960ps6.dat","3960ps7.dat","3960ps8.dat","3960psb.dat","3960psc.dat","3960pse.dat","3960pv1.dat","3960pv2.dat","3960pv3.dat","3960pv4.dat","3960px1.dat","3960px2.dat","3960px3.dat","39611.dat","40687.dat","4093.dat","4093a.dat","4093ad01.dat","4093b.dat","4093c.dat","41680.dat","41855.dat","4211.dat","4212a.dat","42409.dat","4270181.dat","4285.dat","4285a.dat","4285b.dat","43898.dat","43898p01.dat","43898p02.dat","43898pa1.dat","43898pa2.dat","43898ps1.dat","43898ps2.dat","43898px1.dat","43898px2.dat","44375.dat","44375a.dat","44375aps1.dat","44375aps2.dat","44375aps3.dat","44375b.dat","44375bp01.dat","44375bp03.dat","44375bpa0.dat","44375bps0.dat","44375bps1.dat","44375bps2.dat","44375p01.dat","44375p02.dat","4488.dat","44882.dat","45677.dat","45677d01.dat","45677ds1.dat","45729.dat","4590.dat","4616992.dat","47456.dat","47457.dat","4750.dat","4771a.dat","50949.dat","52031.dat","52031d01.dat","52031d02.dat","52031d03.dat","52031d50.dat","52031d51.dat","52037.dat","5306.dat","54093.dat","56640.dat","56641.dat","58124c01.dat","58124c02.dat","60212.dat","63082.dat","64570.dat","65138.dat","6584.dat","6625c01.dat","66789.dat","66790.dat","66792.dat","71752.dat","72132.dat","73832.dat","74166.dat","79743.dat","85975.dat","87609.dat","90001.dat","90001p01.dat","91049.dat","92088.dat","92338-f2.dat","92339.dat","92340.dat","93541.dat","98263.dat","98281.dat","98383.dat","99206.dat","99780.dat","20952p02.dat","2612.dat","2628.dat","2629.dat","30157b.dat","30303.dat","30303pa0.dat","3263.dat","33088.dat","3960p0g.dat","3960p0h.dat","3960ph0.dat","3960ps9.dat","40687.dat","4093ad01.dat","43898p03.dat","43898p04.dat","44375bp02.dat","44375bp03.dat","44375bp04.dat","44375bp05.dat","44375bp06.dat","44375bp07.dat","44375bps2.dat","45677d02.dat","45677d03.dat","45677d04.dat","45677d05.dat","45677d06.dat","45677ds1.dat","45677dy0.dat","47456.dat","52031d01.dat","52031d03.dat","52031d04.dat","52031d05.dat","5306.dat","65138.dat","65468d.dat","71752.dat","72132.dat","73832.dat","74166.dat","79743.dat","89681.dat","90001c01.dat","90001c01p01.dat","90001p01.dat","92338-f2.dat","93541.dat","99206.dat","u9541.dat",
+   sFile = "87087.dat" '"4070.dat"
+   '"2441.dat","2612.dat","2628.dat","2629.dat","27261.dat","2726c01.dat","2726c02.dat","274.dat","289.dat","30036.dat","30042.dat","30065.dat","30157b.dat","30234.dat","30303.dat","30303pa0.dat","30527c01.dat","30527c02.dat","30527c03.dat","32739.dat","33088.dat","33121.dat","33122.dat","33286.dat","35327.dat","35473.dat","36840.dat","37720a.dat","3788.dat","3960.dat","3960p01.dat","3960p02.dat","3960p03.dat","3960p04.dat","3960p05.dat","3960p06.dat","3960p07.dat","3960p08.dat","3960p09.dat","3960p0a.dat","3960p0b.dat","3960p0c.dat","3960p0d.dat","3960p0e.dat","3960p0f.dat","3960p0g.dat","3960p0h.dat","3960p0i.dat","3960pa0.dat","3960pa1.dat","3960pb0.dat","3960pb1.dat","3960pb2.dat","3960pb3.dat","3960pb4.dat","3960pb5.dat","3960pb9.dat","3960pbc.dat","3960pf1.dat","3960pf2.dat","3960ph0.dat","3960pm0.dat","3960ps1.dat","3960ps2.dat","3960ps3.dat","3960ps4.dat","3960ps5.dat","3960ps6.dat","3960ps7.dat","3960ps8.dat","3960psb.dat","3960psc.dat","3960pse.dat","3960pv1.dat","3960pv2.dat","3960pv3.dat","3960pv4.dat","3960px1.dat","3960px2.dat","3960px3.dat","39611.dat","40687.dat","4093.dat","4093a.dat","4093ad01.dat","4093b.dat","4093c.dat","41680.dat","41855.dat","4211.dat","4212a.dat","42409.dat","4270181.dat","4285.dat","4285a.dat","4285b.dat","43898.dat","43898p01.dat","43898p02.dat","43898pa1.dat","43898pa2.dat","43898ps1.dat","43898ps2.dat","43898px1.dat","43898px2.dat","44375.dat","44375a.dat","44375aps1.dat","44375aps2.dat","44375aps3.dat","44375b.dat","44375bp01.dat","44375bp03.dat","44375bpa0.dat","44375bps0.dat","44375bps1.dat","44375bps2.dat","44375p01.dat","44375p02.dat","4488.dat","44882.dat","45677.dat","45677d01.dat","45677ds1.dat","45729.dat","4590.dat","4616992.dat","47456.dat","47457.dat","4750.dat","4771a.dat","50949.dat","52031.dat","52031d01.dat","52031d02.dat","52031d03.dat","52031d50.dat","52031d51.dat","52037.dat","5306.dat","54093.dat","56640.dat","56641.dat","58124c01.dat","58124c02.dat","60212.dat","63082.dat","64570.dat","65138.dat","6584.dat","6625c01.dat","66789.dat","66790.dat","66792.dat","71752.dat","72132.dat","73832.dat","74166.dat","79743.dat","85975.dat","87609.dat","90001.dat","90001p01.dat","91049.dat","92088.dat","92338-f2.dat","92339.dat","92340.dat","93541.dat","98263.dat","98281.dat","98383.dat","99206.dat","99780.dat","20952p02.dat","2612.dat","2628.dat","2629.dat","30157b.dat","30303.dat","30303pa0.dat","3263.dat","33088.dat","3960p0g.dat","3960p0h.dat","3960ph0.dat","3960ps9.dat","40687.dat","4093ad01.dat","43898p03.dat","43898p04.dat","44375bp02.dat","44375bp03.dat","44375bp04.dat","44375bp05.dat","44375bp06.dat","44375bp07.dat","44375bps2.dat","45677d02.dat","45677d03.dat","45677d04.dat","45677d05.dat","45677d06.dat","45677ds1.dat","45677dy0.dat","47456.dat","52031d01.dat","52031d03.dat","52031d04.dat","52031d05.dat","5306.dat","65138.dat","65468d.dat","71752.dat","72132.dat","73832.dat","74166.dat","79743.dat","89681.dat","90001c01.dat","90001c01p01.dat","90001p01.dat","92338-f2.dat","93541.dat","99206.dat","u9541.dat",   
 end scope
 
 dim as string sModel
@@ -311,7 +314,9 @@ with tSz
    
 end with
 
-printf(!"Parts: %i\n",g_PartCount)
+redim as PartCollisionBox atCollision()
+CheckCollisionModel( pModel , atCollision() )
+printf(!"Parts: %i , Collisions: %i \n",g_PartCount,ubound(atCollision)\2)
 
 #ifdef DebugShadow
 dim as PartSnap tSnap
@@ -333,6 +338,8 @@ with tSnap
    next N
 end with
 #endif
+
+'do : sleep 50 : flip : loop
 
 'puts("")
 'puts("3001 B1 s7 = 3001 B2 c1;")
@@ -432,8 +439,17 @@ do
       glDisable( GL_POLYGON_STIPPLE )
    #endif
    
-   if bBoundingBox then         
-      glEnable( GL_POLYGON_STIPPLE )
+   glDepthMask (GL_FALSE)
+   if bBoundingBox then
+      glColor4f(0,1,0,.25)
+      with tSz
+         DrawLimitsCube( .xMin-1,.xMax+1 , .yMin-1,.yMax+1 , .zMin-1,.zMax+1 )      
+      end with
+   end if
+   
+   var iCollisions = ubound(atCollision)
+   if iCollisions andalso instr(sFile,".dat")=0 then
+      glEnable( GL_POLYGON_STIPPLE )      
       static as ulong aStipple(32-1)
       dim as long iMove = (timer*8) and 7
       for iY as long = 0 to 31         
@@ -441,15 +457,17 @@ do
          aStipple(iY) = iN shr ((iY+iMove) and 7)
       next iY
       glPolygonStipple(	cptr(glbyte ptr,@aStipple(0)) )
-      'glColor4f(0,1,0,.25)
       if (iMove and 2) then glColor4f(1,0,0,1) else glColor4f(0,0,0,1)
-      with tSz
-         DrawLimitsCube( .xMin-1,.xMax+1 , .yMin-1,.yMax+1 , .zMin-1,.zMax+1 )
-      end with   
-      glDisable( GL_POLYGON_STIPPLE )
+      for I as long = 0 to iCollisions-1   
+         with atCollision(I)
+            DrawLimitsCube( .xMin-1,.xMax+1 , .yMin-1,.yMax+1 , .zMin-1,.zMax+1 )
+         end with
+      next I
+      glDisable( GL_POLYGON_STIPPLE )      
    end if
+   glDepthMask (GL_TRUE)
    
-   glPopMatrix()
+   'glPopMatrix()
             
    Dim e as fb.EVENT = any
    while (ScreenEvent(@e))

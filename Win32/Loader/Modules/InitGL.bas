@@ -10,6 +10,8 @@
 #include once "GL/glut.bi"
 #include once "fbgfx.bi"
 
+#include "ResizableGL.bas"
+
 #if 0
    'https://www.ldraw.org/article/218 ldraw specification
    'LDraw uses a right-handed co-ordinate system where -Y is "up".
@@ -36,14 +38,23 @@
    
 #endif
 
-const ScrWid=640,ScrHei=480
+'const ScrWid=640,ScrHei=480
 
-sub InitOpenGL()   
+function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    
    'screencontrol( fb.SET_GL_NUM_SAMPLES , 4 )
    'screencontrol( fb.SET_GL_DEPTH_BITS , 24 )
    'screencontrol( fb.SET_GL_COLOR_BITS , 32 )
    screenres ScrWid,ScrHei,32,,fb.GFX_OPENGL' or fb.GFX_MULTISAMPLE      
+   Gfx.Resize(ScrWid,ScrHei)
+   dim as HWND hwndGFX
+   screencontrol fb.GET_WINDOW_HANDLE , *cptr(uinteger ptr,@hwndGFX)   
+         
+   var lCurStyle = GetWindowLong(hwndGFX,GWL_STYLE) and (not (WS_MINIMIZEBOX or WS_MAXIMIZEBOX))
+   var lCurStyleEx = GetWindowLong(hwndGFX,GWL_EXSTYLE)
+   SetWindowLong( hwndGFX , GWL_STYLE , lCurStyle or WS_SIZEBOX )
+   SetWindowLong( hwndGFX , GWL_EXSTYLE , lCurStyleEx or WS_EX_TOOLWINDOW )
+   SetWindowPos( hwndGFX , NULL , 0,0 , 0,0 , SWP_NOMOVE or SWP_NOSIZE or SWP_NOZORDER or SWP_FRAMECHANGED )
    
    '' ReSizeGLScene
    glViewport 0, 0, ScrWid, ScrHei                  '' Reset The Current Viewport
@@ -103,7 +114,7 @@ sub InitOpenGL()
     
     glEnable(GL_COLOR_MATERIAL)
     glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE)        
-    
-    
+        
+    return hwndGFX
 
-end sub
+end function

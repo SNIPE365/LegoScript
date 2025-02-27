@@ -177,7 +177,7 @@ end type
 type ModelList
    iFilenameOffset as long                 'offset for the file name string
    pModel          as DATFile ptr          'ptr to the model structure
-end type   
+end type
 
 #define Cast_fbStr( _Str ) cptr( fbStr ptr , @_Str )
 type fbStr
