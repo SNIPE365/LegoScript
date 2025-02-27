@@ -1,8 +1,0 @@
-[Shortcut]
-3001d03.dat
-3001d05.dat
-3001d06.dat
-3001d07.dat
-3001d08.dat
-3001d09.dat
-3001d0a.dat
