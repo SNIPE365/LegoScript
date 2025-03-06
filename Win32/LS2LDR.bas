@@ -116,13 +116,13 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
    #define TokenLineNumber(_N) (cptr(fbStr ptr,@sToken(_N))->iSize)
    
    #ifdef __Standalone
-      #define ParserError( _text ) color 12:print "Error: ";SafeText(_text);" at line";TokenLineNumber(iCurToken);" '";SafeText(sStatement);"'" : sResult="" : color 7: exit while
-      #define ParserWarning( _text ) color 14:print "Warning: ";SafeText(_text);" at line";TokenLineNumber(iCurToken);" '";SafeText(sStatement);"'":color 7
+      #define ParserError( _text ) color 12:print "Error: ";SafeText(_text);!"\r\nat line ";TokenLineNumber(iCurToken);" '";SafeText(sStatement);"'" : sResult="" : color 7: exit while
+      #define ParserWarning( _text ) color 14:print "Warning: ";SafeText(_text);!"\r\nat line ";TokenLineNumber(iCurToken);" '";SafeText(sStatement);"'":color 7
       #define LinkerError( _text ) color 12 : print "Error: ";_text; : sResult="" : color 7
       #define LinkerWarning( _text ) color 14 : print "Warning: ";_text;
    #else
-      #define ParserError( _text ) sOutput += "Error: " & SafeText(_text) & " at line" & TokenLineNumber(iCurToken) & " '" & SafeText(sStatement) & !"'\r\n" : sResult="" : exit while
-      #define ParserWarning( _text ) sOutput += "Warning: " & SafeText(_text) & " at line" & TokenLineNumber(iCurToken) & " '" & SafeText(sStatement) & !"'\r\n"
+      #define ParserError( _text ) sOutput += "Error: " & SafeText(_text) & !"\r\nat line " & TokenLineNumber(iCurToken) & " '" & SafeText(sStatement) & !"'\r\n" : sResult="" : exit while
+      #define ParserWarning( _text ) sOutput += "Warning: " & SafeText(_text) & !"\r\nat line " & TokenLineNumber(iCurToken) & " '" & SafeText(sStatement) & !"'\r\n"
       #define LinkerError( _text ) sOutput += "Error: " & _text & !"\r\n" : sResult=""
       #define LinkerWarning( _text ) sOutput += "Warning: " & _text & !"\r\n" 
    #endif
@@ -159,7 +159,7 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
       dim as long iTokStart=0,iTokNext,iTokCnt=0,iTokEnd=len(sStatement)
       'split tokens
       'print "["+sStatement+"]"
-      var pzStatement = cptr(ubyte ptr,strptr(sStatement))            
+      var pzStatement = cptr(ubyte ptr,strptr(sStatement))      
       do
          #define iCurToken iTokCnt-1
          if iTokCnt > ubound(sToken) then ParserError("Too many tokens")            
@@ -168,9 +168,9 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
             'skipping start of next token till a "non token separator" is found
             while (g_bSeparators(.pzData[0]) and stToken)
                if .pzData[0]=0 then exit do
-               .pzData += 1 : iTokStart += 1
+               .pzData += 1 : iTokStart += 1               
                select case .pzData[-1] 'special characters
-               case asc(!"\n")   'new line (LF)
+               case asc(!"\n") 'new line (LF)
                   iLineNumber += 1
                case asc(!"\r")   'new line (CRLF)
                   if .pzData[0]=asc(!"\n") then .pzData += 1 : iTokStart += 1 : iLineNumber += 1
@@ -189,9 +189,10 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
                      wend
                   end if
                end select
-               if iTokStart >= iTokEnd then exit do
-            wend 
+               if iTokStart >= iTokEnd then .iSize = iLineNumber : exit do
+            wend
             'locating end/size of current token
+            ''print .pzData[0],chr(.pzData[0])
             if (g_bSeparators(.pzData[0]) and (not stToken)) then
                .iLen = 1 : iTokStart += 1
             else
@@ -199,26 +200,32 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
                while g_bSeparators(.pzData[.iLen])=0
                   if iTokStart >= iTokEnd then exit while
                   .iLen += 1 : iTokStart += 1
-               wend               
+               wend
             end if
+            .iSize = iLineNumber
             if .iLen <= 0 then exit do
-            .iSize = iLineNumber : iTokCnt += 1 
+            iTokCnt += 1
          end with         
       loop
-            
+      
       iStStart = iStNext+1
       if iTokCnt=0 then if iStNext=0 then exit while else continue while
       
       'Display Tokens
-      #ifdef __Standalone
       for N as long = 0 to iTokCnt-1
-         if iTokenLineNumber <> TokenLineNumber(N) then 
-            puts("") : iTokenLineNumber = TokenLineNumber(N)
-         end if         
+         if iTokenLineNumber <> TokenLineNumber(N) then
+            #ifdef __Standalone
+            puts("")
+            #endif
+            iTokenLineNumber = TokenLineNumber(N)
+         end if
+         #ifdef __Standalone
          printf("%s","{"+SafeText(sToken(N))+"}")
+         #endif
       next N
+      #ifdef __Standalone
       puts("")
-      #endif
+      #endif      
       
       'Parse Tokens
       dim as long iCurToken=0
@@ -227,12 +234,11 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
       
       #define tLeft(_N)  tConn.iLeft##_N
       #define tRight(_N) tConn.iRight##_N
-  
+            
       do 
          #define sRelToken(_N) sToken(iCurToken+(_N))
          #define sCurToken sToken(iCurToken)
-         var iName=ecNotFound, bExisting = false
-         
+         var iName=ecNotFound, bExisting = false         
          'if the first token is a primative (DAT) name then it's a declaration
          if IsPrimative( sCurToken ) then
             #define sPart sCurToken
@@ -242,7 +248,11 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
             iName = FindPartName( sName )
             if iName >= 0 then ParserError( "Name already exists" )            
             iName = AddPartName( sName , sPart  )            
-            if iName >=0 andalso g_tPart(iName).bFoundPart = 0 then ParserWarning("'"+sPart+"' primative not found")
+            if iName >=0 andalso g_tPart(iName).bFoundPart = 0 then 
+               ParserError("'"+sPart+"' primative not found")
+               'puts("bad primative?")
+               exit do
+            end if
             iCurToken += 2            
          else 'otherwise it must be an existing part name
             #define sName sCurToken
@@ -264,11 +274,11 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
          'first for the LEFT side then for the RIGHT side
          if tLeft(Part) < 0 then tLeft(Part) = iName else tRight(Part) = iName
          if tLeft(Part) = tRight(Part) then ParserError("a part can't connect to itself")
-                           
+         
          with g_tPart(iName)
             do 
                if iCurToken = iTokCnt then                
-                  if tLeft(Part) < 0 then ParserError("premature end of statement")                  
+                  if tLeft(Part) < 0 then ParserError("premature end of statement")
                   exit do,do
                end if
                iCurToken += 1
@@ -285,10 +295,12 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
                   end if
                   var iConn = ReadTokenNumber(sThisToken,1)                  
                   if iConn <= 0 then ParserError("invalid connector number")                  
-                  if LoadPartModel( g_tPart(iName) ) < 0 then ParserError("failed to load model")
+                  if LoadPartModel( g_tPart(iName) ) < 0 then 
+                     '*CHECK* it hangs here if it fails to load?
+                     ParserError("failed to load model")
+                  end if                  
                   var pModel = g_tModels(curPart.iModelIndex).pModel 
-                  var pSnap = cptr(PartSnap ptr,pModel->pData)
-                  
+                  var pSnap = cptr(PartSnap ptr,pModel->pData)                  
                   with *pSnap
                      select case sThisToken[0]
                      case asc("s")                        
@@ -301,8 +313,7 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
                      'printf(!"Studs=%i Clutchs=%i Aliases=%i Axles=%i Axlehs=%i Bars=%i Barhs=%i Pins=%i Pinhs=%i\n", _
                      '.lStudCnt , .lClutchCnt , .lAliasCnt , .lAxleCnt , .lAxleHoleCnt ,.lBarCnt , .lBarHoleCnt , .lPinCnt , .lPinHoleCnt )
                   end with
-                  if tLeft(Type) = tRight(Type) then ParserError("same type of connector")
-                     
+                  if tLeft(Type) = tRight(Type) then ParserError("same type of connector")                  
                case asc("="): 'assignment token
                   if tRight(Part) >= 0 then               
                      ParserError("expected end of statement, got '"+sThisToken+"'")
@@ -338,13 +349,14 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
                end select
             loop
          end with
+         puts("C3")
       loop
       
       AddConnection( tConn )
       
       if iStNext=0 then exit while      
-   wend   
-   
+   wend
+         
    'generate LDRAW and check collisions
    if iStNext=0 andalso g_iPartCount>0 then
       '------------------------------------------------------------------------
@@ -846,11 +858,11 @@ else
    'sScript = _ 
    '   !"87087 B1 s1 = 87087 B2 #2 x-90 c1;"
    sScript = _
-      "3865 BP10 #7 s69 = 3001p11 B1 c1;" _
-      "B1 s1 = 3001p11 B2 #2 c5;" _
-      "B2 s1 = 3001p11 B3 #3 c6;" _
-      "B3 c5 = 3001p11 B4 #4 s1;" _
-      "B4 c1 = 4070 B5 #5 s2;" 
+      !"3865 BP10 #7 s69 = 3001p11 B1 c1; \n" _
+      !"B1 s1 = 3001p11 B2 #2 c5; \n " _
+      !"B2 s1 = 3001p11 B3 #3 c6; \n" _
+      !"B3 c5 = 3001p11 B4 #4 s1; \n" _
+      !"B4 c1 = 4070 B5 #5 s22; \n" 
      
 end if
 var sModel = LegoScriptToLDraw(sScript)

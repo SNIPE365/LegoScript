@@ -1,3 +1,4 @@
+#cmdline "-g"
 #define __Main "LegoScript"
 
 #include once "windows.bi"
@@ -12,7 +13,8 @@
 #define Errorf(p...)
 #define Debugf(p...)
 
-'TODO (18/02/25): merge ViewModel into LegoScript.bas
+'TODO (05/03/25): merge Combobox into LegoScript.bas
+'TODO (05/03/25): fix LS2LDR parsing bugs
 
 '*************** Enumerating our control id's ***********
 enum StatusParts
@@ -59,7 +61,7 @@ dim shared g_hCurMenu as any ptr , g_CurItemID as long , g_CurItemState as long
 
 dim shared as HANDLE g_hResizeEvent
 dim shared as hwnd g_GfxHwnd
-dim shared as byte g_DoQuit
+dim shared as byte g_DoQuit , g_Show3D
 dim shared as string g_CurrentFilePath
 
 #define GiveUp(_N) return false
@@ -74,8 +76,50 @@ dim shared as string g_CurrentFilePath
 #include "Loader\Modules\Model.bas"
 #include "LS2LDR.bas"
 
+'******************** Menu Handling Helper Functions **************
+namespace Menu 
+   function AddSubMenu( hMenu as any ptr , sText as string ) as any ptr
+      if IsMenu(hMenu)=0 then return NULL
+      var hResult = CreatePopupMenu()
+      AppendMenu( hMenu , MF_POPUP or MF_STRING , cast(UINT_PTR,hResult) , sText )    
+      if hMenu=g_WndMenu andalso CTL(wcMain) then DrawMenuBar( CTL(wcMain) )
+      return hResult
+   end function
+   function MenuAddEntry( hMenu as any ptr , iID as long = 0 , sText as string = "" , pEvent as any ptr = 0 , bState as long = 0 ) as long    
+      if IsMenu(hMenu)=0 then return -1
+      dim as MENUITEMINFO tItem = type( sizeof(MENUITEMINFO) )    
+      tItem.fMask      = MIIM_DATA or MIIM_ID or MIIM_STATE or MIIM_TYPE
+      tItem.fType      = iif( len(sText) , iif( bState and MFT_RADIOCHECK , MFT_RADIOCHECK , MFT_STRING ) , MFT_SEPARATOR )
+      tItem.fState     = bState and (not MFT_RADIOCHECK)
+      tItem.wID        = iID
+      tItem.dwItemData = cast(long_ptr,pEvent)
+      if len(sText) then tItem.dwTypeData = strptr(sText)
+      InsertMenuItem( hMenu , &hFFFFFFFF , true , @tItem )
+      'DrawMenuBar( g_GfxWnd )
+      return iID
+   end function   
+   'MFS_CHECKED , MFS_DEFAULT , MFS_DISABLED , MFS_ENABLED , MFS_GRAYED , MFS_HILITE , MFS_UNCHECKED , MFS_UNHILITE
+   function MenuState( hMenu as any ptr , iID as long , bState as long = 0 ) as long
+      if IsMenu(hMenu)=0 then return -1
+      dim as MENUITEMINFO tItem = type( sizeof(MENUITEMINFO) , MIIM_STATE )      
+      tItem.fState = bState
+      SetMenuItemInfo( hMenu , iID , false , @tItem )
+      return bState
+   end function
+   function MenuText( hMenu as any ptr , iID as long , sText as string ) as long
+      if IsMenu(hMenu)=0 then return -1    
+      dim as MENUITEMINFO tItem = type( sizeof(MENUITEMINFO) , MIIM_TYPE )          
+      GetMenuItemInfo( hMenu , iID , false , @tItem )    
+      tItem.dwTypeData = strptr(sText)
+      SetMenuItemInfo( hMenu , iID , false , @tItem )
+      return len(sText)
+   end function
+   sub Trigger( iID as ushort )
+      SendMessage(CTL(wcMain),WM_MENUSELECT,iID,cast(LPARAM,g_WndMenu))      
+      SendMessage( CTL(wcMain) , WM_COMMAND , iID , 0 )
+   end sub
+end namespace
 '******************************************************************
-
 namespace Viewer
    dim shared as byte g_LoadFile = 0
    dim shared as string g_sGfxFile , g_sFileName
@@ -104,9 +148,12 @@ namespace Viewer
    sub MainThread( hReadyEvent as any ptr )
       
       g_Mutex = MutexCreate()
-      g_GfxHwnd = InitOpenGL(400,300)   
+      dim as long ScrWid,ScrHei : screeninfo ScrWid,ScrHei
+      g_GfxHwnd = InitOpenGL(ScrWid,ScrHei)   
+      SetWindowPos( g_GfxHwnd , NULL , 0,0 , 400,300 , SWP_NOMOVE or SWP_NOZORDER or SWP_NOACTIVATE )
       ShowWIndow( g_GfxHwnd , SW_HIDE )
       if hReadyEvent then SetEvent( hReadyEvent )
+      SetEvent( g_hResizeEvent )
                   
       dim as long iModel=-1,iBorders=-1
       dim as DATFile ptr  pModel
@@ -134,7 +181,7 @@ namespace Viewer
                if bRightPressed then fPositionX += e.dx*g_zFar/100 : fPositionY += e.dy*g_zFar/100
             case fb.EVENT_MOUSE_WHEEL
                iWheel = e.z-iPrevWheel
-               fZoom = -3+(iWheel/8)
+               fZoom = -3+(iWheel/12)
             case fb.EVENT_MOUSE_BUTTON_PRESS
                if e.button = fb.BUTTON_MIDDLE then 
                   iPrevWheel = iWheel
@@ -186,7 +233,7 @@ namespace Viewer
                   bBoundingBox = not bBoundingBox
                end select
             case fb.EVENT_WINDOW_CLOSE
-               exit do
+               menu.Trigger( 30001 ) 'hide GFX window
             end select
          wend
                      
@@ -279,7 +326,10 @@ namespace Viewer
             MutexUnlock( g_Mutex )
          end if
          
+         're-create base view in case the window got resized
          if WaitForSingleObject( g_hResizeEvent , 0 )=0 then
+            dim as RECT tRc : GetClientRect(g_GfxHwnd,@tRc)
+            var g_iCliWid = tRc.right , g_iCliHei = tRc.bottom        
             glViewport 0, 0, gfx.g_iCliWid, gfx.g_iCliHei                  '' Reset The Current Viewport
             glMatrixMode GL_PROJECTION                       '' Select The Projection Matrix
             glLoadIdentity                                   '' Reset The Projection Matrix
@@ -388,46 +438,6 @@ namespace Viewer
       mutexdestroy( g_Mutex )
       
    end sub
-end namespace
-
-'******************** Menu Handling Helper Functions **************
-namespace Menu
-   function AddSubMenu( hMenu as any ptr , sText as string ) as any ptr
-      if IsMenu(hMenu)=0 then return NULL
-      var hResult = CreatePopupMenu()
-      AppendMenu( hMenu , MF_POPUP or MF_STRING , cast(UINT_PTR,hResult) , sText )    
-      if hMenu=g_WndMenu andalso CTL(wcMain) then DrawMenuBar( CTL(wcMain) )
-      return hResult
-   end function
-   function MenuAddEntry( hMenu as any ptr , iID as long = 0 , sText as string = "" , pEvent as any ptr = 0 , bState as long = 0 ) as long    
-      if IsMenu(hMenu)=0 then return -1
-      dim as MENUITEMINFO tItem = type( sizeof(MENUITEMINFO) )    
-      tItem.fMask      = MIIM_DATA or MIIM_ID or MIIM_STATE or MIIM_TYPE
-      tItem.fType      = iif( len(sText) , iif( bState and MFT_RADIOCHECK , MFT_RADIOCHECK , MFT_STRING ) , MFT_SEPARATOR )
-      tItem.fState     = bState and (not MFT_RADIOCHECK)
-      tItem.wID        = iID
-      tItem.dwItemData = cast(long_ptr,pEvent)
-      if len(sText) then tItem.dwTypeData = strptr(sText)
-      InsertMenuItem( hMenu , &hFFFFFFFF , true , @tItem )
-      'DrawMenuBar( g_GfxWnd )
-      return iID
-   end function   
-   'MFS_CHECKED , MFS_DEFAULT , MFS_DISABLED , MFS_ENABLED , MFS_GRAYED , MFS_HILITE , MFS_UNCHECKED , MFS_UNHILITE
-   function MenuState( hMenu as any ptr , iID as long , bState as long = 0 ) as long
-      if IsMenu(hMenu)=0 then return -1
-      dim as MENUITEMINFO tItem = type( sizeof(MENUITEMINFO) , MIIM_STATE )      
-      tItem.fState = bState
-      SetMenuItemInfo( hMenu , iID , false , @tItem )
-      return bState
-   end function
-   function MenuText( hMenu as any ptr , iID as long , sText as string ) as long
-      if IsMenu(hMenu)=0 then return -1    
-      dim as MENUITEMINFO tItem = type( sizeof(MENUITEMINFO) , MIIM_TYPE )          
-      GetMenuItemInfo( hMenu , iID , false , @tItem )    
-      tItem.dwTypeData = strptr(sText)
-      SetMenuItemInfo( hMenu , iID , false , @tItem )
-      return len(sText)
-   end function
 end namespace
 
 sub NotifySelChange( iID as long )
@@ -549,8 +559,9 @@ end sub
 sub Edit_Copy()
    print __FUNCTION__
 end sub
-sub View_ToggleGW()   
-   if g_GfxHwnd then ShowWindow( g_GfxHwnd , iif( g_CurItemState and MFS_CHECKED , SW_HIDE , SW_SHOW ) )
+sub View_ToggleGW()
+   g_Show3D = (g_CurItemState and MFS_CHECKED)=0
+   if g_GfxHwnd then ShowWindow( g_GfxHwnd , iif( g_Show3D , SW_SHOWNA , SW_HIDE ) )
    Menu.MenuState( g_hCurMenu,g_CurItemID,g_CurItemState xor MFS_CHECKED )
 end sub
 sub Help_About()
@@ -588,15 +599,16 @@ function CreateMainMenu() as HMENU
 end function
 
 sub Button_Compile()
+   SetWindowText( CTL(wcStatus) , "Building..." )   
    var iMaxLen = GetWindowTextLength( CTL(wcEdit) )
    var sScript = space(iMaxLen)
    if GetWindowText( CTL(wcEdit) , strptr(sScript) , iMaxLen+1 )<>iMaxLen then 
       puts("Failed to retrieve text content...")
+      SetWindowText( CTL(wcStatus) , "Build failed." )
       exit sub  
-   end if   
-   
+   end if
    dim as string sOutput, sError
-   sOutput = LegoScriptToLDraw( sScript , sError )
+   sOutput = LegoScriptToLDraw( sScript , sError )   
    SetWindowText( CTL(wcOutput) , iif(len(sOutput),sOutput,sError) )
    if len(sOutput) then
       if lcase(right(g_CurrentFilePath,3)) = ".ls" then
@@ -605,6 +617,7 @@ sub Button_Compile()
          Viewer.LoadMemory( sOutput , g_CurrentFilePath+".ldr" )
       end if
    end if
+   SetWindowText( CTL(wcStatus) , iif(len(sOutput),"Ready.","Script error.") )
    
 end sub
 
@@ -621,14 +634,20 @@ function CreateMainAccelerators() as HACCEL
    return CreateAcceleratorTable( @AccelList(0) , ubound(AccelList)+1 )
 end function
 sub DockGfxWindow()   
-   dim as RECT RcWnd=any,RcGfx=any,RcCli=any
+   dim as RECT RcWnd=any,RcGfx=any,RcCli=any,RcDesk
+   GetWindowRect( GetDesktopWindow() , @RcDesk )
    GetWindowRect( g_GfxHwnd , @RcGfx )
-   GetWindowRect( CTL(wcMain) ,@RcWnd )
-   var iYPos = RcWnd.top+((RcWnd.bottom-RcWnd.Top)-(RcGfx.bottom-RcGfx.top))\2
+   GetWindowRect( CTL(wcMain) ,@RcWnd )   
+   var iYPos = RcWnd.top+((RcWnd.bottom-RcWnd.Top)-(RcGfx.bottom-RcGfx.top))\2   
    GetClientRect( CTL(wcMain) ,@RcCli )
    dim as POINT tPtRight = type(RcCli.Right-3,0)
    ClientToScreen( CTL(wcMain) , @tPtRight )   
-   SetWindowPos( g_GfxHwnd , NULL , tPtRight.x ,iYPos , 0,0 , SWP_NOSIZE or SWP_NOZORDER or SWP_NOACTIVATE )
+   var hPlace = HWND_TOP
+   if tPtRight.x >= (RcDesk.right-8) then 
+      hPlace = HWND_TOPMOST : tPtRight.x -= (RcGfx.right - RcGfx.left)
+   end if
+   'gfx.tOldPt.x = -65537
+   SetWindowPos( g_GfxHwnd , hPlace , tPtRight.x-4 ,iYPos , 0,0 , SWP_NOSIZE or SWP_NOACTIVATE )
 end sub   
 sub ResizeMainWindow( bCenter as boolean = false )
    'Calculate Client Area Size
@@ -665,7 +684,7 @@ end sub
 
 ' *************** Procedure Function ****************
 function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LPARAM ) as LRESULT
-         
+      
    select case( message )       
    case WM_CREATE 'Window was created
                   
@@ -685,10 +704,10 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
       InitFont( wfEdit    , g_sFixedFont  , 12 )
       
                   
-      AddButtonA( wcButton , cMarginL , cMarginT , _pct(15) , cRow(1.25)  , "Compile" )
+      AddButtonA( wcButton , cMarginL , cMarginT , _pct(15) , cRow(1.25)  , "Build" )
       AddRichA  ( wcEdit   , cMarginL , _NextRow , cMarginR , _pct(43) , "" , WS_HSCROLL or WS_VSCROLL  )
       AddRichA  ( wcOutput , cMarginL , _NextRow , cMarginR , _pct(43) , "" , WS_HSCROLL or WS_VSCROLL or ES_READONLY )
-      AddStatusA( wcStatus , "Status" )
+      AddStatusA( wcStatus , "Ready." )
       
       SetControlsFont( wfEdit   , wcEdit , wcOutput )
       SetControlsFont( wfStatus , wcStatus )
@@ -756,9 +775,25 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
       return 0
    case WM_MOVE
       DockGfxWindow()
-   case WM_USER+1
+   case WM_USER+1 'gfx resized
       SetEvent(g_hResizeEvent)
       DockGfxWindow()
+   case WM_USER+2 'gfx moved
+      DockGfxWindow()
+   case WM_ACTIVATE  'Activated/Deactivated
+      if g_GfxHwnd andalso g_Show3D then
+         var fActive = LOWORD(wParam) , fMinimized = HIWORD(wParam) , hwndPrevious = cast(HWND,lParam)
+         if fActive then
+            ShowWindow( g_GfxHwnd , SW_SHOWNA )            
+            DockGfxWindow()
+         else
+            if fMinimized then                              
+               ShowWindow( g_GfxHwnd , SW_HIDE )
+            else
+               SetWindowPos( g_GfxHwnd , HWND_NOTOPMOST , 0,0 , 0,0 , SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE )
+            end if
+         end if
+      end if
    case WM_CLOSE
       if GetWindowTextLength( CTL(wcEdit) ) then
          #define sMsg !"All unsaved data will be lost, continue?"
