@@ -373,7 +373,7 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
          var iColor = iif( .iColor<0 , 16 , .iColor ) , psPrimative = @.sPrimative
                   
          _fPX = .tLocation.fPX : _fPY = .tLocation.fPY : _fPZ = .tLocation.fPZ         
-         .tMatrix = g_tIdentityMatrix         
+         .tMatrix = g_tIdentityMatrix
          if .tLocation.fAX then MatrixRotateX( .tMatrix , .tMatrix , .tLocation.fAX )
          if .tLocation.fAY then MatrixRotateY( .tMatrix , .tMatrix , .tLocation.fAY )
          if .tLocation.fAZ then MatrixRotateZ( .tMatrix , .tMatrix , .tLocation.fAZ )         
@@ -419,9 +419,16 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
             var ptLocation = @g_tPart(.iLeftPart).tLocation
             var pLeftPart = @g_tPart(.iLeftPart) , iRightPart_ = .iRightPart
                                     
-            with g_tPart(iRightPart_)
-               
-               .tMatrix = pLeftPart->tMatrix
+            with g_tPart(iRightPart_)                              
+               if memcmp( @pLeftPart->tMatrix , @g_tBlankMatrix , sizeof(Matrix4x4) ) = 0 then
+                  'if memcmp( @pRightPart->tMatrix , @g_tBlankMatrix , sizeof(Matrix4x4) ) = 0 then                  
+                     .tMatrix = g_tIdentityMatrix
+                  'else
+                  '   .tMatrix =pRightPart->tMatrix
+                  'end if
+               else
+                  .tMatrix = pLeftPart->tMatrix
+               end if
                with *(pLeft->pMatOrg)
                   '.fPosX = 0
                   '.fPosY = 100
@@ -450,8 +457,8 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
                
                if .tLocation.fPX = 0 andalso .tLocation.fPY=0 andalso .tLocation.fPZ=0 then
                   .tLocation.fPX = _fPX : .tLocation.fPY = _fPY : .tLocation.fPZ = _fPZ
-               elseif abs(.tLocation.fPX-_fPX)>.001 orelse abs(.tLocation.fPY-_fPY)>.001 orelse abs(.tLocation.fPZ-_fPZ)>.001 then
-                  LinkerError( "Impossible Connection detected!" )
+               elseif abs(.tLocation.fPX-_fPX)>.001 orelse abs(.tLocation.fPY-_fPY)>.001 orelse abs(.tLocation.fPZ-_fPZ)>.001 then                  
+                  'LinkerError( "Impossible Connection detected!" )
                end if
                dim as PartSize tPart = any  : tPart = pModel->tSize
                var iIdx = .iModelIndex
@@ -495,7 +502,7 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
                end with
                sResult += zTemp 
                #ifdef __Standalone
-               printf("%s",zTemp)
+               printf("<%i>%s",__LINE__,zTemp)
                #endif
             end with            
             'puts("1 0 40 -24 -20 1 0 0 0 1 0 0 0 1 3001.dat")
@@ -855,6 +862,7 @@ else
      '!"003238a P1 #2 c1 = 003238b P2 #4 s1;"
    #endif
    
+   #if 0
    'sScript = _ 
    '   !"87087 B1 s1 = 87087 B2 #2 x-90 c1;"
    sScript = _
@@ -863,6 +871,11 @@ else
       !"B2 s1 = 3001p11 B3 #3 c6; \n" _
       !"B3 c5 = 3001p11 B4 #4 s1; \n" _
       !"B4 c1 = 4070 B5 #5 s22; \n" 
+   #endif
+   
+   sScript = _
+      "3002 B2 #7 s1 = 3001p11 B1 c1;" !"\n" _
+      "3001 B3 #2 s2 = B1 c1;"         !"\n"
      
 end if
 var sModel = LegoScriptToLDraw(sScript)
@@ -881,7 +894,7 @@ if len(sModel) andalso iDump then
    print #f,sModel
    close #f
 end if
-      
+
 if len(sModel) then
    var sParms = """"+sModel+""""
    puts("-----------------")

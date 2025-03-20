@@ -6,6 +6,7 @@
 #include once "win\commdlg.bi"
 #include once "win\ole2.bi"
 #include once "win\Richedit.bi"
+#include once "win\uxtheme.bi"
 #include once "crt.bi"
 #include once "fbthread.bi"
 
@@ -13,8 +14,12 @@
 #define Errorf(p...)
 #define Debugf(p...)
 
-'TODO (05/03/25): merge Combobox into LegoScript.bas
+
 'TODO (05/03/25): fix LS2LDR parsing bugs
+'TODO (06/03/25): check bug regarding wheel positioning and the line numbers
+'TODO (20/03/25): add multipass linker, to resolve forward references
+'TODO (20/03/25): process keys to toggle filters and to change the text/add type (plate/brick/etc...)
+'TODO (20/03/25): investigate clipboard being cleared when closing by console
 
 '*************** Enumerating our control id's ***********
 enum StatusParts
@@ -24,6 +29,7 @@ end enum
 enum WindowControls
   wcMain
   wcButton
+  wcLines
   wcEdit
   wcOutput
   wcStatus
@@ -75,6 +81,7 @@ dim shared as string g_CurrentFilePath
 #include "Loader\Modules\Matrix.bas"
 #include "Loader\Modules\Model.bas"
 #include "LS2LDR.bas"
+#include "ComboBox.bas"
 
 '******************** Menu Handling Helper Functions **************
 namespace Menu 
@@ -465,7 +472,8 @@ function LoadFileIntoEditor( sFile as string ) as boolean
    sLine="":sScript=""
    g_CurrentFilePath = sFile
    SetWindowText( CTL(wcMain) , sAppName + " - " + sFile )
-   SetFocus( CTL(wcEdit) )
+   NotifySelChange( wcEdit )
+   SetFocus( CTL(wcButton) )
    return true
 end function
 
@@ -478,7 +486,7 @@ sub File_New()
    end if
    SetWindowText( CTL(wcEdit) , "" )
    SetWindowText( CTL(wcMain) , sAppName + " - Unnamed")
-   NotifySelChange( wcEDIT )
+   NotifySelChange( wcEdit )
    SetFocus( CTL(wcEdit) )
 end sub
 sub File_Open()
@@ -499,6 +507,7 @@ sub File_Open()
       .nMaxFile = 32767
       .lpstrInitialDir = NULL
       .lpstrTitle = NULL
+      .lpstrDefExt = @"ls"
       .Flags = OFN_FILEMUSTEXIST or OFN_PATHMUSTEXIST or OFN_NOCHANGEDIR
       if GetOpenFileName( @tOpen ) = 0 then exit sub      
       print "["+*.lpstrFile+"]"
@@ -538,6 +547,7 @@ sub File_SaveAs()
       .lpstrInitialDir = NULL
       .lpstrTitle = NULL
       .Flags = OFN_PATHMUSTEXIST 'or OFN_NOCHANGEDIR
+      .lpstrDefExt = @"ls"
       if GetSaveFileName( @tOpen ) = 0 then exit sub      
       print "["+*.lpstrFile+"]"
       var f = freefile()
@@ -609,7 +619,8 @@ sub Button_Compile()
    end if
    dim as string sOutput, sError
    sOutput = LegoScriptToLDraw( sScript , sError )   
-   SetWindowText( CTL(wcOutput) , iif(len(sOutput),sOutput,sError) )
+   SetWindowText( CTL(wcOutput) , iif(len(sError)=0,sOutput,sError) )
+   
    if len(sOutput) then
       if lcase(right(g_CurrentFilePath,3)) = ".ls" then
          Viewer.LoadMemory( sOutput , left(g_CurrentFilePath,len(g_CurrentFilePath)-3)+".ldr" )
@@ -621,6 +632,68 @@ sub Button_Compile()
    
 end sub
 
+static shared as long g_iPrevTopRow = 0 , g_iPrevRowCount = 0 , g_RowDigits = 2
+static shared as zstring*128 g_zRows
+static shared as SearchQueryContext g_SQCtx
+sub Lines_Draw( hEdit as HWND , tDraw as DRAWITEMSTRUCT )   
+   with tDraw      
+      dim PT as POINT = any
+      var iCharIdx = Sendmessage( hEdit , EM_LINEINDEX  , g_iPrevTopRow , 0 )
+      var iResu = SendMessage( hEdit , EM_POSFROMCHAR , cast(WPARAM,@PT) , iCharIdx )
+      'printf(!"%i/%i[%i]\n",iResu,iCharIdx,PT.Y)
+      SetTextColor( .hdc , GetSysColor(COLOR_GRAYTEXT) )
+      FillRect( .hdc , @.rcItem , cast(HBRUSH,GetSysColorBrush(COLOR_BTNFACE)) )
+      .rcItem.top += PT.Y+2 : .rcItem.right -= 4 : .rcItem.bottom -= (4+GetSystemMetrics(SM_CYHSCROLL))
+      DrawText( .hDC , g_zRows , -1 , @.rcItem , DT_RIGHT or DT_NOPREFIX )
+      'SetTextAlign( .hdc , TA_RIGHT )
+      'ExtTextOut( .hDC , .rcItem.right , .rcItem.top , ETO_CLIPPED or ETO_OPAQUE , @.rcItem , g_zRows , len(g_zRows) , NULL )
+   end with
+end sub
+sub RichEdit_TopRowChange( hCtl as HWND )
+   var iTopRow = SendMessage( hCTL , EM_GETFIRSTVISIBLELINE , 0,0 )
+   var iRows = SendMessage( hCTL , EM_GETLINECOUNT , 0,0 )
+   if g_iPrevRowCount <> iRows then
+      var iRowDigits = 2
+      if iRows > 99 then iRowDigits += 1
+      if iRows > 999 then iRowDigits += 1
+      if iRows > 9999 then iRowDigits += 1
+      if iRows > 99999 then iRowDigits += 1
+      if iRowDigits <> g_RowDigits then
+         g_RowDigits = iRowDigits
+         PostMessage( CTL(wcMain) , WM_USER+3 , 0 , 0 )
+      end if
+   end if
+   if g_iPrevTopRow <> iTopRow orelse g_iPrevRowCount <> iRows then
+      g_iPrevTopRow = iTopRow : g_iPrevRowCount = iRows
+      var pzRows = @g_zRows      
+      for N as long = 1 to iif(iRows<15,iRows,15)
+         pzRows += sprintf(pzRows,!"%i\r\n",iTopRow+N)
+      next N      
+      InvalidateRect( CTL(wcLines) , NULL , FALSE )
+      'SetWindowText( CTL(wcLines) , zRows )      
+   end if
+end sub
+sub RichEdit_SelChange( hCtl as HWND , iRow as long , iCol as long )   
+   #define zRow t.zRow_      
+   type tBuffer
+      union
+         wSize as ushort
+         zRow_ as zstring*1024
+      end union
+   end type
+   dim t as tBuffer = any : t.wSize = 1023
+   var iSz = SendMessage( hCtl , EM_GETLINE , iRow , cast(LRESULT,@t) )
+   if iSz < 0 orelse iSz > 1023 then exit sub   
+   var iWid = 80 : zRow[iSz-2]=0   
+   'printf( !"%i:%s\r",iSz,left(zRow+space(iWid-6),iWid-5) )   
+   with g_SQCtx
+      if ubound(.sTokenTxt) < 0 then redim .sTokenTxt(.iMaxTok-1)      
+      .bChanged = 1 : .iCur = iCol 'instr( iCol+1 , zRow , " " )-1
+      'if .iCur < 0 then .iCur = iSz-2
+   end with
+   dim as string sRow = zRow
+   HandleTokens( sRow , g_SQCtx )
+end sub
 sub ProcessAccelerator( iID as long )
    select case iID
    case acToggleMenu
@@ -648,8 +721,9 @@ sub DockGfxWindow()
    end if
    'gfx.tOldPt.x = -65537
    SetWindowPos( g_GfxHwnd , hPlace , tPtRight.x-4 ,iYPos , 0,0 , SWP_NOSIZE or SWP_NOACTIVATE )
+   NotifySelChange( wcEdit )
 end sub   
-sub ResizeMainWindow( bCenter as boolean = false )
+sub ResizeMainWindow( bCenter as boolean = false )         
    'Calculate Client Area Size
    dim as RECT RcWnd=any,RcCli=any,RcDesk=any
    var hWnd = CTL(wcMain)
@@ -676,21 +750,39 @@ sub ResizeMainWindow( bCenter as boolean = false )
    'recalculate control sizes based on window size
    ResizeLayout( hWnd , g_tMainCtx.tForm , RcCli.right , RcCli.bottom )
    MoveWindow( CTL(wcStatus) ,0,0 , 0,0 , TRUE )
-   dim as long aWidths(2-1) = {RcCli.right\2,-1}
+   dim as long aWidths(2-1) = {RcCli.right*.85,-1}
    SendMessage( CTL(wcStatus) , SB_SETPARTS , 2 , cast(LPARAM,@aWidths(0)) )
-   DockGfxWindow()
+   DockGfxWindow()   
+   
    
 end sub
 
+static shared as any ptr OrgEditProc
+function WndProcEdit ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LPARAM ) as LRESULT
+   select case message
+   case WM_VSCROLL
+      var iResu = CallWindowProc( OrgEditProc , hWnd , message , wParam, lParam )
+      g_iPrevRowCount = 0
+      RichEdit_TopRowChange( hWnd )
+      return iResu
+   end select
+   return CallWindowProc( OrgEditProc , hWnd , message , wParam, lParam )   
+end function
+
 ' *************** Procedure Function ****************
 function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LPARAM ) as LRESULT
-      
+   
+   var pCtx = (@g_tMainCtx)      
+   #include "LSModules\Controls.bas"
+   #include "LSModules\ControlsMacros.bas"
+   
    select case( message )       
+   case WM_DRAWITEM
+      var wID = clng(wParam) , ptDrw = cast(LPDRAWITEMSTRUCT,lparam)
+      select case wId
+      case wcLines : Lines_Draw( CTL(wcEdit) , *ptDrw )
+      end select
    case WM_CREATE 'Window was created
-                  
-      var pCtx = (@g_tMainCtx)      
-      #include "LSModules\Controls.bas"
-      #include "LSModules\ControlsMacros.bas"
                   
       if CTL(wcMain) then return 0
       _InitForm()
@@ -701,26 +793,34 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
       
       InitFont( wfDefault , g_sMainFont   , 12 )
       InitFont( wfStatus  , g_sMainFont  , 10 )
-      InitFont( wfEdit    , g_sFixedFont  , 12 )
-      
+      InitFont( wfEdit    , g_sFixedFont  , 12 )      
                   
       AddButtonA( wcButton , cMarginL , cMarginT , _pct(15) , cRow(1.25)  , "Build" )
-      AddRichA  ( wcEdit   , cMarginL , _NextRow , cMarginR , _pct(43) , "" , WS_HSCROLL or WS_VSCROLL  )
-      AddRichA  ( wcOutput , cMarginL , _NextRow , cMarginR , _pct(43) , "" , WS_HSCROLL or WS_VSCROLL or ES_READONLY )
+      AddTextA  ( wcLines  , cMarginL , _NextRow , _pct(1.66*2) , _pct(53) ,  "" , SS_OWNERDRAW )
+      AddRichA  ( wcEdit   , _NextCol0, _SameRow , cMarginR , _pct(53) , "" , WS_HSCROLL or WS_VSCROLL or ES_AUTOHSCROLL or ES_DISABLENOSCROLL  )
+      AddRichA  ( wcOutput , cMarginL , _NextRow , cMarginR , _BottomP(-5) , "" , WS_HSCROLL or WS_VSCROLL or ES_AUTOHSCROLL or ES_READONLY )
       AddStatusA( wcStatus , "Ready." )
-      
-      SetControlsFont( wfEdit   , wcEdit , wcOutput )
-      SetControlsFont( wfStatus , wcStatus )
                   
-      SendMessage( CTL(wcEdit) , EM_SETEVENTMASK , 0 , ENM_SELCHANGE )
+      SetControlsFont( wfEdit   , wcLines , wcEdit , wcOutput )
+      SetControlsFont( wfStatus , wcStatus )
+      
+      SetWindowTheme( CTL(wcEdit) , "" , "" )
+      SendMessage( CTL(wcEdit) , EM_EXLIMITTEXT , 0 , 16*1024*1024 ) '16mb text limit
+      SendMessage( CTL(wcEdit) , EM_SETEVENTMASK , 0 , ENM_SELCHANGE or ENM_KEYEVENTS or ENM_SCROLL )
+      OrgEditProc = cast(any ptr,SetWindowLongPtr( CTL(wcEdit) , GWLP_WNDPROC , cast(LONG_PTR,@WndProcEdit) ))
                           
       WaitForSingleObject( hEventGfxReady , INFINITE )    
       CloseHandle( hEventGfxReady )
       if g_GfxHwnd = 0 then return -1 'failed
-        
+      
+      InitSearchWindow()      
+      'SetWindowPos( g_hContainer , 0 , 0,0,100,100 , SWP_NOZORDER or SWP_SHOWWINDOW or SWP_NOMOVE )
+      'ShowWindow( g_hContainer , SW_SHOW )
       ResizeMainWindow( true )    
       File_New()    
-      LoadFileIntoEditor( exePath+"\sample.ls" )
+      'LoadFileIntoEditor( exePath+"\sample.ls" )
+      SetForegroundWindow( ctl(wcMain) )
+      SetFocus( ctl(wcEdit) )
       return 0
           
    case WM_MENUSELECT 'track newest menu handle/item/state
@@ -736,10 +836,12 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
             with *cptr(SELCHANGE ptr,lParam)
                'static as CHARRANGE tPrev = type(-1,-1)
                var iRow = SendMessage( CTL(wID) , EM_EXLINEFROMCHAR , 0 , .chrg.cpMax )
-               var iCol = .chrg.cpMax - SendMessage( CTL(wID) , EM_LINEINDEX  , iRow , 0 )
+               var iCol = .chrg.cpMax - SendMessage( CTL(wID) , EM_LINEINDEX  , iRow , 0 )               
                dim as zstring*64 zPart = any : sprintf(zPart,"%i : %i",iRow+1,iCol+1)
                'printf(!"(%s) > %i to %i    \r",,,.chrg.cpMin,.chrg.cpMax)
-               SendMessage( CTL(wcStatus) , SB_SETTEXT , spCursor , cast(LPARAM,@zPart) )               
+               SendMessage( CTL(wcStatus) , SB_SETTEXT , spCursor , cast(LPARAM,@zPart) ) 
+               RichEdit_TopRowChange( CTL(wID) )
+               RichEdit_SelChange( CTL(wID) , iRow , iCol )
             end with
          end select
       end select
@@ -760,12 +862,26 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
          g_CurItemID = 0 : g_hCurMenu = 0
       case  1         'Accelerator
          ProcessAccelerator( wID )
-      case BN_CLICKED 'button click
-         select case wID
+      case else
+         select case wID                  
+         case wcEdit
+            select case wNotifyCode
+            case EN_SETFOCUS               
+               ShowWindow( g_hContainer , g_SearchVis   )               
+            case EN_KILLFOCUS
+               if GetForegroundWindow() <> g_hContainer then 
+                  ShowWindow( g_hContainer , SW_HIDE )
+               end if
+            case EN_VSCROLL 
+               RichEdit_TopRowChange( hwndCtl )
+            end select
          case wcButton
-            printf(!"[%p %p]\n",CTL(wcButton),hwndCtl)            
-            Button_Compile()            
-         end select      
+            select case wNotifyCode
+            case BN_CLICKED
+               printf(!"[%p %p]\n",CTL(wcButton),hwndCtl)            
+               Button_Compile()            
+            end select
+         end select
       end select      
       
       return 0
@@ -780,6 +896,9 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
       DockGfxWindow()
    case WM_USER+2 'gfx moved
       DockGfxWindow()
+   case WM_USER+3 'Resize Number border
+      SetControl( wcLines , cMarginL , _BtP(wcButton,0.5) , _pct((.18+1.52*g_RowDigits)) , _pct(53) , CTL(wcLines) )
+      ResizeMainWindow()      
    case WM_ACTIVATE  'Activated/Deactivated
       if g_GfxHwnd andalso g_Show3D then
          var fActive = LOWORD(wParam) , fMinimized = HIWORD(wParam) , hwndPrevious = cast(HWND,lParam)
@@ -794,6 +913,16 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
             end if
          end if
       end if
+   #if 0
+   case WM_ACTIVATEAPP
+      var fActive = wParam
+      'if GetForegroundWindow() <> g_hContainer then fActive = (GetFocus = CTL(wcEdit))
+      if fActive then
+         ShowWindow( g_hContainer , g_SearchVis   )
+      else
+         ShowWindow( g_hContainer , SW_HIDE )
+      end if
+   #endif
    case WM_CLOSE
       if GetWindowTextLength( CTL(wcEdit) ) then
          #define sMsg !"All unsaved data will be lost, continue?"
@@ -815,13 +944,13 @@ end function
 ' *********************************************************************
 sub WinMain ()
    
-   dim wMsg as MSG
-   dim wcls as WNDCLASS
+   dim tMsg as MSG
+   dim tcls as WNDCLASS
    dim as HWND hWnd  
     
    '' Setup window class  
     
-   with wcls
+   with tcls
     .style         = CS_HREDRAW or CS_VREDRAW
     .lpfnWndProc   = @WndProc
     .cbClsExtra    = 0
@@ -835,7 +964,7 @@ sub WinMain ()
    end with
     
    '' Register the window class     
-   if( RegisterClass( @wcls ) = FALSE ) then
+   if( RegisterClass( @tcls ) = FALSE ) then
     MessageBox( null, "Failed to register wcls!", sAppName, MB_ICONINFORMATION )
     exit sub
    end if
@@ -857,11 +986,12 @@ sub WinMain ()
    ShowWindow( hWnd , SW_SHOW )
    UpdateWindow( hWnd )
   
-   while( GetMessage( @wMsg, NULL, 0, 0 ) <> FALSE )    
-      if TranslateAccelerator( hWnd , hAcceleratos , @wMsg ) then continue while
-      if IsDialogMessage( hWnd , @wMsg ) then continue while
-      TranslateMessage( @wMsg )
-      DispatchMessage( @wMsg )    
+   while( GetMessage( @tMsg, NULL, 0, 0 ) <> FALSE )    
+      if TranslateAccelerator( hWnd , hAcceleratos , @tMsg ) then continue while
+      if IsDialogMessage( hWnd , @tMsg ) then continue while
+      TranslateMessage( @tMsg )
+      DispatchMessage( @tMsg )    
+      ProcessMessage( tMsg )
    wend    
 
 end sub
@@ -877,10 +1007,10 @@ WinMain() '<- main function
 g_DoQuit = 1
 
 #if 0
-3865 BP10 #7 s69 = 3001p11 B1 y90 c1;
-B1 s1 = 3001p11 B2 #2 c5;
-B2 s1 = 3001p11 B3 #3 c6;
-B3 c5 = 3001p11 B4 #4 s1;
-B4 c1 = 4070 B5 #5 s2;
-003238a P1 #2 c1 = 003238b P2 #4 s1;
+   3865 BP10 #7 s69 = 3001p11 B1 y90 c1;
+   B1 s1 = 3001p11 B2 #2 c5;
+   B2 s1 = 3001p11 B3 #3 c6;
+   B3 c5 = 3001p11 B4 #4 s1;
+   B4 c1 = 4070 B5 #5 s2;
+   003238a P1 #2 c1 = 003238b P2 #4 s1;
 #endif

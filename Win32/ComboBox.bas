@@ -2,9 +2,12 @@
 #include once "fbgfx.bi"
 #include once "fbthread.bi"
 
-#define __Main
-#define __NoRender
-'#define DebugLoading
+#ifndef __Main
+   #define __Main "combobox.bas"
+   #define __NoRender
+   #define Standalone
+   '#define DebugLoading
+#endif
 
 'kill exepath+"\PartCache.bin"
 #include once "Loader\PartSearch.bas"
@@ -44,7 +47,7 @@
 dim shared as HWND g_hCon=any,g_hContainer=any  'console/container
 dim shared as HWND g_hSearch=any,g_hStatus=any 'controls
 dim shared as RECT g_rcCon = any , g_rcSearch
-dim shared as POINT rcCursor 
+dim shared as POINT g_rcCursor 
 dim shared as long g_ConWid,g_ConHei,g_FntWid,g_FntHei
 dim shared as long g_SearchVis , g_SearchRowHei
 dim shared as byte g_SearchChanged , g_DoFilterDump
@@ -112,12 +115,17 @@ function SearchContainerMessages( hWnd as HWND , iMsg as integer , wParam as WPA
    return DefWindowProc( hWnd , imsg , wParam , lParam)
 end function
 sub InitSearchWindow()
-   g_hCon = GetConsoleWindow()
-   var lWidHei = Width()
-   g_ConWid = loword(lWidHei) : g_ConHei = hiword(lWidHei)
-   GetClientRect(g_hCon,@g_rcCon)
-   g_FntWid = g_rcCon.Right\g_ConWid
-   g_FntHei = g_rcCon.Bottom\g_ConHei
+   
+   #ifdef Standalone
+      g_hCon = GetConsoleWindow()
+      var lWidHei = Width()
+      g_ConWid = loword(lWidHei) : g_ConHei = hiword(lWidHei)
+      GetClientRect(g_hCon,@g_rcCon)
+      g_FntWid = g_rcCon.Right\g_ConWid
+      g_FntHei = g_rcCon.Bottom\g_ConHei
+   #else
+      g_hCon = Ctl(wcEdit)
+   #endif
    
    const SearchContainer = "SearchContainer"
    dim as WNDCLASSEX wx
@@ -139,11 +147,15 @@ sub InitSearchWindow()
    
    dim as POINT tStatusPT = (0,g_rcCon.Bottom-24)
    ClientToScreen( g_hCon , @tStatusPT )
-   g_hStatus = CreateWindowEx( cMainStyleEx , "edit" , NULL , cStatusStyle , tStatusPT.x,tStatusPT.y , g_rcCon.Right,24, g_hCon , NULL , hInstance , NULL)
+   #ifdef Standalone
+      g_hStatus = CreateWindowEx( cMainStyleEx , "edit" , NULL , cStatusStyle , tStatusPT.x,tStatusPT.y , g_rcCon.Right,24, g_hCon , NULL , hInstance , NULL)
+      SetLayeredWindowAttributes( g_hStatus , 0 , 192 , LWA_ALPHA )
+   #else
+      g_hStatus = CTL(wcStatus)
+   #endif   
    g_hContainer = CreateWindowEx( cMainStyleEx, SearchContainer, SearchContainer ,cMainStyle,0, 0, 0, 0,g_hCon , NULL, hInstance, NULL ) 'HWND_MESSAGE   
    g_hSearch = CreateWindowEx( 0 , "listbox" , NULL , cListBoxStyle , 0,0,300,100 , g_hContainer , NULL, hInstance, NULL )
-   SetLayeredWindowAttributes( g_hContainer , 0 , 192 , LWA_ALPHA )
-   SetLayeredWindowAttributes( g_hStatus , 0 , 192 , LWA_ALPHA )
+   SetLayeredWindowAttributes( g_hContainer , 0 , 192 , LWA_ALPHA )   
    
    dim as RECT tRcItem = any
    SendMessage( g_hSearch , LB_ADDSTRING , 0 , cast(LPARAM,@"1") )
@@ -152,42 +164,33 @@ sub InitSearchWindow()
    SendMessage( g_hSearch , LB_RESETCONTENT , 0,0 )   
    g_SearchRowHei = tRcItem.top
    
+   #ifdef Standalone
    SetForegroundWindow( g_hCon )
+   #endif
       
 end sub
-sub ProcessMessages()
-      
-   static as POINT rcOldPt   
-   dim as POINT rcPt = rcCursor
-   ClientToScreen( g_hCon , @rCpt )
-   if rcPt.x <> rcOldPt.x orelse rcPt.y <> rcOldPt.y then
-      rcOldPt = rcPt 
-      SetWindowPos( g_hContainer , NULL , rcPt.x , rcPt.y ,0,0, SWP_NOSIZE or SWP_NOZORDER or SWP_NOACTIVATE )
-      GetClientRect( g_hCon , @g_rcCon )
-      dim as POINT tStatusPT = (0,g_rcCon.Bottom-24)      
-      ClientToScreen( g_hCon , @tStatusPT )
-      SetWindowPos( g_hStatus , NULL , tStatusPT.x,tStatusPT.y, g_rcCon.Right,24 , SWP_NOZORDER or SWP_NOACTIVATE )
-   end if    
-     
-   dim as MSG tMsg
-   while PeekMessage( @tMsg , NULL , 0,0 , PM_REMOVE )      
-      TranslateMessage( @tMsg )      
-      DispatchMessage( @tMsg )
-      if tMsg.message = WM_LBUTTONDBLCLK then
-         dim dwWritten as DWORD , tEvent as INPUT_RECORD 
-         tEvent.EventType = KEY_EVENT
-         with tEvent.Event.KeyEvent
-            .bKeyDown = 1 : .wRepeatCount = 1
-            .wVirtualKeyCode = VK_SPACE
-            .wVirtualScanCode = fb.SC_SPACE
-            .uChar.AsciiChar = asc(" ")
-            .dwControlKeyState = 0
-         end with            
-         WriteConsoleInput( GetStdHandle(STD_INPUT_HANDLE) , @tEvent , 1 , @dwWritten )
-         continue while
+sub ProcessMessage( tMsg as MSG )
+   if tMsg.hwnd <> g_hSearch then exit sub
+   if tMsg.message = WM_LBUTTONDBLCLK then
+         #ifdef Standalone
+            dim dwWritten as DWORD , tEvent as INPUT_RECORD 
+            tEvent.EventType = KEY_EVENT
+            with tEvent.Event.KeyEvent
+               .bKeyDown = 1 : .wRepeatCount = 1
+               .wVirtualKeyCode = VK_SPACE
+               .wVirtualScanCode = fb.SC_SPACE
+               .uChar.AsciiChar = asc(" ")
+               .dwControlKeyState = 0
+            end with            
+            WriteConsoleInput( GetStdHandle(STD_INPUT_HANDLE) , @tEvent , 1 , @dwWritten )
+         #else
+            SendMessage( g_hCon , WM_CHAR , asc(" ") , 1 or (fb.SC_SPACE shl 16) or (1 shl 30) )
+         #endif
+         exit sub 'continue while
       end if         
-      if tMsg.message = WM_KEYDOWN then
-         if (tMsg.wParam = VK_SPACE orelse tMsg.wParam = VK_RETURN orelse tMsg.wParam = VK_BACK) then
+   if tMsg.message = WM_KEYDOWN then
+      if (tMsg.wParam = VK_SPACE orelse tMsg.wParam = VK_RETURN orelse tMsg.wParam = VK_BACK) then
+         #ifdef Standalone
             SetForegroundWindow( g_hCon ) 
             if tMsg.wParam = VK_SPACE orelse tMsg.wParam = VK_BACK then 
                dim dwWritten as DWORD , tEvent as INPUT_RECORD 
@@ -201,11 +204,42 @@ sub ProcessMessages()
                end with            
                WriteConsoleInput( GetStdHandle(STD_INPUT_HANDLE) , @tEvent , 1 , @dwWritten )
             end if
-            continue while
-         end if
+         #else
+            if tMsg.wParam = VK_SPACE orelse tMsg.wParam = VK_BACK then             
+               tMsg.hwnd = g_hCon
+               TranslateMessage( @tMsg )
+               'DispatchMessage( @tMsg )
+            end if
+            'SendMessage( g_hCon , WM_CHAR , asc(" ") , 1 or (fb.SC_SPACE shl 16) or (1 shl 30) )
+         #endif
+         exit sub 'continue while
       end if
+   end if
+end sub
+#ifdef Standalone
+sub ProcessMessages()
+      
+   static as POINT rcOldPt   
+   dim as POINT rcPt = g_rcCursor
+   ClientToScreen( g_hCon , @rCpt )
+   if rcPt.x <> rcOldPt.x orelse rcPt.y <> rcOldPt.y then
+      rcOldPt = rcPt 
+      SetWindowPos( g_hContainer , NULL , rcPt.x , rcPt.y ,0,0, SWP_NOSIZE or SWP_NOZORDER or SWP_NOACTIVATE )
+      
+      GetClientRect( g_hCon , @g_rcCon )
+      dim as POINT tStatusPT = (0,g_rcCon.Bottom-24)      
+      ClientToScreen( g_hCon , @tStatusPT )
+      SetWindowPos( g_hStatus , NULL , tStatusPT.x,tStatusPT.y, g_rcCon.Right,24 , SWP_NOZORDER or SWP_NOACTIVATE )
+   end if    
+     
+   dim as MSG tMsg
+   while PeekMessage( @tMsg , NULL , 0,0 , PM_REMOVE )      
+      TranslateMessage( @tMsg )      
+      DispatchMessage( @tMsg )
+      ProcessMessage( tMsg )      
    wend
 end sub
+#endif
 
 type FilteredListDump
    #define DeclareStringPerFlag( _Name , _Bit ) as string sIs##_Name
@@ -268,6 +302,7 @@ function IsPartFiltered( pPart as SearchPartStruct ptr ) as boolean
    
 end function
 function UpdateSearch(sSearch as string) as long
+               
    dim as long iPart = -1, iFound = 0
       
    SendMessage( g_hSearch , WM_SETREDRAW , false , 0 )
@@ -322,11 +357,12 @@ function UpdateSearch(sSearch as string) as long
       SetWindowLong( g_hSearch , GWL_STYLE , GetWindowLong( g_hSearch ,GWL_STYLE) and (not WS_HSCROLL) )
    end if
    SetWindowPos( g_hSearch , NULL , 0,0 , (iBigWid+iCharWid)*iCols , iRows*g_SearchRowHei+iScrollHei , SWP_NOMOVE or SWP_NOZORDER or SWP_NOACTIVATE ) 
-   dim as POINT rCpt = rcCursor
+   
+   dim as POINT rCpt = g_rcCursor
    ClientToScreen( g_hCon , @rCpt )
    GetWindowRect( g_hSearch , @g_rcSearch )
    g_rcSearch.right -= g_rcSearch.left : g_rcSearch.bottom -= g_rcSearch.top   
-   SetWindowPos( g_hContainer , NULL , rcPt.x , rcPt.y , g_rcSearch.right , g_rcSearch.bottom , SWP_NOZORDER or SWP_NOACTIVATE )      
+   SetWindowPos( g_hContainer , NULL , rcPt.x , rcPt.y , g_rcSearch.right , g_rcSearch.bottom , SWP_NOZORDER or SWP_NOACTIVATE )
    
    SendMessage( g_hSearch , WM_SETREDRAW , true , 0 )
    if iFound then
@@ -361,251 +397,282 @@ sub DumpFilteredParts( sSearch as string )
    ThreadDetach(ThreadCreate( @ShowDumpTextFile , NULL ))
 end sub
 
+type SearchQueryContext
+   as byte bChanged=1 , bRecalcTokens=TRUE , iTokCnt=any , iCurTok=any , iMaxTok = 8
+   as long iCur,iTokStart=1,iTokEnd=1
+   as string sCaption , sStatusText , sToken = ""
+   redim as string sTokenTxt(any)
+end type
+
+function HandleTokens( sText as string , tCtx as SearchQueryContext ) as long
+   function = 0
+   dim as byte bDontSearch = 0
+   with tCtx
+      'split tokens and count
+      if .bChanged orelse .bReCalcTokens then
+         .bReCalcTokens=false
+         dim as long I = 1,iStart=0
+         .iTokCnt = 0 : .iCurTok = 0
+         do
+            while asc(sText,I)=32 : I+= 1 : wend
+            iStart = I      
+            while asc(sText,I)<>32 andalso asc(sText,I)<>0 : I+= 1 : wend
+            if I <> iStart then
+               if (.iCur+1)>=iStart andalso .iCur<=I then .iCurTok = .iTokCnt
+               .sTokenTxt(.iTokCnt) = mid(sText,iStart,I-iStart)
+               .iTokCnt += 1
+               if .iTokCnt = .iMaxTok then 
+                  .iMaxTok += 8 : redim preserve .sTokenTxt(.iMaxTok-1)
+               end if
+            end if
+         loop while asc(sText,I)
+         
+         if .iCurTok andalso .sTokenTxt(.iCurTok-1) <> "=" then bDontSearch = 1
+         
+         'chk tokens
+         .sCaption = .iCur & " > Tokens: " & .iTokCnt & "(" & .iCurTok & ") " & .iTokStart & "-" & .iTokEnd & " {"
+         for I=0 to .iTokCnt-1
+            if I then .sCaption += ","
+            if I=.iCurTok then
+              .sCaption += "['"+.sTokenTxt(I)+"']"
+            else
+               .sCaption += "'"+.sTokenTxt(I)+"'"
+            end if
+         next I         
+         
+      end if               
+      
+      if g_SearchChanged then 'if search selection changed update everything else
+         g_SearchChanged = false
+         var iSel   = SendMessage( g_hSearch , LB_GETCURSEL , 0 , 0 )
+         var iPart = SendMessage( g_hSearch , LB_GETITEMDATA , iSel , 0 )
+         var pPart = PartStructFromIndex(iPart), sPart = pPart->zName
+         sPart = left(sPart,instrrev(sPart,".")-1)
+         SetWindowText( g_hStatus , GetPartDescription(iPart) )
+         sText = left(sText,.iTokStart-1)+sPart+mid(sText,.iTokEnd+1)
+         .iCur = (.iTokStart-1)+len(sPart)
+         if .bChanged=0 then .bChanged=-1 'changed but don't need to research
+      end if  
+      
+      if .bChanged then            
+         
+         function = .bChanged
+         
+         'grab current token
+         .iTokStart = instrrev(sText," ",.iCur)+1
+         .iTokEnd   = instr(.iCur+1,sText," ")-1
+         if .iTokEnd <= 0 then .iTokEnd = len(sText)
+         .sToken = mid(sText,.iTokStart,(.iTokEnd-.iTokStart)+1)
+         'SetWindowText( GetConsoleWindow() , iTokStart & "," & iTokEnd & " '"+sToken+"'")
+         
+         
+         if .bChanged=1 then            
+            #ifdef Standalone
+               g_rcCursor.x = pos()*g_FntWid : g_rcCursor.y = csrlin()*g_FntHei
+            #else
+               'get position from the current cursor and adjust the position based on font size
+               dim as CHARRANGE tSelRange = any
+               SendMessage( CTL(wcEdit) , EM_EXGETSEL , 0 , cast(LPARAM,@tSelRange) )
+               SendMessage( CTL(wcEdit) , EM_POSFROMCHAR , cast(WPARAM,@g_RcCursor) , tSelRange.cpMin )
+               g_RcCursor.x += g_tMainCtx.hFnt( wfEdit ).bCurWid+1
+               g_RcCursor.y += g_tMainCtx.hFnt( wfEdit ).bCurHei+1
+            #endif
+            g_SearchVis = iif( bDontSearch=0 andalso len(.sToken)>1 andalso UpdateSearch(.sToken) , SW_SHOWNA , SW_HIDE )
+            ShowWindow( g_hContainer , g_SearchVis )               
+            if g_SearchVis = SW_HIDE then SetWindowText( g_hStatus , .sStatusText )            
+         end if
+         
+         .bChanged=0
+                     
+         var sFilters = " Filters:"
+         if g_FilterFlags andalso IsWindowVisible(g_hContainer) then
+            #define ListFilteredFlags( _Name , _Bit ) if g_FilterFlags and wIs##_Name then sFilters += " " #_Name
+            ForEachPartFlag( ListFilteredFlags )
+         end if
+         if sFilters=" Filters:" then sFilters="" else sFilters += "(" & g_iFilteredCount & " filtered)"
+         SetWindowText( GetConsoleWindow() , .sCaption+"}"+sFilters)
+         
+      end if
+   end with
+end function
+
+#ifdef Standalone
 function QueryText( sTextOrg as string ) as long   
    dim as long ConWid = width(), ConHei = hiword(ConWid)   
    ConWid = loword(ConWid)
    
-   dim as string sText = sTextOrg , sToken = "" , sStatusText = ""
-   dim as long iLin=csrlin(),iCol=pos(),iViewWid=ConWid-iCol
-   dim as long iStart=0,iCur=len(sText)
-   dim as byte bChanged=1,bReCalcTokens=true,iTokCnt=any,iCurTok=any,iMaxTok=8
-   dim as long iTokStart=1,iTokEnd=1,iPrevLen=len(sText)
-   redim as string sTokenTxt(iMaxTok-1)
+   dim as SearchQueryContext tCtx
       
-   var hPrevFore = GetForegroundWindow()   
+   dim as string sText = sTextOrg
+   dim as long iLin=csrlin(),iCol=pos(),iViewWid=ConWid-iCol
+   dim as long iStart=0 , iPrevLen   
          
-   do
-      var sKey = inkey()
-      if len(sKey)=0 then 
-         var hForeground = GetForegroundWindow()         
-         if hForeground <> hPrevFore then
-            #if 0 'debug for Window change...
-               scope
-                  dim as zstring*256 wintit=any, wincls=any
-                  GetWindowText(hForeground,wintit,256)
-                  GetClassName(hForeground,wincls,256)
-                  dim as DWORD dwPid
-                  GetWindowThreadProcessID( hForeground , @dwPid )
-                  SetWindowText( GetConsoleWindow() , "Fore:Pid=" & dwPid & "/" & GetCurrentProcessID & " '" & wintit & "(" & wincls & ")"  )
-               end scope
-               sleep 250
-            #endif
-            if hForeground = g_hCon orelse hForeground = g_hContainer then
-               ShowWindow( g_hContainer , g_SearchVis   )
-               ShowWindow( g_hStatus    , SW_SHOWNA   )
-            else
-               if hPrevFore = g_hCon orelse hPrevFore = g_hContainer then
-                  ShowWindow( g_hContainer , SW_HIDE )
-                  ShowWindow( g_hStatus    , SW_HIDE )
-               end if
-            end if
-            hPrevFore = hForeground
-         end if
-         'split tokens and count
-         static as string sCaption
-         if bChanged orelse bReCalcTokens then
-            bReCalcTokens=false
-            dim as long I = 1,iStart=0
-            iTokCnt = 0 : iCurTok = 0            
-            do
-               while asc(sText,I)=32 : I+= 1 : wend
-               iStart = I      
-               while asc(sText,I)<>32 andalso asc(sText,I)<>0 : I+= 1 : wend
-               if I <> iStart then
-                  if (iCur+1)>=iStart andalso iCur<=I then iCurTok = iTokCnt
-                  sTokenTxt(iTokCnt) = mid(sText,iStart,I-iStart)
-                  iTokCnt += 1
-                  if iTokCnt = iMaxTok then 
-                     iMaxTok += 8 : redim preserve sTokenTxt(iMaxTok-1)
+   var hPrevFore = GetForegroundWindow()
+   with tCtx      
+      redim .sTokenTxt(.iMaxTok-1)
+      .iCur=len(sText) : iPrevLen=.iCur      
+      do
+         var sKey = inkey()
+         if len(sKey)=0 then 
+            var hForeground = GetForegroundWindow()         
+            if hForeground <> hPrevFore then
+               #if 0 'debug for Window change...
+                  scope
+                     dim as zstring*256 wintit=any, wincls=any
+                     GetWindowText(hForeground,wintit,256)
+                     GetClassName(hForeground,wincls,256)
+                     dim as DWORD dwPid
+                     GetWindowThreadProcessID( hForeground , @dwPid )
+                     SetWindowText( GetConsoleWindow() , "Fore:Pid=" & dwPid & "/" & GetCurrentProcessID & " '" & wintit & "(" & wincls & ")"  )
+                  end scope
+                  sleep 250
+               #endif
+               if hForeground = g_hCon orelse hForeground = g_hContainer then
+                  ShowWindow( g_hContainer , g_SearchVis   )
+                  ShowWindow( g_hStatus    , SW_SHOWNA   )
+               else
+                  if hPrevFore = g_hCon orelse hPrevFore = g_hContainer then
+                     ShowWindow( g_hContainer , SW_HIDE )
+                     ShowWindow( g_hStatus    , SW_HIDE )
                   end if
                end if
-            loop while asc(sText,I)
-            
-            'chk tokens
-            sCaption = iCur & " > Tokens: " & iTokCnt & "(" & iCurTok & ") " & iTokStart & "-" & iTokEnd & " {"
-            for I=0 to iTokCnt-1
-               if I then sCaption += ","
-               if I=iCurTok then
-                 sCaption += "['"+sTokenTxt(I)+"']"
+               hPrevFore = hForeground
+            end if
+            if HandleTokens( sText , tCtx ) then
+               'update the screen
+               var iExtra = iPrevLen-len(sText)
+               if iExtra < 1 then iExtra = 0
+               iPrevLen = len(sText)
+               locate iLin,iCol: print mid(sText+space(iExtra),iStart+1,iViewWid)
+               locate iLin,iCol+.iCur-iStart
+            end if
+            sleep 10,1 : ProcessMessages() : continue do
+         end if
+         dim as long iKey = sKey[0]
+         if iKey=255 then iKey = -sKey[1]      
+         #define _alt(_K)  (-fb.SC_##_K)
+         #define _ctrl(_K) (1+asc(#_K)-asc("A"))
+         #define _shift (GetKeyState(VK_SHIFT) shr 1)      
+         select case iKey      
+         case 8             'backspace - remove character from left
+            if .iCur>0 then 
+               'if sText[iCur-1]=32 then bReCalcTokens=true 'recalc every space
+               sText = left(sText,.iCur-1)+mid(sText,.iCur+1)
+               .iCur -= 1 : .bChanged = 1
+            end if
+         case -fb.SC_DELETE 'delete    - remove character from right
+            if .iCur<len(sText) then
+               'if sText[iCur]=32 then bReCalcTokens=true 'recalc every space
+               sText = left(sText,.iCur)+mid(sText,.iCur+2)
+               .bChanged = 1
+            end if
+         case 9,-15         'tab        - auto complete (-15 = shift+tab)
+            if len(.sToken)>1 then
+               var iCount = SendMessage( g_hSearch , LB_GETCOUNT , 0 , 0 )
+               var iSel   = SendMessage( g_hSearch , LB_GETCURSEL , 0 , 0 )
+               var iSelOrg = iSel
+               if iSel = LB_ERR then iSel=0 else iSel = (iSel+iCount+iif(iKey=9,1,-1)) mod iCount
+               SendMessage( g_hSearch , LB_SETCURSEL , iSel , 0 )
+               g_SearchChanged = true
+            end if
+         case 13            'enter      - finish editing
+            sTextOrg = sText : return 1
+         case 27            'escape     - cancels editing
+            return 0
+         case _alt(D)       'alt+D      - toggle filtering for Donor parts
+            g_FilterFlags xor= wIsDonor    : .bChanged = 1
+         case _alt(P)       'alt+P      - toggle filtering for Path/Printed parts
+            g_FilterFlags xor= iif(_shift,wIsPrinted,wIsPath)          : .bChanged = 1
+         case _alt(S)       'alt+S      - toggle filtering for Shortcut/Stickered parts
+            g_FilterFlags xor= iif(_shift,wIsStickered,wIsShortcut)    : .bChanged = 1
+         case _alt(C)       'alt+C      - toggle filtering for MultiColored/PreColored parts
+            g_FilterFlags xor= iif(_shift,wIsPreColored,wIsMultiColor) : .bChanged = 1
+         case _alt(T)       'alt+T      - toggle filtering for template parts
+            g_FilterFlags xor= wIsTemplate : .bChanged = 1
+         case _alt(A)       'alt+A      - toggle filtering for alias parts
+            g_FilterFlags xor= wIsAlias    : .bChanged = 1
+         case _alt(M)       'alt+M      - toggle filtering for multi-moulded parts
+            g_FilterFlags xor= wIsMoulded  : .bChanged = 1         
+         case _alt(H)       'alt+H      - toggle filtering for helper parts
+            g_FilterFlags xor= wIsHelper   : .bChanged = 1         
+         case _alt(F)       'alt+F      - toggle part filtering
+            g_FilterFlags xor= wIsHidden   : .bChanged = 1      
+         case _ctrl(S)      'ctrl+S     - toggle filtering for sticker parts
+            g_FilterFlags xor= wIsSticker  : .bChanged = 1      
+         case _ctrl(F)      'ctrl+F     - clear all filters
+            g_FilterFlags=0 : .bChanged = 1
+         case _ctrl(D)      'ctrl+D     - dump ???? / filtered names
+            if _shift then 'filtered names
+               DumpFilteredParts(.sToken)
+            else ' ????
+               rem
+            end if         
+         case -fb.SC_HOME   'home       - move cursor to start
+            if .iCur then .iCur=0 : locate iLin,iCol+.iCur-iStart : .bChanged = 1
+         case -fb.SC_END    'end        - move cursor to end
+            if .iCur<>len(sText) then .iCur=len(sText) : locate iLin,iCol+.iCur-iStart : .bChanged = 1
+         case -fb.SC_LEFT   'left       - move cursor to previous character
+            if .iCur>0 then 
+               .iCur -= 1 : locate iLin,iCol+.iCur-iStart 
+               if sText[.iCur]=32 then .bChanged = 1
+            end if
+         case -115          'ctrl+left  - move cursor to previous token
+            if .iCur>0 then
+               if sText[.iCur-1]=32 then
+                  do : .iCur -= 1 : loop while .iCur andalso sText[.iCur]=32
                else
-                  sCaption += "'"+sTokenTxt(I)+"'"
-               end if
-            next I            
-            
-         end if
-            
-         if g_SearchChanged then 'if search selection changed update everything else
-            g_SearchChanged = false
-            var iSel   = SendMessage( g_hSearch , LB_GETCURSEL , 0 , 0 )
-            var iPart = SendMessage( g_hSearch , LB_GETITEMDATA , iSel , 0 )
-            var pPart = PartStructFromIndex(iPart), sPart = pPart->zName
-            sPart = left(sPart,instrrev(sPart,".")-1)
-            SetWindowText( g_hStatus , GetPartDescription(iPart) )
-            sText = left(sText,iTokStart-1)+sPart+mid(sText,iTokEnd+1)
-            iCur = (iTokStart-1)+len(sPart)
-            if bChanged=0 then bChanged=-1 'changed but don't need to research
-         end if
-         if bChanged then            
-            
-            'update the screen
-            var iExtra = iPrevLen-len(sText)
-            if iExtra < 1 then iExtra = 0
-            iPrevLen = len(sText)
-            locate iLin,iCol: print mid(sText+space(iExtra),iStart+1,iViewWid)
-            locate iLin,iCol+iCur-iStart
-            
-            'grab current token
-            iTokStart = instrrev(sText," ",iCur)+1
-            iTokEnd   = instr(iCur+1,sText," ")-1
-            if iTokEnd <= 0 then iTokEnd = len(sText)
-            sToken = mid(sText,iTokStart,(iTokEnd-iTokStart)+1)
-            'SetWindowText( GetConsoleWindow() , iTokStart & "," & iTokEnd & " '"+sToken+"'")
-            
-            if bChanged=1 then
-               g_SearchVis = iif( len(sToken)>1 andalso UpdateSearch(sToken) , SW_SHOWNA , SW_HIDE )
-               ShowWindow( g_hContainer , g_SearchVis )               
-               if g_SearchVis = SW_HIDE then SetWindowText( g_hStatus , sStatusText )
-               rcCursor.x = pos()*g_FntWid : rcCursor.y = csrlin()*g_FntHei
+                  do : .iCur -= 1 : loop while .iCur andalso sText[.iCur]<>32
+               end if               
+               .bChanged = 1
             end if
-            
-            bChanged=0
-                        
-            var sFilters = " Filters:"
-            if g_FilterFlags andalso IsWindowVisible(g_hContainer) then
-               #define ListFilteredFlags( _Name , _Bit ) if g_FilterFlags and wIs##_Name then sFilters += " " #_Name
-               ForEachPartFlag( ListFilteredFlags )
+         case -fb.SC_RIGHT  'right      - move cursor to next character
+            if .iCur<len(sText) then 
+               .iCur += 1 : locate iLin,iCol+.iCur-iStart 
+               if sText[.iCur]=32 then .bChanged = 1
             end if
-            if sFilters=" Filters:" then sFilters="" else sFilters += "(" & g_iFilteredCount & " filtered)"
-            SetWindowText( GetConsoleWindow() , sCaption+"}"+sFilters)
-            
-         end if
-         
-         sleep 10,1 : ProcessMessages() : continue do
-      end if
-      dim as long iKey = sKey[0]
-      if iKey=255 then iKey = -sKey[1]      
-      #define _alt(_K)  (-fb.SC_##_K)
-      #define _ctrl(_K) (1+asc(#_K)-asc("A"))
-      #define _shift (GetKeyState(VK_SHIFT) shr 1)      
-      select case iKey      
-      case 8             'backspace - remove character from left
-         if iCur>0 then 
-            'if sText[iCur-1]=32 then bReCalcTokens=true 'recalc every space
-            sText = left(sText,iCur-1)+mid(sText,iCur+1)
-            iCur -= 1 : bChanged = 1
-         end if
-      case -fb.SC_DELETE 'delete    - remove character from right
-         if iCur<len(sText) then
-            'if sText[iCur]=32 then bReCalcTokens=true 'recalc every space
-            sText = left(sText,iCur)+mid(sText,iCur+2)
-            bChanged = 1
-         end if
-      case 9,-15         'tab        - auto complete (-15 = shift+tab)
-         if len(sToken)>1 then
-            var iCount = SendMessage( g_hSearch , LB_GETCOUNT , 0 , 0 )
-            var iSel   = SendMessage( g_hSearch , LB_GETCURSEL , 0 , 0 )
-            var iSelOrg = iSel
-            if iSel = LB_ERR then iSel=0 else iSel = (iSel+iCount+iif(iKey=9,1,-1)) mod iCount
-            SendMessage( g_hSearch , LB_SETCURSEL , iSel , 0 )
-            g_SearchChanged = true
-         end if
-      case 13            'enter      - finish editing
-         sTextOrg = sText : return 1
-      case 27            'escape     - cancels editing
-         return 0
-      case _alt(D)       'alt+D      - toggle filtering for Donor parts
-         g_FilterFlags xor= wIsDonor    : bChanged = 1
-      case _alt(P)       'alt+P      - toggle filtering for Path/Printed parts
-         g_FilterFlags xor= iif(_shift,wIsPrinted,wIsPath)          : bChanged = 1
-      case _alt(S)       'alt+S      - toggle filtering for Shortcut/Stickered parts
-         g_FilterFlags xor= iif(_shift,wIsStickered,wIsShortcut)    : bChanged = 1
-      case _alt(C)       'alt+C      - toggle filtering for MultiColored/PreColored parts
-         g_FilterFlags xor= iif(_shift,wIsPreColored,wIsMultiColor) : bChanged = 1
-      case _alt(T)       'alt+T      - toggle filtering for template parts
-         g_FilterFlags xor= wIsTemplate : bChanged = 1
-      case _alt(A)       'alt+A      - toggle filtering for alias parts
-         g_FilterFlags xor= wIsAlias    : bChanged = 1
-      case _alt(M)       'alt+M      - toggle filtering for multi-moulded parts
-         g_FilterFlags xor= wIsMoulded  : bChanged = 1         
-      case _alt(H)       'alt+H      - toggle filtering for helper parts
-         g_FilterFlags xor= wIsHelper   : bChanged = 1         
-      case _alt(F)       'alt+F      - toggle part filtering
-         g_FilterFlags xor= wIsHidden   : bChanged = 1      
-      case _ctrl(S)      'ctrl+S     - toggle filtering for sticker parts
-         g_FilterFlags xor= wIsSticker  : bChanged = 1      
-      case _ctrl(F)      'ctrl+F     - clear all filters
-         g_FilterFlags=0 : bChanged = 1
-      case _ctrl(D)      'ctrl+D     - dump ???? / filtered names
-         if _shift then 'filtered names
-            DumpFilteredParts(sToken)
-         else ' ????
-            rem
-         end if         
-      case -fb.SC_HOME   'home       - move cursor to start
-         if iCur then iCur=0 : locate iLin,iCol+iCur-iStart : bChanged = 1
-      case -fb.SC_END    'end        - move cursor to end
-         if iCur<>len(sText) then iCur=len(sText) : locate iLin,iCol+iCur-iStart : bChanged = 1
-      case -fb.SC_LEFT   'left       - move cursor to previous character
-         if iCur>0 then 
-            iCur -= 1 : locate iLin,iCol+iCur-iStart 
-            if sText[iCur]=32 then bChanged = 1
-         end if
-      case -115          'ctrl+left  - move cursor to previous token
-         if iCur>0 then
-            if sText[iCur-1]=32 then
-               do : iCur -= 1 : loop while iCur andalso sText[iCur]=32
-            else
-               do : iCur -= 1 : loop while iCur andalso sText[iCur]<>32
-            end if               
-            bChanged = 1
-         end if
-      case -fb.SC_RIGHT  'right      - move cursor to next character
-         if iCur<len(sText) then 
-            iCur += 1 : locate iLin,iCol+iCur-iStart 
-            if sText[iCur]=32 then bChanged = 1
-         end if
-      case -116          'ctrl+right - move cursor to next token
-         if iCur<len(sText) then
-            if sText[iCur+1]=32 then
-               do : iCur += 1 : loop while iCur<len(sText) andalso sText[iCur]=32
-            else
-               do : iCur += 1 : loop while iCur<len(sText) andalso sText[iCur]<>32
-            end if               
-            bChanged = 1
-         end if
-      case is < 32       'special    - ignore all other special keys
-        SetWindowText( GetConsoleWindow() , "Special = " & iKey )
-      case else          'printable  - add to the string
-         ''if iKey<>32 andalso (len(sText)=0 orelse sText[iCur-1]=32) then bReCalcTokens=true 'recalc every space
-         ''if iKey=32 then bRecalcTokens=true
-         if iKey=32 then
-            if g_SearchVis=SW_SHOWNA andalso iCur=iTokEnd then
-               var iSel  = SendMessage( g_hSearch , LB_GETCURSEL , 0 , 0 )               
-               if iSel <> LB_ERR then               
-                  var iPart = SendMessage( g_hSearch , LB_GETITEMDATA , iSel , 0 )                  
-                  var sDesc = GetPartDescription( iPart )
-                  for N as long = 0 to len(sDesc)-1
-                     select case sDesc[N]
-                     case asc("0") to asc("9"),asc("A") to asc("Z"),asc("a") to asc("z"): exit for
-                     end select
-                     sDesc[N]=asc(" ")
-                  next N                  
-                  if instr(sDesc,"hinge")=0 then
-                     if instr(sDesc," plate") then 
-                        sKey += "P"                  
-                     elseif instr(sDesc," brick") then
-                        sKey += "B"
+         case -116          'ctrl+right - move cursor to next token
+            if .iCur<len(sText) then
+               if sText[.iCur+1]=32 then
+                  do : .iCur += 1 : loop while .iCur<len(sText) andalso sText[.iCur]=32
+               else
+                  do : .iCur += 1 : loop while .iCur<len(sText) andalso sText[.iCur]<>32
+               end if               
+               .bChanged = 1
+            end if
+         case is < 32       'special    - ignore all other special keys
+           SetWindowText( GetConsoleWindow() , "Special = " & iKey )
+         case else          'printable  - add to the string
+            ''if iKey<>32 andalso (len(sText)=0 orelse sText[iCur-1]=32) then bReCalcTokens=true 'recalc every space
+            ''if iKey=32 then bRecalcTokens=true
+            if iKey=32 then
+               if g_SearchVis=SW_SHOWNA andalso .iCur=.iTokEnd then
+                  var iSel  = SendMessage( g_hSearch , LB_GETCURSEL , 0 , 0 )               
+                  if iSel <> LB_ERR then               
+                     var iPart = SendMessage( g_hSearch , LB_GETITEMDATA , iSel , 0 )                  
+                     var sDesc = GetPartDescription( iPart )
+                     for N as long = 0 to len(sDesc)-1
+                        select case sDesc[N]
+                        case asc("0") to asc("9"),asc("A") to asc("Z"),asc("a") to asc("z"): exit for
+                        end select
+                        sDesc[N]=asc(" ")
+                     next N                  
+                     if instr(sDesc,"hinge")=0 then
+                        if instr(sDesc," plate") then 
+                           sKey += "P"                  
+                        elseif instr(sDesc," brick") then
+                           sKey += "B"
+                        end if
                      end if
                   end if
                end if
             end if
-         end if
-         sText = left(sText,iCur)+sKey+mid(sText,iCur+1) 
-         iCur += len(sKey): if iCur>iViewWid then iStart = iViewWid-iCur         
-         bChanged = 1
-      end select
-   loop
-end function       
+            sText = left(sText,.iCur)+sKey+mid(sText,.iCur+1) 
+            .iCur += len(sKey): if .iCur>iViewWid then iStart = iViewWid-.iCur         
+            .bChanged = 1
+         end select
+      loop
+   end with
+end function
 
 'puts("3001 B1 s7 = 3001 B2 c1;")
 'puts("1 0 40 -24 -20 1 0 0 0 1 0 0 0 1 3001.dat")
@@ -613,8 +680,8 @@ end function
 
 '#include "LS2LDR.bas"
 
-dim as string sText
-InitSearchWindow()
-QueryText(sText)
-
-sleep
+   dim as string sText
+   InitSearchWindow()
+   QueryText(sText)
+   sleep
+#endif
