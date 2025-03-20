@@ -17,7 +17,8 @@ namespace gfx
   dim shared as integer g_iCliWid,g_iCliHei
   dim shared as byte g_Temp,g_Fullscreen
   dim shared as string g_sGfxDriver
-  dim shared as COLORREF g_BorderColor  
+  dim shared as COLORREF g_BorderColor 
+  dim shared as point tOldPt = type(-9999,9999)
       
   declare sub Resize(iWid as integer=0,iHei as integer=0,iCenter as integer=1,iResizable as integer=0)  
   
@@ -37,22 +38,32 @@ namespace gfx
         end with        
         return iResu
       end if
-    case WM_SIZING
+    case WM_SIZING       
        return DefWindowProc(hwnd,imsg,wparam,lparam)      
     case WM_SIZE
-      if (lScreenFlags and fb.GFX_OPENGL) then        
+      if (lScreenFlags and fb.GFX_OPENGL) then
         dim as RECT tRc : GetClientRect(hWnd,@tRc)
-        g_iCliWid = tRc.right : g_iCliHei = tRc.bottom        
-        
-        #if __Main = "LegoScript"
-        PostMessage( CTL(wcMain) , WM_USER+1 , 0,0 )
-        #endif
-        
+        if g_iCliWid <> tRc.right orelse g_iCliHei <> tRc.bottom then
+          g_iCliWid = tRc.right : g_iCliHei = tRc.bottom                  
+          #if __Main = "LegoScript"          
+          if CTL(wcMain) andalso IsWindowVisible(CTL(wcMain)) then 
+             'puts("size")
+             SendMessage( CTL(wcMain) , WM_USER+1 , 0,0 )
+          end if
+          #endif        
+        end if
       end if
       return DefWindowProc(hwnd,imsg,wparam,lparam)
     case WM_MOVING,WM_MOVE      
-      #if __Main = "LegoScript"
-        PostMessage( CTL(wcMain) , WM_USER+1 , 0,0 )
+      #if __Main = "LegoScript"        
+        dim as point tNewPt : ClientToScreen( hwnd , @tNewPt )
+        if tOldPt.x <> tNewPt.x orelse tOldPt.y <> tNewPt.y then           
+           'var bForced = (tOldPt.x = -65537) : tOldPt = tNewPt           
+           if CTL(wcMain) andalso IsWindowVisible(CTL(wcMain)) then 
+              'puts("moving")              
+              PostMessage( CTL(wcMain) , WM_USER+2 , 0,0 )
+           end if
+        end if
       #endif
       DefWindowProc(hwnd,imsg,wparam,lparam)
     case WM_SETCURSOR      

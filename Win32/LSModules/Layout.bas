@@ -62,6 +62,7 @@ end type
 type FontStruct
   as HFONT  hFont
   as string sName
+  as ubyte  bCurWid , bCurHei
   as ubyte  bSize
   as byte   bBOld  :1
   as byte   bItalic:1
@@ -200,6 +201,10 @@ sub ResizeLayout( hWnd as HWND , tForm as FormStruct , iWidth as long , iHeight 
         var cWeight = iif(.bBold, FW_BOLD , FW_NORMAL ) 
         const cQuality = DRAFT_QUALITY or ANTIALIASED_QUALITY        
         .hFont = CreateFont(nHeight,0,0,0,cWeight,.bItalic,0,0,DEFAULT_CHARSET,0,0,cQuality,0,.sName)    
+        dim as size tSz = any
+        SelectObject( hDC , .hFont )
+        GetTextExtentPoint32( hDC , "_W^" , 3 , @tSz )
+        .bCurWid = (tSz.cx\3) : .bCurHei = tSz.cy
       end with
     next N
     

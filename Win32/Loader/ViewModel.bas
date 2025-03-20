@@ -1,4 +1,4 @@
-#define __Main
+#define __Main "ViewModel.bas"
 '#define __Tester
 #define DebugShadow
 '#define ColorizePrimatives
@@ -22,6 +22,7 @@
 ' TODO: change the collision bounding boxes, to line markers that extend outside the model
 ' TODO: handle the case where viewing a part file instead of a model file (as subparts shouldnt be checked for collision)
 ' TODO: models with submodels shouldnt ignore the collision when it's a submodel (need to detect when?)
+' TODO: (20/03/2025) fix invalid matrices back to identity ones
 
 'https://www.melkert.net/LDCad/tech/meta
 
@@ -231,7 +232,7 @@ end scope
 
 dim as string sModel
 
-#if 1 '1 = Load File , 0 = Load From clipboard
+#if 0 '1 = Load File , 0 = Load From clipboard
    if len(sFile)=0 then sFile=command(1)
    if instr(sFile,"\")=0 andalso instr(sFile,"/")=0 then FindFile(sFile)
    printf(!"Model: '%s'\n",sFile)

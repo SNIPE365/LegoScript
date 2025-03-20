@@ -154,7 +154,7 @@ function instrWhole( sText as string , sSearch as string ) as long
    end select
    return iResu
 end function
-sub LoadPartNames()
+function LoadPartNames() as long
    
    var f = freefile()
    dim as ulong uPartNamesSize = sizeof(ulong)
@@ -264,7 +264,8 @@ sub LoadPartNames()
       print "Parts: "; g_lPartCount
       print "Name sizes: ";uPartNamesSize\1024;"kb"
    #endif
-end sub
+   return true
+end function
 
 LoadPartNames()
 

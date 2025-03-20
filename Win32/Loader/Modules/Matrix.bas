@@ -32,6 +32,7 @@ dim shared as Matrix4x4 g_tIdentityMatrix = ( _
      0, 0, 1, 0,  _
      0, 0, 0, 1 } _
 )
+dim shared as Matrix4x4 g_tBlankMatrix
 tMatrixStack( 0 ) = g_tIdentityMatrix
 function PushAndMultMatrix( pIn as const single ptr ) as boolean
    var pCur = cast(single ptr,@tMatrixStack(g_CurrentMatrix))

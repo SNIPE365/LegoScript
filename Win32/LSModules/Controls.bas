@@ -85,7 +85,7 @@ if pCtx=0 andalso message <> WM_CREATE then Return DefWindowProc( hWnd, message,
       .tX = _mX : .tY = _mY : .tW = _mWid : .tH = _mHei    
       if .iW = 0 then .iX = -10000 : .iY = -10000 : .iW = 1 : .iH = 1
       .hWnd = _mhWnd : if IsWindow(.hWnd)=0 then .hWnd=0
-      if .hWnd=0 then Debugf( !"Failed to create control %s\n",#_mID)
+      'if .hWnd=0 then Debugf( !"Failed to create control %s\n",#_mID)
     end scope
     #ifdef IdPrevCtl
     IdPrevCtl = _mID
