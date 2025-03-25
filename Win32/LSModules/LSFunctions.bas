@@ -162,6 +162,7 @@ function AddPartName( sName as string , sPart as string ) as long
    end if
    
    var iIndex = FindModelIndex( sPart )
+   memset( @g_tPart( g_iPartCount ) , 0 , sizeof(PartStructLS) )
    with g_tPart( g_iPartCount )
       .sName      = sName
       .sPrimative = sPart+".dat"
@@ -182,7 +183,7 @@ function AddPartName( sName as string , sPart as string ) as long
    return g_iPartCount-1
    
 end function
-function AddConnection( byref tConn as PartConnLS ) as long
+function AddConnection( byref tConn as PartConnLS ) as long   
    if (g_iConnCount > ubound(g_tConn)) then
       redim preserve g_tConn( ubound(g_tConn)+_cConnMin+1 )
    end if

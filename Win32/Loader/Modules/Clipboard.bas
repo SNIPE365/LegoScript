@@ -8,7 +8,7 @@ declare function SetClipboard(MYSTRING as string) as integer
 declare function SetClipboardW(MYSTRING as wstring ptr) as integer
 declare function GetClipboard() as string
 
-function SetClipboard(MYSTRING as string) as integer
+function SetClipboard(MYSTRING as string) as integer  
   function = 0
   do  
     if OpenClipboard(NULL) = 0 then return 0
@@ -25,7 +25,7 @@ function SetClipboard(MYSTRING as string) as integer
   loop
   CloseClipboard()
 end function
-function SetClipboardW(MYSTRING as wstring ptr) as integer
+function SetClipboardW(MYSTRING as wstring ptr) as integer  
   if OpenClipboard(null) = 0 then return 0
   if EmptyClipboard() = 0 then return 0
   dim as wstring ptr MYCLIPPTR

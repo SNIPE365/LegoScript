@@ -240,14 +240,14 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
          #define sCurToken sToken(iCurToken)
          var iName=ecNotFound, bExisting = false         
          'if the first token is a primative (DAT) name then it's a declaration
-         if IsPrimative( sCurToken ) then
+         if IsPrimative( sCurToken ) then            
             #define sPart sCurToken
             #define sName sRelToken(1)
             if len(sName)=0 orelse iCurToken >= iTokCnt then ParserError( "Expected part name, got end of statement" )
             if IsValidPartName( sName )=false then ParserError("'"+sName+"' is not a valid part name")
             iName = FindPartName( sName )
             if iName >= 0 then ParserError( "Name already exists" )            
-            iName = AddPartName( sName , sPart  )            
+            iName = AddPartName( sName , sPart  )                        
             if iName >=0 andalso g_tPart(iName).bFoundPart = 0 then 
                ParserError("'"+sPart+"' primative not found")
                'puts("bad primative?")
@@ -262,27 +262,30 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
             iCurToken += 1 : bExisting = true
          end if         
          'if there's no more parameters than it's just a part declaration
-         
          'print ,tLeft(Part) , tRight(Part) , iCurToken ; iTokCnt
          if iCurToken = iTokCnt then 
             if tLeft(Part)<0 then exit do
             ParserError("missing operands in the right side")
-         end if
+         end if         
          'otherwise it's a processed block (assignment?)
-         'so read tokens to add characteristics
-         
+                  
          'first for the LEFT side then for the RIGHT side
          if tLeft(Part) < 0 then tLeft(Part) = iName else tRight(Part) = iName
          if tLeft(Part) = tRight(Part) then ParserError("a part can't connect to itself")
-         
+                  
+         'can only define rotation/offset once
+         dim as byte bDefinedXRot , bDefinedYRot , bDefinedZRot
+         dim as byte bDefinedXOff , bDefinedYOff , bDefinedZOff
+                           
+         'so read tokens to add characteristics
          with g_tPart(iName)
             do 
                if iCurToken = iTokCnt then                
-                  if tLeft(Part) < 0 then ParserError("premature end of statement")
+                  if tLeft(Part) < 0 then ParserError("premature end of statement")                  
                   exit do,do
                end if
                iCurToken += 1
-               var sThisToken = sRelToken(-1)
+               var sThisToken = sRelToken(-1)               
                'parse characteristic
                select case sThisToken[0]
                case asc("s"),asc("c"): 'stud/clutch (connector)   (last token from the side)
@@ -319,21 +322,36 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
                      ParserError("expected end of statement, got '"+sThisToken+"'")
                   end if
                   continue do,do
-               case asc("x"): 'X angle for this piece
-                  if bExisting then 
-                     ParserError("Can't define attributes for existing parts")
-                  end if
-                  .tLocation.fAX = ReadTokenNumber( sThisToken , 1 , true )*(PI/180)
-               case asc("y"): 'Y angle for this piece
-                  if bExisting then 
-                     ParserError("Can't define attributes for existing parts")
-                  end if
-                  .tLocation.fAY = ReadTokenNumber( sThisToken , 1 , true )*(PI/180)
-               case asc("z"): 'Z angle for this piece
-                  if bExisting then 
-                     ParserError("Can't define attributes for existing parts")
-                  end if
-                  .tLocation.fAZ = ReadTokenNumber( sThisToken , 1 , true )*(PI/180)
+               case asc("x"): 'X angle or position for this piece
+                  if bExisting then ParserError("Can't define attributes for existing parts (redefined X offset or rotation)")
+                  select case sThisToken[1]
+                  case asc("o") 
+                     if bDefinedXOff then ParserError("Defined X offset twice")
+                     .tLocation.fPX += ReadTokenNumber( sThisToken , 2 , true ) : bDefinedXOff = 1
+                  case else
+                     if bDefinedXRot then ParserError("Defined X rotation twice")
+                     .tLocation.fAX  = ReadTokenNumber( sThisToken , 1-(sThisToken[1]=asc("r")) , true )*(PI/180) : bDefinedXrot = 1
+                  end select
+               case asc("y"): 'Y angle or position for this piece
+                  if bExisting then ParserError("Can't define attributes for existing parts (redefined Y offset or rotation)")
+                  select case sThisToken[1]
+                  case asc("o") 
+                     if bDefinedYOff then ParserError("Defined Y offset twice")
+                     .tLocation.fPY += ReadTokenNumber( sThisToken , 2 , true ) : bDefinedYOff = 1
+                  case else
+                     if bDefinedYRot then ParserError("Defined Y rotation twice")
+                     .tLocation.fAY  = ReadTokenNumber( sThisToken , 1-(sThisToken[1]=asc("r")) , true )*(PI/180) : bDefinedYrot = 1
+                  end select
+               case asc("z"): 'Z angle or position for this piece
+                  if bExisting then ParserError("Can't define attributes for existing parts (redefined Z offset or rotation)")
+                  select case sThisToken[1]
+                  case asc("o") 
+                     if bDefinedZOff then ParserError("Defined Z offset twice")
+                     .tLocation.fPZ += ReadTokenNumber( sThisToken , 2 , true ) : bDefinedZOff = 1
+                  case else
+                     if bDefinedZRot then ParserError("Defined Z rotation twice")
+                     .tLocation.fAZ  = ReadTokenNumber( sThisToken , 1-(sThisToken[1]=asc("r")) , true )*(PI/180) : bDefinedZrot = 1
+                  end select
                case asc("#"): 'color token #nn #RGB #RRGGBB
                   if bExisting then 
                      ParserError("Can't define attributes for existing parts")
@@ -346,178 +364,213 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
                   .iColor = iColor                  
                case else
                   ParserError("Unknown token '"+sThisToken+"'")
-               end select
+               end select               
             loop
-         end with
-         puts("C3")
+         end with         
       loop
-      
-      AddConnection( tConn )
+            
+      with tConn      
+         if .iLeftPart <> ecNotFound andalso .iRightPart <> ecNotFound then
+            AddConnection( tConn ) 'lsfunctions.bas
+         end if
+      end with
       
       if iStNext=0 then exit while      
    wend
-         
-   'generate LDRAW and check collisions
-   if iStNext=0 andalso g_iPartCount>0 then
-      '------------------------------------------------------------------------
-      '------------------------ first part positioning ------------------------
-      '------------------------------------------------------------------------
-      dim as zstring*256 zTemp=any
-      dim as SnapPV ptr pLeft=any,pRight=any
-      dim as single tVec3(2) = any
-      #define _fPX tVec3(0)
-      #define _fPY tVec3(1)
-      #define _fPZ tVec3(2)
-      with g_tPart(0)
-         'print .sName , .sPrimative , .iColor
-         var iColor = iif( .iColor<0 , 16 , .iColor ) , psPrimative = @.sPrimative
-                  
-         _fPX = .tLocation.fPX : _fPY = .tLocation.fPY : _fPZ = .tLocation.fPZ         
-         .tMatrix = g_tIdentityMatrix
-         if .tLocation.fAX then MatrixRotateX( .tMatrix , .tMatrix , .tLocation.fAX )
-         if .tLocation.fAY then MatrixRotateY( .tMatrix , .tMatrix , .tLocation.fAY )
-         if .tLocation.fAZ then MatrixRotateZ( .tMatrix , .tMatrix , .tLocation.fAZ )         
-         with .tMatrix
-            sprintf(zTemp,!"1 %i %f %f %f %g %g %g %g %g %g %g %g %g %s\r\n",iColor,_fPX,_fPY,_fPZ, _
-               .m(0),.m(1),.m(2),.m(4),.m(5),.m(6),.m(8),.m(9),.m(10) , *psPrimative )
+   
+   #macro DebugParts()
+      puts("sNam sPrimative  Colr Idx Ct Ok LocX LocY LocZ AngX AngY AngZ SX    1    2    4   SY    6    8    9   SZ")
+      for N as long = 0 to g_iPartCount-1      
+         with g_tPart(N)
+            var sPrim = .sPrimative , iPos = instrrev(sPrim,"\") 
+            if iPos then sPrim = mid(sPrim,iPos+1)
+            printf( _
+               !"%-4s %-11s %-4i %-3i %-2i %-2i " _
+               !"%4i %4i %4i %4i %4i %4i " _
+               !"%1.1f  %1.1f  %1.1f  " _
+               !"%1.1f  %1.1f  %1.1f  " _
+               !"%1.1f  %1.1f  %1.1f\n", _            
+               .sName,sPrim,.iColor,.iModelIndex,.bPartCat,.bFoundPart, _
+               cint(.tLocation.fPX),cint(.tLocation.fPY),cint(.tLocation.fPZ), _
+               cint(.tLocation.fAX),cint(.tLocation.fAY),cint(.tLocation.fAZ), _
+               (.tMatrix.fScaleX) , (.tMatrix.f_1)     , (.tMatrix.f_2)     , _
+               (.tMatrix.f_4)     , (.tMatrix.fScaleY) , (.tMatrix.f_6)     , _
+               (.tMatrix.f_8)     , (.tMatrix.f_9)     , (.tMatrix.fScaleZ) , _            
+            )
          end with
-         sResult += zTemp 
-         #ifdef __Standalone
-         printf("%s",zTemp)
-         #endif
-      end with
-      '------------------------------------------------------------------------
-      '--------------- later parts are relative to some other part ------------
-      '---------- so process all connections to get the relative parts --------
-      '------------------------------------------------------------------------
-      for I as long = 0 to g_iConnCount-1
-         with g_tConn(I)
-            'print _
-            '   .iLeftPart  & "{" & .iLeftType  & ":" & .iLeftNum  & "} = " & _
-            '   .iRightPart & "{" & .iRightType & ":" & .iRightNum & "}"
-            'dim as single FromX,FromY,FromZ , ToX,ToY,ToZ
-            var pModel = g_tModels(g_tPart(.iLeftPart).iModelIndex).pModel 
-            var pSnap = cptr(PartSnap ptr,pModel->pData)            
-            select case .iLeftType
-            case spStud   : pLeft = pSnap->pStud  +.iLeftNum-1
-            case spClutch : pLeft = pSnap->pClutch+.iLeftNum-1
-            case else     : puts("Error")
-            end select
-            pModel = g_tModels(g_tPart(.iRightPart).iModelIndex).pModel 
-            pSnap = cptr(PartSnap ptr,pModel->pData)
-            select case .iRightType
-            case spStud   : pRight = pSnap->pStud  +.iRightNum-1
-            case spClutch : pRight = pSnap->pClutch+.iRightNum-1
-            case else     : puts("Error")
-            end select
-            'print pLeft->fPX , pLeft->fPY , pLeft->fPZ
-            'print pRight->fPX , pRight->fPY , pRight->fPZ
-            'type SnapPV
-            '   as single fPX,fPY,fPZ 'position
-            '   as single fVX,fVy,fVZ 'direction vector
-            'end type
-            var ptLocation = @g_tPart(.iLeftPart).tLocation
-            var pLeftPart = @g_tPart(.iLeftPart) , iRightPart_ = .iRightPart
-                                    
-            with g_tPart(iRightPart_)                              
-               if memcmp( @pLeftPart->tMatrix , @g_tBlankMatrix , sizeof(Matrix4x4) ) = 0 then
-                  'if memcmp( @pRightPart->tMatrix , @g_tBlankMatrix , sizeof(Matrix4x4) ) = 0 then                  
-                     .tMatrix = g_tIdentityMatrix
-                  'else
-                  '   .tMatrix =pRightPart->tMatrix
-                  'end if
-               else
-                  .tMatrix = pLeftPart->tMatrix
-               end if
-               with *(pLeft->pMatOrg)
-                  '.fPosX = 0
-                  '.fPosY = 100
-                  '.fPosZ = 0
-               end with
-               : if pLeft->pMatOrg then MultMatrix4x4( .tMatrix , .tMatrix , pLeft->pMatOrg )
-               : if pRight->pMatOrg then MultMatrix4x4( .tMatrix , .tMatrix , pRight->pMatOrg )
+      next N
+   #endmacro
+   
+   DebugParts()   
+   #if 1
+      'generate LDRAW and check collisions
+      if iStNext=0 andalso g_iPartCount>0 then      
+         dim as zstring*256 zTemp=any
+         dim as SnapPV ptr pLeft=any,pRight=any
+         dim as single tVec3(2) = any
+         #define _fPX tVec3(0)
+         #define _fPY tVec3(1)
+         #define _fPZ tVec3(2)
+         if g_iConnCount > 0 then      
+            '------------------------------------------------------------------------
+            '------------------------ first part positioning ------------------------
+            '------------------------------------------------------------------------
+            with g_tPart( g_tConn(0).iLeftPart )
+               'print .sName , .sPrimative , .iColor
+               var iColor = iif( .iColor<0 , 16 , .iColor ) , psPrimative = @.sPrimative
+                        
+               _fPX = .tLocation.fPX : _fPY = .tLocation.fPY : _fPZ = .tLocation.fPZ         
+               .tMatrix = g_tIdentityMatrix
                if .tLocation.fAX then MatrixRotateX( .tMatrix , .tMatrix , .tLocation.fAX )
                if .tLocation.fAY then MatrixRotateY( .tMatrix , .tMatrix , .tLocation.fAY )
-               if .tLocation.fAZ then MatrixRotateZ( .tMatrix , .tMatrix , .tLocation.fAZ )
-               
-               _fPX = pLeft->fPX : _fPY = pLeft->fPY : _fPZ = pLeft->fPZ               
-               'if pLeft->pMatOrg then MultiplyMatrixVector( @tVec3(0) , pLeft->pMatOrg )
-               'MultiplyMatrixVector( @tVec3(0) , @pLeftPart->tMatrix )
-               tVec3(0) += pLeftPart->tMatrix.fPosX
-               tVec3(1) += pLeftPart->tMatrix.fPosY
-               tVec3(2) += pLeftPart->tMatrix.fPosZ
-               
-               dim as single tVec3R(2) = { pRight->fPX , pRight->fPY , pRight->fPZ }
-               'if pRight->pMatOrg then MultiplyMatrixVector( @tVec3R(0) , pRight->pMatOrg )
-               'MultiplyMatrixVector( @tVec3R(0) , @.tMatrix )
-               
-               _fPX = ptLocation->fPX - (_fPX + tVec3R(0)) '.fPX
-               _fPY = ptLocation->fPY + (_fPY - tVec3R(1)) '.fPY
-               _fPZ = ptLocation->fPZ + (_fpZ + tVec3R(2)) '.fPZ
-               
-               if .tLocation.fPX = 0 andalso .tLocation.fPY=0 andalso .tLocation.fPZ=0 then
-                  .tLocation.fPX = _fPX : .tLocation.fPY = _fPY : .tLocation.fPZ = _fPZ
-               elseif abs(.tLocation.fPX-_fPX)>.001 orelse abs(.tLocation.fPY-_fPY)>.001 orelse abs(.tLocation.fPZ-_fPZ)>.001 then                  
-                  'LinkerError( "Impossible Connection detected!" )
-               end if
-               dim as PartSize tPart = any  : tPart = pModel->tSize
-               var iIdx = .iModelIndex
-               'with tPart
-               '   printf(!"Part: %i = x:%f>%f y:%f>%f z:%f>%f\n", _
-               '     iIdx , .xMin,.xMax , .yMin,.yMax , .zMin,.zMax )
-               'end with
-               if (tPart.yMin-(-4)) < .0001 then tPart.yMin = 0
-               tPart.xMin = tPart.xMin+.1+.tLocation.fPX : tPart.xMax = tPart.xMax-.1+.tLocation.fPX
-               tPart.yMin = tPart.yMin+.1+.tLocation.fPY : tPart.yMax = tPart.yMax-.1+.tLocation.fPY
-               tPart.zMin = tPart.zMin+.1+.tLocation.fPZ : tPart.zMax = tPart.zMax-.1+.tLocation.fPZ               
-                  
-               #if 0
-                  for N as long = 0 to g_iPartCount-1
-                     if N = iRightPart_ then continue for
-                     if .tLocation.fPX = 0 andalso .tLocation.fPY=0 andalso .tLocation.fPZ=0 then
-                        continue for
-                     end if
-                     with g_tPart(N)                     
-                        dim as PartSize tChk = any
-                        tChk = g_tModels(g_tPart(N).iModelIndex).pModel->tSize                     
-                        if (tChk.yMin-(-4)) < .0001 then tChk.yMin = 0                     
-                        tChk.xMin = tChk.xMin+.1+.tLocation.fPX : tChk.xMax = tChk.xMax-.1+.tLocation.fPX
-                        tChk.yMin = tChk.yMin+.1+.tLocation.fPY : tChk.yMax = tChk.yMax-.1+.tLocation.fPY
-                        tChk.zMin = tChk.zMin+.1+.tLocation.fPZ : tChk.zMax = tChk.zMax-.1+.tLocation.fPZ
-                        if CheckCollision( tPart , tChk ) then
-                           dim as zstring*128 zMessage = any
-                           sprintf(zMessage,!"Collision! between part %s and %s",g_tPart(iRightPart_).sName,.sName)
-                           LinkerWarning( zMessage )
-                        end if
-                     end with
-                  next N
-               #endif
-                                             
-               var iColor = iif(.iColor<0,16,.iColor), psPrimative = @.sPrimative
-               'nearest = roundf(val * 100) / 100
+               if .tLocation.fAZ then MatrixRotateZ( .tMatrix , .tMatrix , .tLocation.fAZ )         
                with .tMatrix
-                  #define r(_i) (roundf(.m(_i)*100000)/100000)
                   sprintf(zTemp,!"1 %i %f %f %f %g %g %g %g %g %g %g %g %g %s\r\n",iColor,_fPX,_fPY,_fPZ, _
-                     r(0),r(1),r(2),r(4),r(5),r(6),r(8),r(9),r(10) , *psPrimative )
+                     .m(0),.m(1),.m(2),.m(4),.m(5),.m(6),.m(8),.m(9),.m(10) , *psPrimative )
                end with
                sResult += zTemp 
                #ifdef __Standalone
-               printf("<%i>%s",__LINE__,zTemp)
+               printf("%s",zTemp)
                #endif
-            end with            
-            'puts("1 0 40 -24 -20 1 0 0 0 1 0 0 0 1 3001.dat")
-            'puts("1 0 0 0 0 1 0 0 0 1 0 0 0 1 3001.dat")
-            
-         end with
-      next I
-   end if
+            end with
+         end if
+         '------------------------------------------------------------------------
+         '--------------- later parts are relative to some other part ------------
+         '---------- so process all connections to get the relative parts --------
+         '------------------------------------------------------------------------
+         for I as long = 0 to g_iConnCount-1
+            with g_tConn(I)
+               'print _
+               '   .iLeftPart  & "{" & .iLeftType  & ":" & .iLeftNum  & "} = " & _
+               '   .iRightPart & "{" & .iRightType & ":" & .iRightNum & "}"
+               'dim as single FromX,FromY,FromZ , ToX,ToY,ToZ
+               var pModel = g_tModels(g_tPart(.iLeftPart).iModelIndex).pModel 
+               var pSnap = cptr(PartSnap ptr,pModel->pData)            
+               select case .iLeftType
+               case spStud   : pLeft = pSnap->pStud  +.iLeftNum-1
+               case spClutch : pLeft = pSnap->pClutch+.iLeftNum-1
+               case else     : puts("Error")
+               end select
+               pModel = g_tModels(g_tPart(.iRightPart).iModelIndex).pModel 
+               pSnap = cptr(PartSnap ptr,pModel->pData)
+               select case .iRightType
+               case spStud   : pRight = pSnap->pStud  +.iRightNum-1
+               case spClutch : pRight = pSnap->pClutch+.iRightNum-1
+               case else     : puts("Error")
+               end select
+               'print pLeft->fPX , pLeft->fPY , pLeft->fPZ
+               'print pRight->fPX , pRight->fPY , pRight->fPZ
+               'type SnapPV
+               '   as single fPX,fPY,fPZ 'position
+               '   as single fVX,fVy,fVZ 'direction vector
+               'end type
+               var ptLocation = @g_tPart(.iLeftPart).tLocation
+               var pLeftPart = @g_tPart(.iLeftPart) , iRightPart_ = .iRightPart
+               
+               'pLeft/pRight are the snap matrix for the piece stud/clutch
+                          
+                                       
+               with g_tPart(iRightPart_)                              
+                  if memcmp( @pLeftPart->tMatrix , @g_tBlankMatrix , sizeof(Matrix4x4) ) = 0 then
+                     'if memcmp( @pRightPart->tMatrix , @g_tBlankMatrix , sizeof(Matrix4x4) ) = 0 then                  
+                        .tMatrix = g_tIdentityMatrix
+                     'else
+                     '   .tMatrix =pRightPart->tMatrix
+                     'end if
+                  else
+                     .tMatrix = pLeftPart->tMatrix
+                  end if
+                  with *(pLeft->pMatOrg)
+                     '.fPosX = 0
+                     '.fPosY = 100
+                     '.fPosZ = 0
+                  end with
+                  : if pLeft->pMatOrg then MultMatrix4x4( .tMatrix , .tMatrix , pLeft->pMatOrg )
+                  : if pRight->pMatOrg then MultMatrix4x4( .tMatrix , .tMatrix , pRight->pMatOrg )
+                  if .tLocation.fAX then MatrixRotateX( .tMatrix , .tMatrix , .tLocation.fAX )
+                  if .tLocation.fAY then MatrixRotateY( .tMatrix , .tMatrix , .tLocation.fAY )
+                  if .tLocation.fAZ then MatrixRotateZ( .tMatrix , .tMatrix , .tLocation.fAZ )
+                  
+                  _fPX = pLeft->fPX : _fPY = pLeft->fPY : _fPZ = pLeft->fPZ               
+                  'if pLeft->pMatOrg then MultiplyMatrixVector( @tVec3(0) , pLeft->pMatOrg )
+                  'MultiplyMatrixVector( @tVec3(0) , @pLeftPart->tMatrix )
+                  tVec3(0) += pLeftPart->tMatrix.fPosX
+                  tVec3(1) += pLeftPart->tMatrix.fPosY
+                  tVec3(2) += pLeftPart->tMatrix.fPosZ
+                  
+                  dim as single tVec3R(2) = { pRight->fPX , pRight->fPY , pRight->fPZ }
+                  'if pRight->pMatOrg then MultiplyMatrixVector( @tVec3R(0) , pRight->pMatOrg )
+                  'MultiplyMatrixVector( @tVec3R(0) , @.tMatrix )
+                  
+                  _fPX = ptLocation->fPX - (_fPX + tVec3R(0)) + .tLocation.fPX '.fPX
+                  _fPY = ptLocation->fPY + (_fPY - tVec3R(1)) + .tLocation.fPY '.fPY
+                  _fPZ = ptLocation->fPZ + (_fpZ + tVec3R(2)) + .tLocation.fPZ '.fPZ
+                  
+                  'if .tLocation.fPX = 0 andalso .tLocation.fPY=0 andalso .tLocation.fPZ=0 then
+                     .tLocation.fPX = _fPX : .tLocation.fPY = _fPY : .tLocation.fPZ = _fPZ
+                  'elseif abs(.tLocation.fPX-_fPX)>.001 orelse abs(.tLocation.fPY-_fPY)>.001 orelse abs(.tLocation.fPZ-_fPZ)>.001 then
+                  '   'LinkerError( "Impossible Connection detected!" )
+                  'end if
+                  dim as PartSize tPart = any  : tPart = pModel->tSize
+                  var iIdx = .iModelIndex
+                  'with tPart
+                  '   printf(!"Part: %i = x:%f>%f y:%f>%f z:%f>%f\n", _
+                  '     iIdx , .xMin,.xMax , .yMin,.yMax , .zMin,.zMax )
+                  'end with
+                  if (tPart.yMin-(-4)) < .0001 then tPart.yMin = 0
+                  tPart.xMin = tPart.xMin+.1+.tLocation.fPX : tPart.xMax = tPart.xMax-.1+.tLocation.fPX
+                  tPart.yMin = tPart.yMin+.1+.tLocation.fPY : tPart.yMax = tPart.yMax-.1+.tLocation.fPY
+                  tPart.zMin = tPart.zMin+.1+.tLocation.fPZ : tPart.zMax = tPart.zMax-.1+.tLocation.fPZ               
+                     
+                  #if 0
+                     for N as long = 0 to g_iPartCount-1
+                        if N = iRightPart_ then continue for
+                        if .tLocation.fPX = 0 andalso .tLocation.fPY=0 andalso .tLocation.fPZ=0 then
+                           continue for
+                        end if
+                        with g_tPart(N)                     
+                           dim as PartSize tChk = any
+                           tChk = g_tModels(g_tPart(N).iModelIndex).pModel->tSize                     
+                           if (tChk.yMin-(-4)) < .0001 then tChk.yMin = 0                     
+                           tChk.xMin = tChk.xMin+.1+.tLocation.fPX : tChk.xMax = tChk.xMax-.1+.tLocation.fPX
+                           tChk.yMin = tChk.yMin+.1+.tLocation.fPY : tChk.yMax = tChk.yMax-.1+.tLocation.fPY
+                           tChk.zMin = tChk.zMin+.1+.tLocation.fPZ : tChk.zMax = tChk.zMax-.1+.tLocation.fPZ
+                           if CheckCollision( tPart , tChk ) then
+                              dim as zstring*128 zMessage = any
+                              sprintf(zMessage,!"Collision! between part %s and %s",g_tPart(iRightPart_).sName,.sName)
+                              LinkerWarning( zMessage )
+                           end if
+                        end with
+                     next N
+                  #endif
+                                                
+                  var iColor = iif(.iColor<0,16,.iColor), psPrimative = @.sPrimative
+                  'nearest = roundf(val * 100) / 100
+                  with .tMatrix
+                     #define r(_i) (roundf(.m(_i)*100000)/100000)
+                     sprintf(zTemp,!"1 %i %f %f %f %g %g %g %g %g %g %g %g %g %s\r\n",iColor,_fPX,_fPY,_fPZ, _
+                        r(0),r(1),r(2),r(4),r(5),r(6),r(8),r(9),r(10) , *psPrimative )
+                  end with
+                  sResult += zTemp 
+                  #ifdef __Standalone
+                  printf("<%i>%s",__LINE__,zTemp)
+                  #endif
+               end with            
+               'puts("1 0 40 -24 -20 1 0 0 0 1 0 0 0 1 3001.dat")
+               'puts("1 0 0 0 0 1 0 0 0 1 0 0 0 1 3001.dat")
+               
+            end with
+         next I
+      end if
+   #endif   
+   DebugParts()
          
    clear sToken(0),0,16*sizeof(fbStr) ': erase sToken
    clear sStatement,0,sizeof(fbStr)   ': sStatement = ""
    
    redim as PartStructLS g_tPart(_cPartMin)
    redim as PartConnLS g_tConn(_cConnMin)
-      
+   
    return sResult
    
 end function
@@ -873,9 +926,12 @@ else
       !"B4 c1 = 4070 B5 #5 s22; \n" 
    #endif
    
+   #if 1
    sScript = _
-      "3002 B2 #7 s1 = 3001p11 B1 c1;" !"\n" _
-      "3001 B3 #2 s2 = B1 c1;"         !"\n"
+      "3002 B2 #7 s1 = 3001p11 B1 xo12 c1;" !"\n" '_
+      '"3001 B3 #2 s2 = B1 c1;"         !"\n"
+   #endif
+   
      
 end if
 var sModel = LegoScriptToLDraw(sScript)

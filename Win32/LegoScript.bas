@@ -19,7 +19,7 @@
 'TODO (06/03/25): check bug regarding wheel positioning and the line numbers
 'TODO (20/03/25): add multipass linker, to resolve forward references
 'TODO (20/03/25): process keys to toggle filters and to change the text/add type (plate/brick/etc...)
-'TODO (20/03/25): investigate clipboard being cleared when closing by console
+'TODO (25/03/25): re-organize the LS2LDR code, so that it looks better and explain better
 
 '*************** Enumerating our control id's ***********
 enum StatusParts
@@ -760,11 +760,17 @@ end sub
 static shared as any ptr OrgEditProc
 function WndProcEdit ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LPARAM ) as LRESULT
    select case message
+   case WM_CHAR
+      select case wParam
+      case 3,24 'Ctrl-C / Ctrl-X
+         var lResu = CallWindowProc( OrgEditProc , hWnd , message , wParam, lParam )      
+         GetClipboard() : return lResu
+      end select      
    case WM_VSCROLL
       var iResu = CallWindowProc( OrgEditProc , hWnd , message , wParam, lParam )
       g_iPrevRowCount = 0
       RichEdit_TopRowChange( hWnd )
-      return iResu
+      return iResu   
    end select
    return CallWindowProc( OrgEditProc , hWnd , message , wParam, lParam )   
 end function
@@ -878,7 +884,6 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
          case wcButton
             select case wNotifyCode
             case BN_CLICKED
-               printf(!"[%p %p]\n",CTL(wcButton),hwndCtl)            
                Button_Compile()            
             end select
          end select
@@ -1002,6 +1007,12 @@ if LoadLibrary("Riched32.dll")=0 then
   MessageBox(null,"Failed To Load richedit component",null,MB_ICONERROR)
   end
 end if
+
+function BeforeExit( dwCtrlType as DWORD ) as WINBOOL   
+   GetClipboard() : system() : return 0 'never? :P
+end function
+SetConsoleCtrlHandler( @BeforeExit , TRUE )
+
 g_AppInstance = GetModuleHandle(null)
 WinMain() '<- main function
 g_DoQuit = 1
