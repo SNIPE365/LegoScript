@@ -14,12 +14,15 @@
 #define Errorf(p...)
 #define Debugf(p...)
 
+' !!! some pieces have unmatched studs vs clutch (and i suspect that's their design problem) !!!
+' !!! because when using ldraw it does not matter the order, so they never enforced that     !!!
 
+'TODO (20/03/25): process keys to toggle filters and to change the text/add type (plate/brick/etc...)
 'TODO (05/03/25): fix LS2LDR parsing bugs
 'TODO (06/03/25): check bug regarding wheel positioning and the line numbers
-'TODO (20/03/25): add multipass linker, to resolve forward references
-'TODO (20/03/25): process keys to toggle filters and to change the text/add type (plate/brick/etc...)
 'TODO (25/03/25): re-organize the LS2LDR code, so that it looks better and explain better
+
+'the model is no longer updating, say if I remove a part, or all parts, or change something.
 
 '*************** Enumerating our control id's ***********
 enum StatusParts
@@ -44,6 +47,10 @@ end enum
 enum Accelerators
    acFirst = 9100-1
    acToggleMenu
+   'combobox shortcuts
+   acFilterDonor      , acFilterPath       , acFilterPrinted  , acFilterShortcut , acFilterStickered
+   acFilterMultiColor , acFilterPreColored , acFilterTemplate , acFilterAlias    , acFilterMoulded
+   acFilterHelper     , acFilterHidden     , acFilterSticker  , acFilterClear    , acFilterDump
 end enum
 
 #define CTL(_I) g_tMainCtx.hCtl(_I).hwnd
@@ -698,14 +705,80 @@ sub ProcessAccelerator( iID as long )
    select case iID
    case acToggleMenu
       SetMenu( CTL(wcMain) , iif( GetMenu(CTL(wcMain)) , NULL , g_WndMenu ) )
+      case acFilterDonor       : g_FilterFlags xor= wIsDonor
+      case acFilterPath        : g_FilterFlags xor= wIsPath
+      case acFilterPrinted     : g_FilterFlags xor= wIsPrinted
+      case acFilterShortcut    : g_FilterFlags xor= wIsShortcut
+      case acFilterStickered   : g_FilterFlags xor= wIsStickered
+      case acFilterMultiColor  : g_FilterFlags xor= wIsMultiColor
+      case acFilterPreColored  : g_FilterFlags xor= wIsPreColored
+      case acFilterTemplate    : g_FilterFlags xor= wIsTemplate
+      case acFilterAlias       : g_FilterFlags xor= wIsAlias
+      case acFilterMoulded     : g_FilterFlags xor= wIsMoulded
+      case acFilterHelper      : g_FilterFlags xor= wIsHelper 
+      case acFilterHidden      : g_FilterFlags xor= wIsHidden
+      case acFilterSticker     : g_FilterFlags xor= wIsSticker
+      case acFilterClear       : g_FilterFlags = 0
+      case acFilterDump        : puts("Dump filter parts")
    end select
+   #if 0
+      case _alt(D)       'alt+D      - toggle filtering for Donor parts
+         g_FilterFlags xor= wIsDonor    : .bChanged = 1
+      case _alt(P)       'alt+P      - toggle filtering for Path/Printed parts
+         g_FilterFlags xor= iif(_shift,wIsPrinted,wIsPath)          : .bChanged = 1
+      case _alt(S)       'alt+S      - toggle filtering for Shortcut/Stickered parts
+         g_FilterFlags xor= iif(_shift,wIsStickered,wIsShortcut)    : .bChanged = 1
+      case _alt(C)       'alt+C      - toggle filtering for MultiColored/PreColored parts
+         g_FilterFlags xor= iif(_shift,wIsPreColored,wIsMultiColor) : .bChanged = 1
+      case _alt(T)       'alt+T      - toggle filtering for template parts
+         g_FilterFlags xor= wIsTemplate : .bChanged = 1
+      case _alt(A)       'alt+A      - toggle filtering for alias parts
+         g_FilterFlags xor= wIsAlias    : .bChanged = 1
+      case _alt(M)       'alt+M      - toggle filtering for multi-moulded parts
+         g_FilterFlags xor= wIsMoulded  : .bChanged = 1         
+      case _alt(H)       'alt+H      - toggle filtering for helper parts
+         g_FilterFlags xor= wIsHelper   : .bChanged = 1         
+      case _alt(F)       'alt+F      - toggle part filtering
+         g_FilterFlags xor= wIsHidden   : .bChanged = 1      
+      case _ctrl(S)      'ctrl+S     - toggle filtering for sticker parts
+         g_FilterFlags xor= wIsSticker  : .bChanged = 1      
+      case _ctrl(F)      'ctrl+F     - clear all filters
+         g_FilterFlags=0 : .bChanged = 1
+      case _ctrl(D)      'ctrl+D     - dump ???? / filtered names
+         if _shift then 'filtered names
+            DumpFilteredParts(.sToken)
+         else ' ????
+            rem
+         end if
+      end select
+   #endif
+         
+   
 end sub
+
 function CreateMainAccelerators() as HACCEL
    static as ACCEL AccelList(...) = { _
-      ( FSHIFT or FVIRTKEY , VK_SPACE , acToggleMenu ) _
+      ( FSHIFT or FVIRTKEY , VK_SPACE , acToggleMenu ), _
+      _ 'accelerators for combobox
+      ( FALT or FVIRTKEY               , VK_D , acFilterDonor ), _
+      ( FALT or FVIRTKEY               , VK_P , acFilterPath ), _
+      ( FALT or FSHIFT or FVIRTKEY     , VK_P , acFilterPrinted ), _
+      ( FALT or FVIRTKEY               , VK_S , acFilterShortcut ), _
+      ( FALT or FSHIFT or FVIRTKEY     , VK_S , acFilterStickered ), _      
+      ( FALT or FVIRTKEY               , VK_C , acFilterMultiColor ), _
+      ( FALT or FSHIFT or FVIRTKEY     , VK_C , acFilterPreColored ), _      
+      ( FALT or FVIRTKEY               , VK_T , acFilterTemplate ), _
+      ( FALT or FVIRTKEY               , VK_A , acFilterAlias ), _
+      ( FALT or FVIRTKEY               , VK_M , acFilterMoulded ), _
+      ( FALT or FVIRTKEY               , VK_H , acFilterHelper ), _
+      ( FALT or FVIRTKEY               , VK_F , acFilterHidden ), _
+      ( FCONTROL or FVIRTKEY           , VK_S , acFilterSticker ), _
+      ( FCONTROL or FSHIFT or FVIRTKEY , VK_C , acFilterClear ), _
+      ( FCONTROL or FVIRTKEY           , VK_D , acFilterDump )  _
    }
    return CreateAcceleratorTable( @AccelList(0) , ubound(AccelList)+1 )
 end function
+
 sub DockGfxWindow()   
    dim as RECT RcWnd=any,RcGfx=any,RcCli=any,RcDesk
    GetWindowRect( GetDesktopWindow() , @RcDesk )
@@ -930,7 +1003,7 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
    #endif
    case WM_CLOSE
       if GetWindowTextLength( CTL(wcEdit) ) then
-         #define sMsg !"All unsaved data will be lost, continue?"
+         #define sMsg !"All unsaved data will be lost, quit anyway?"
          if MessageBox( CTL(wcMain) , sMsg , "File->Quit" , MB_ICONQUESTION or MB_YESNO ) <> IDYES then return 0
       end if
       PostQuitMessage(0) ' to quit
