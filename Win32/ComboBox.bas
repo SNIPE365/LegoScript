@@ -314,6 +314,7 @@ function UpdateSearch(sSearch as string) as long
    SelectObject( hDC , hFont )
    
    dim as SIZE tSize
+   dim as string sShowDesc
    g_iFilteredCount = 0
    for N as long = 0 to (1 shl 24) 'cfg_MaxSearchParts-1      
       iPart = SearchPart(sSearch,iPart)
@@ -340,11 +341,13 @@ function UpdateSearch(sSearch as string) as long
       if iCharWid=0 then iCharWid = tSize.CX\len(sName)
       if tSize.CX >  iBigWid then iBigWid = tSize.CX      
       var iIdx = SendMessage( g_hSearch , LB_ADDSTRING , 0 , cast(LPARAM,strptr(sName)) )
-      SendMessage( g_hSearch , LB_SETITEMDATA  , iIdx , iPart )      
-      if iFound=0 then SetWindowText( g_hStatus , " " & sDesc )
-      iFound += 1
-      
+      SendMessage( g_hSearch , LB_SETITEMDATA  , iIdx , iPart )                  
+      if iFound=0 then sShowDesc = sDesc 
+      iFound += 1      
    next    
+   
+   if g_iFilteredCount then sShowDesc = "(" & g_iFilteredCount & " Filtered) "+sShowDesc
+   SetWindowText( g_hStatus , " " & sShowDesc )   
       
    'change search list size to accomodate the number of entries found (max 4,3)
    var iRows = iif(iFound>cfg_SearchBoxRows,cfg_SearchBoxRows,iFound)

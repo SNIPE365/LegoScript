@@ -22,6 +22,7 @@
    _Do(Moulded    ,  9 ) 
    _Do(Sticker    , 10 ) 
    _Do(Helper     , 11 ) 
+   _Do(Inverted   , 14 )
    _Do(Hidden     , 15 ) 'last one for generically hide the parts
 #endmacro  
 

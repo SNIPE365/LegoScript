@@ -21,6 +21,7 @@
 'TODO (05/03/25): fix LS2LDR parsing bugs
 'TODO (06/03/25): check bug regarding wheel positioning and the line numbers
 'TODO (25/03/25): re-organize the LS2LDR code, so that it looks better and explain better
+'TODO (01/04/25): make enable auto-completion menu to work / add shortcut to open graphics window
 
 'the model is no longer updating, say if I remove a part, or all parts, or change something.
 
@@ -48,9 +49,11 @@ enum Accelerators
    acFirst = 9100-1
    acToggleMenu
    'combobox shortcuts
-   acFilterDonor      , acFilterPath       , acFilterPrinted  , acFilterShortcut , acFilterStickered
-   acFilterMultiColor , acFilterPreColored , acFilterTemplate , acFilterAlias    , acFilterMoulded
-   acFilterHelper     , acFilterHidden     , acFilterSticker  , acFilterClear    , acFilterDump
+   acFilterClear      , acFilterInvert     , acFilterHidden
+   acFilterDonor      , acFilterPath       , acFilterPrinted    , acFilterShortcut 
+   acFilterStickered  , acFilterMultiColor , acFilterPreColored , acFilterTemplate 
+   acFilterAlias      , acFilterMoulded    , acFilterHelper     , acFilterSticker    
+   acFilterDump
 end enum
 
 #define CTL(_I) g_tMainCtx.hCtl(_I).hwnd
@@ -92,23 +95,30 @@ dim shared as string g_CurrentFilePath
 
 '******************** Menu Handling Helper Functions **************
 namespace Menu 
-   function AddSubMenu( hMenu as any ptr , sText as string ) as any ptr
+   function AddSubMenu( hMenu as any ptr , sText as string , iID as long = 0 ) as any ptr
       if IsMenu(hMenu)=0 then return NULL
       var hResult = CreatePopupMenu()
-      AppendMenu( hMenu , MF_POPUP or MF_STRING , cast(UINT_PTR,hResult) , sText )    
+      'AppendMenu( hMenu , MF_POPUP or MF_STRING , cast(UINT_PTR,hResult) , sText )
+      dim as MENUITEMINFOA tItem = type( sizeof(MENUITEMINFO) )
+      with tItem
+         .fMask = MIIM_SUBMENU or MIIM_ID or MIIM_STRING
+         .hSubMenu = hResult : .wId = iID
+         .dwTypeData = strptr(stext)
+      end with
+      InsertMenuItemA( hMenu , -1 , true , @tItem )      
       if hMenu=g_WndMenu andalso CTL(wcMain) then DrawMenuBar( CTL(wcMain) )
       return hResult
    end function
    function MenuAddEntry( hMenu as any ptr , iID as long = 0 , sText as string = "" , pEvent as any ptr = 0 , bState as long = 0 ) as long    
       if IsMenu(hMenu)=0 then return -1
-      dim as MENUITEMINFO tItem = type( sizeof(MENUITEMINFO) )    
+      dim as MENUITEMINFOA tItem = type( sizeof(MENUITEMINFO) )    
       tItem.fMask      = MIIM_DATA or MIIM_ID or MIIM_STATE or MIIM_TYPE
       tItem.fType      = iif( len(sText) , iif( bState and MFT_RADIOCHECK , MFT_RADIOCHECK , MFT_STRING ) , MFT_SEPARATOR )
       tItem.fState     = bState and (not MFT_RADIOCHECK)
       tItem.wID        = iID
       tItem.dwItemData = cast(long_ptr,pEvent)
       if len(sText) then tItem.dwTypeData = strptr(sText)
-      InsertMenuItem( hMenu , &hFFFFFFFF , true , @tItem )
+      InsertMenuItemA( hMenu , &hFFFFFFFF , true , @tItem )
       'DrawMenuBar( g_GfxWnd )
       return iID
    end function   
@@ -177,6 +187,7 @@ namespace Viewer
                
       dim as boolean bBoundingBox
       dim as boolean bLeftPressed,bRightPressed,bWheelPressed
+      dim as byte bShiftPressed
       dim as long iFps
       dim as single fRotationX = 120 , fRotationY = 20
       dim as single fPositionX , fPositionY , fPositionZ , fZoom = -3
@@ -209,7 +220,7 @@ namespace Viewer
             case fb.EVENT_KEY_PRESS
                select case e.ascii
                case 8
-                  if bBoundingBox then
+                  if bShiftPressed then
                      g_CurPart = -1
                      printf(!"g_CurPart = %i    \r",g_CurPart)
                      dim as PartSize tSzTemp
@@ -220,7 +231,7 @@ namespace Viewer
                      printf(!"g_CurDraw = %i    \r",g_CurDraw)
                   end if               
                case asc("="),asc("+")
-                  if bBoundingBox then
+                  if bShiftPressed then
                      g_CurPart = ((g_CurPart+2) mod (g_PartCount+1))-1
                      printf(!"g_CurPart = %i    \r",g_CurPart)
                      dim as PartSize tSzTemp
@@ -231,7 +242,7 @@ namespace Viewer
                      printf(!"g_CurDraw = %i    \r",g_CurDraw)
                   end if
                case asc("-"),asc("_")
-                  if bBoundingBox then
+                  if bShiftPressed then
                      g_CurPart = ((g_CurPart+g_PartCount+1) mod (g_PartCount+1))-1
                      printf(!"g_CurPart = %i    \r",g_CurPart)
                      dim as PartSize tSzTemp
@@ -243,8 +254,14 @@ namespace Viewer
                   end if               
                end select
                select case e.scancode
-               case fb.SC_TAB
-                  bBoundingBox = not bBoundingBox
+               case fb.SC_LSHIFT : bShiftPressed or= 1
+               case fb.SC_RSHIFT : bShiftPressed or= 2
+               case fb.SC_TAB   : bBoundingBox = not bBoundingBox
+               end select
+            case fb.EVENT_KEY_RELEASE
+               select case e.scancode
+               case fb.SC_LSHIFT : bShiftPressed and= (not 1)
+               case fb.SC_RSHIFT : bShiftPressed and= (not 2)
                end select
             case fb.EVENT_WINDOW_CLOSE
                menu.Trigger( 30001 ) 'hide GFX window
@@ -571,46 +588,147 @@ sub File_Exit()
    SendMessage( CTL(wcMain) , WM_CLOSE , 0,0 )
 end sub
 sub Edit_Undo()
-   print __FUNCTION__
+   puts(__FUNCTION__)
 end sub
 sub Edit_Copy()
-   print __FUNCTION__
+   puts(__FUNCTION__)
+end sub
+sub Completion_Enable()
+   puts(__FUNCTION__)
+   var iToggledState = g_CurItemState xor MFS_CHECKED
+   Menu.MenuState( g_hCurMenu,g_CurItemID,iToggledState )   
+   EnableMenuItem( g_hCurMenu , 32000 , iif( iToggledState and MFS_CHECKED , MF_ENABLED , MF_GRAYED ) )
+end sub
+sub Completion_ClearFilters()
+   puts(__FUNCTION__)
+   g_FilterFlags = 0
+   for N as long = acFilterHidden to acFilterSticker
+      Menu.MenuState( g_hCurMenu , N-acFilterHidden+32003 , g_CurItemState )
+   next N
+end sub
+'#define Completion_InvertFilters Completion_Toggle
+sub Completion_InvertFilters()
+   puts(__FUNCTION__)
+   for N as long = acFilterHidden to acFilterSticker
+      Menu.Trigger( N-acFilterHidden+32003 )
+   next N
+end sub
+sub Completion_Toggle()
+   var iAccelID = acFilterClear+(g_CurItemID-32001)
+   var iToggledState = g_CurItemState xor MFS_CHECKED
+   Menu.MenuState( g_hCurMenu,g_CurItemID,iToggledState )   
+   #define ChgFilter( _Name ) g_FilterFlags = iif( iToggledState and MFS_CHECKED , g_FilterFlags or _Name , g_FilterFlags and (not (_Name)) )
+   select case iAccelID '32001 = Completion.Filters.Clear
+   case acFilterHidden      : ChgFilter( wIsHidden )   
+   case acFilterDonor       : ChgFilter( wIsDonor )
+   case acFilterPath        : ChgFilter( wIsPath )
+   case acFilterPrinted     : ChgFilter( wIsPrinted )
+   case acFilterShortcut    : ChgFilter( wIsShortcut )
+   case acFilterStickered   : ChgFilter( wIsStickered )
+   case acFilterMultiColor  : ChgFilter( wIsMultiColor )
+   case acFilterPreColored  : ChgFilter( wIsPreColored )
+   case acFilterTemplate    : ChgFilter( wIsTemplate )
+   case acFilterAlias       : ChgFilter( wIsAlias )    
+   case acFilterMoulded     : ChgFilter( wIsMoulded )
+   case acFilterHelper      : ChgFilter( wIsHelper )
+   case acFilterSticker     : ChgFilter( wIsSticker )
+   end select
 end sub
 sub View_ToggleGW()
-   g_Show3D = (g_CurItemState and MFS_CHECKED)=0
+   var iToggledState = g_CurItemState xor MFS_CHECKED
+   g_Show3D = (iToggledState and MFS_CHECKED)<>0
    if g_GfxHwnd then ShowWindow( g_GfxHwnd , iif( g_Show3D , SW_SHOWNA , SW_HIDE ) )
-   Menu.MenuState( g_hCurMenu,g_CurItemID,g_CurItemState xor MFS_CHECKED )
+   Menu.MenuState( g_hCurMenu,g_CurItemID, iToggledState )
+   for N as long = 40002 to 40008 'View.xxxx
+      EnableMenuItem( g_hCurMenu , N , iif( iToggledState and MFS_CHECKED , MF_ENABLED , MF_GRAYED ) )
+   next N
+end sub
+sub View_Key()
+   if IsWindow(g_GfxHwnd)=0 then exit sub
+   dim vk as long , sft as byte
+   select case g_CurItemID
+   case 40002 : vk = VK_BACK     'Backspace
+   case 40003 : vk = VK_ADD      '+
+   case 40004 : vk = VK_SUBTRACT '-
+   case 40006 : vk = VK_BACK     : sft = 1 'Shift BACKSPACE
+   case 40007 : vk = VK_ADD      : sft = 1 'Shift +
+   case 40008 : vk = VK_SUBTRACT : sft = 1 'Shift -
+   case else  : puts("bad View_key"): exit sub
+   end select
+   'var scShift =  (MapVirtualKey( VK_SHIFT , 0 ) shl 16)+1
+   if sft then SendMessage( g_GfxHwnd , WM_KEYDOWN , VK_SHIFT , 0 ) 'scShift )
+   SendMessage( g_GfxHwnd , WM_KEYDOWN , vk , 0 )   
+   SendMessage( g_GfxHwnd , WM_KEYUP  , vk , 0 )
+   if sft then SendMessage( g_GfxHwnd , WM_KEYUP   , VK_SHIFT , 0 ) 'scShift )
+end sub
+sub View_Toggle()
+   if IsWindow(g_GfxHwnd)=0 then exit sub
+   ' 40005
+   var iToggledState = g_CurItemState xor MFS_CHECKED
+   Menu.MenuState( g_hCurMenu,g_CurItemID,iToggledState )   
+   SendMessage( g_GfxHwnd , WM_KEYDOWN , VK_TAB , 0 )   
+   SendMessage( g_GfxHwnd , WM_KEYUP   , VK_TAB , 0 )
 end sub
 sub Help_About()
-   print __FUNCTION__
+   puts(__FUNCTION__)
 end sub
 function CreateMainMenu() as HMENU
    
-   #macro _SubMenu( _sText ) 
+   #macro _SubMenu( _sText... ) 
    scope
       var hMenu = Menu.AddSubMenu( hMenu , _sText )
    #endmacro
    #define _EndSubMenu() end scope
    #define _Entry( _Parms... ) Menu.MenuAddEntry( hMenu , _Parms )
-   
+         
    var hMenu = CreateMenu() : g_WndMenu = hMenu
-   _SubMenu( "File" )
-     _Entry( 10001 , "New"     , @File_New    )
-     _Entry( 10002 , "Open"    , @File_Open   )     
-     _Entry( 10003 , "Save"    , @File_Save   )
-     _Entry( 10004 , "Save As" , @File_SaveAs )
+   _SubMenu( "&File" )
+     _Entry( 10001 , "New"                              , @File_New    )
+     _Entry( 10002 , "Open"                             , @File_Open   )     
+     _Entry( 10003 , "Save"                             , @File_Save   )
+     _Entry( 10004 , "Save As"                          , @File_SaveAs )
      _Entry()
-     _Entry( 10005 , "Quit"    , @File_Exit   )
+     _Entry( 10005 , "Quit"                !"\tAlt+F4"  , @File_Exit   )
+   _EndSubMenu()   
+   _SubMenu( "&Edit" )      
+      _Entry( 20001 , "&Undo"              !"\tCtrl+Z" , @Edit_Undo ) ' , MFT_RADIOCHECK or MFS_CHECKED )
+      _Entry( 20002 , "&Copy"              !"\tCtrl+C" , @Edit_Copy ) ', MFT_RADIOCHECK )
    _EndSubMenu()
-   _SubMenu( "&Edit" )
-      _Entry( 20001 , "&Undo" , @Edit_Undo ) ' , MFT_RADIOCHECK or MFS_CHECKED )
-      _Entry( 20002 , "&Copy" , @Edit_Copy ) ', MFT_RADIOCHECK )
+   _SubMenu( "&Completion" )
+      _Entry( 30001 , "&Enable" , @Completion_Enable )         
+      _SubMenu( "&Filters" , 32000 )
+         _Entry( 32001 , "C&lear"          !"\tCtrl+Shift+C", @Completion_ClearFilters )
+         _Entry( 32002 , "&Invert"         !"\tCtrl+I"      , @Completion_InvertFilters )
+         _Entry()
+         _Entry( 32003 , "&Variations"     !"\tAlt+Shift+F" , @Completion_Toggle )
+         _Entry( 32004 , "&Donor"          !"\tAlt+D"       , @Completion_Toggle )
+         _Entry( 32005 , "&Path"           !"\tAlt+P"       , @Completion_Toggle )
+         _Entry( 32006 , "P&rinted"        !"\tShift+Alt+P" , @Completion_Toggle )
+         _Entry( 32007 , "Shortcut"        !"\tAlt+S"       , @Completion_Toggle )
+         _Entry( 32008 , "Stic&kered"      !"\tAlt+K"       , @Completion_Toggle )
+         _Entry( 32009 , "Multi&color"     !"\tAlt+M"       , @Completion_Toggle )
+         _Entry( 32010 , "Pre-c&olored"    !"\tShift+Alt+C" , @Completion_Toggle )
+         _Entry( 32011 , "&Template"       !"\tAlt+T"       , @Completion_Toggle )
+         _Entry( 32012 , "&Alias"          !"\tAlt+A"       , @Completion_Toggle )
+         _Entry( 32013 , "&Moulded"        !"\tAlt+Shift+M" , @Completion_Toggle )
+         _Entry( 32014 , "&Helper"         !"\tAlt+Shift+H" , @Completion_Toggle )
+         _Entry( 32015 , "&Stickers"       !"\tAlt+S"       , @Completion_Toggle )
+      _EndSubMenu()            
    _EndSubMenu()
    _SubMenu( "&View" )
-      _Entry( 30001 , "&Graphics Window" , @View_ToggleGW ) ' , MFT_RADIOCHECK or MFS_CHECKED )      
+      _Entry( 40001 , "&Graphics Window"    !"\tCtrl+G"   , @View_ToggleGW ) ' , MFT_RADIOCHECK or MFS_CHECKED )      
+      _Entry()
+      _Entry( 40002 , "Reset View parts"    !"\tBACKSPACE", @View_Key      , MFS_GRAYED )
+      _Entry( 40003 , "View &Next part"     !"\t+"        , @View_Key      , MFS_GRAYED )
+      _Entry( 40004 , "View &Previous part" !"\t-"        , @View_Key      , MFS_GRAYED )
+      _Entry()      
+      _Entry( 40005 , "&Show bounding box"  !"\tTAB"      , @View_Toggle   , MFS_GRAYED )
+      _Entry( 40006 , "Reset bounding box"  !"\tShift BACKSPACE", @View_Key, MFS_GRAYED )
+      _Entry( 40007 , "Ne&xt part"          !"\tShift +"  , @View_Key      , MFS_GRAYED )
+      _Entry( 40008 , "&Pre&vious part"     !"\tShift -"  , @View_Key      , MFS_GRAYED )
    _EndSubMenu()
    _SubMenu( "&Help" )          
-      _Entry( 40001 , "About" , @Help_About )
+      _Entry( 50001 , "About" , @Help_About )
    _EndSubMenu()
    return hMenu
 end function
@@ -705,75 +823,30 @@ sub ProcessAccelerator( iID as long )
    select case iID
    case acToggleMenu
       SetMenu( CTL(wcMain) , iif( GetMenu(CTL(wcMain)) , NULL , g_WndMenu ) )
-      case acFilterDonor       : g_FilterFlags xor= wIsDonor
-      case acFilterPath        : g_FilterFlags xor= wIsPath
-      case acFilterPrinted     : g_FilterFlags xor= wIsPrinted
-      case acFilterShortcut    : g_FilterFlags xor= wIsShortcut
-      case acFilterStickered   : g_FilterFlags xor= wIsStickered
-      case acFilterMultiColor  : g_FilterFlags xor= wIsMultiColor
-      case acFilterPreColored  : g_FilterFlags xor= wIsPreColored
-      case acFilterTemplate    : g_FilterFlags xor= wIsTemplate
-      case acFilterAlias       : g_FilterFlags xor= wIsAlias
-      case acFilterMoulded     : g_FilterFlags xor= wIsMoulded
-      case acFilterHelper      : g_FilterFlags xor= wIsHelper 
-      case acFilterHidden      : g_FilterFlags xor= wIsHidden
-      case acFilterSticker     : g_FilterFlags xor= wIsSticker
-      case acFilterClear       : g_FilterFlags = 0
-      case acFilterDump        : puts("Dump filter parts")
+   case acFilterClear to acFilterSticker                 '--- combobox accelerators ---
+      Menu.Trigger( 32001+iID-acFilterClear )
+   case acFilterDump        : puts("Dump filter parts")  '--- debug accelerators ---
    end select
-   #if 0
-      case _alt(D)       'alt+D      - toggle filtering for Donor parts
-         g_FilterFlags xor= wIsDonor    : .bChanged = 1
-      case _alt(P)       'alt+P      - toggle filtering for Path/Printed parts
-         g_FilterFlags xor= iif(_shift,wIsPrinted,wIsPath)          : .bChanged = 1
-      case _alt(S)       'alt+S      - toggle filtering for Shortcut/Stickered parts
-         g_FilterFlags xor= iif(_shift,wIsStickered,wIsShortcut)    : .bChanged = 1
-      case _alt(C)       'alt+C      - toggle filtering for MultiColored/PreColored parts
-         g_FilterFlags xor= iif(_shift,wIsPreColored,wIsMultiColor) : .bChanged = 1
-      case _alt(T)       'alt+T      - toggle filtering for template parts
-         g_FilterFlags xor= wIsTemplate : .bChanged = 1
-      case _alt(A)       'alt+A      - toggle filtering for alias parts
-         g_FilterFlags xor= wIsAlias    : .bChanged = 1
-      case _alt(M)       'alt+M      - toggle filtering for multi-moulded parts
-         g_FilterFlags xor= wIsMoulded  : .bChanged = 1         
-      case _alt(H)       'alt+H      - toggle filtering for helper parts
-         g_FilterFlags xor= wIsHelper   : .bChanged = 1         
-      case _alt(F)       'alt+F      - toggle part filtering
-         g_FilterFlags xor= wIsHidden   : .bChanged = 1      
-      case _ctrl(S)      'ctrl+S     - toggle filtering for sticker parts
-         g_FilterFlags xor= wIsSticker  : .bChanged = 1      
-      case _ctrl(F)      'ctrl+F     - clear all filters
-         g_FilterFlags=0 : .bChanged = 1
-      case _ctrl(D)      'ctrl+D     - dump ???? / filtered names
-         if _shift then 'filtered names
-            DumpFilteredParts(.sToken)
-         else ' ????
-            rem
-         end if
-      end select
-   #endif
-         
-   
 end sub
-
 function CreateMainAccelerators() as HACCEL
    static as ACCEL AccelList(...) = { _
       ( FSHIFT or FVIRTKEY , VK_SPACE , acToggleMenu ), _
       _ 'accelerators for combobox
+      ( FCONTROL or FSHIFT or FVIRTKEY , VK_C , acFilterClear ), _
+      ( FCONTROL or FVIRTKEY           , VK_I , acFilterInvert ), _
+      ( FALT or FSHIFT or FVIRTKEY     , VK_F , acFilterHidden ), _
       ( FALT or FVIRTKEY               , VK_D , acFilterDonor ), _
       ( FALT or FVIRTKEY               , VK_P , acFilterPath ), _
       ( FALT or FSHIFT or FVIRTKEY     , VK_P , acFilterPrinted ), _
       ( FALT or FVIRTKEY               , VK_S , acFilterShortcut ), _
-      ( FALT or FSHIFT or FVIRTKEY     , VK_S , acFilterStickered ), _      
-      ( FALT or FVIRTKEY               , VK_C , acFilterMultiColor ), _
+      ( FALT or FVIRTKEY               , VK_K , acFilterStickered ), _      
+      ( FALT or FVIRTKEY               , VK_M , acFilterMultiColor ), _
       ( FALT or FSHIFT or FVIRTKEY     , VK_C , acFilterPreColored ), _      
       ( FALT or FVIRTKEY               , VK_T , acFilterTemplate ), _
       ( FALT or FVIRTKEY               , VK_A , acFilterAlias ), _
-      ( FALT or FVIRTKEY               , VK_M , acFilterMoulded ), _
-      ( FALT or FVIRTKEY               , VK_H , acFilterHelper ), _
-      ( FALT or FVIRTKEY               , VK_F , acFilterHidden ), _
-      ( FCONTROL or FVIRTKEY           , VK_S , acFilterSticker ), _
-      ( FCONTROL or FSHIFT or FVIRTKEY , VK_C , acFilterClear ), _
+      ( FALT or FSHIFT or FVIRTKEY     , VK_M , acFilterMoulded ), _
+      ( FALT or FSHIFT or FVIRTKEY     , VK_H , acFilterHelper ), _      
+      ( FCONTROL or FSHIFT or FVIRTKEY , VK_S , acFilterSticker ), _      
       ( FCONTROL or FVIRTKEY           , VK_D , acFilterDump )  _
    }
    return CreateAcceleratorTable( @AccelList(0) , ubound(AccelList)+1 )
@@ -870,9 +943,9 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
       g_hResizeEvent = CreateEvent( NULL , FALSE , FALSE , NULL )
       ThreadDetach( ThreadCreate( @Viewer.MainThread , hEventGfxReady ) )
       
-      InitFont( wfDefault , g_sMainFont   , 12 )
-      InitFont( wfStatus  , g_sMainFont  , 10 )
-      InitFont( wfEdit    , g_sFixedFont  , 12 )      
+      InitFont( wfDefault , g_sMainFont   , 12 ) 'default application font
+      InitFont( wfStatus  , g_sMainFont  , 10 )  'status bar font
+      InitFont( wfEdit    , g_sFixedFont  , 16 ) 'edit controls font
                   
       AddButtonA( wcButton , cMarginL , cMarginT , _pct(15) , cRow(1.25)  , "Build" )
       AddTextA  ( wcLines  , cMarginL , _NextRow , _pct(1.66*2) , _pct(53) ,  "" , SS_OWNERDRAW )
@@ -892,7 +965,10 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
       CloseHandle( hEventGfxReady )
       if g_GfxHwnd = 0 then return -1 'failed
       
-      InitSearchWindow()      
+      InitSearchWindow()
+      Menu.Trigger( 30001 ) 'Completion.Enable
+      'Menu.Trigger( 32003 ) 'Completion.Enable.Variations
+      
       'SetWindowPos( g_hContainer , 0 , 0,0,100,100 , SWP_NOZORDER or SWP_SHOWWINDOW or SWP_NOMOVE )
       'ShowWindow( g_hContainer , SW_SHOW )
       ResizeMainWindow( true )    
@@ -951,7 +1027,7 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
                if GetForegroundWindow() <> g_hContainer then 
                   ShowWindow( g_hContainer , SW_HIDE )
                end if
-            case EN_VSCROLL 
+            case EN_VSCROLL
                RichEdit_TopRowChange( hwndCtl )
             end select
          case wcButton
