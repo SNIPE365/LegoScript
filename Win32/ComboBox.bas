@@ -53,7 +53,7 @@ dim shared as long g_SearchVis , g_SearchRowHei
 dim shared as byte g_SearchChanged , g_DoFilterDump
 
 #define g_FilterParts (g_FilterFlags and wIsHidden)
-dim shared as long g_FilterFlags = wIsHidden , g_ReverseFilterFlags = 0
+dim shared as long g_FilterFlags = 0 , g_ReverseFilterFlags = 0 '= wIsHidden
 
 rem ------------------------- configuration -----------------------------
    #macro ForEachConfig( _Do )
@@ -456,7 +456,7 @@ function HandleTokens( sText as string , tCtx as SearchQueryContext ) as long
          .iCur = (.iTokStart-1)+len(sPart)
          if .bChanged=0 then .bChanged=-1 'changed but don't need to research
       end if  
-      
+                  
       if .bChanged then            
          
          function = .bChanged
