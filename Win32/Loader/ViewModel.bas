@@ -255,7 +255,7 @@ dim as string sModel
          next N
       else 'if there isnt a model in the clipboard, then load this:
          sModel = _    
-         "1 2 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 3024.dat" EOL _         
+         "1 2 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 4070.dat" EOL _         
          ' ------------------------------------------------------
          
          'sModel = _ 'all of lines belo should end with EOL _

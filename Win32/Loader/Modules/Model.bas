@@ -536,7 +536,9 @@ type PartSnap
    as SnapPV ptr pStud,pClutch
 end type
 
-#if 0
+'#define ShadowCalcMatrix
+
+#ifdef ShadowCalcMatrix
 sub SnapAddStud( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) )
    with tSnap
       for N as long = 0 to iCnt-1
@@ -572,11 +574,12 @@ sub SnapAddClutch( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) 
 end sub
 #else
 sub SnapAddStud( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) )   
-   with tSnap
+   with tSnap      
       for N as long = 0 to iCnt-1
         .lStudCnt += 1
         .pStud = reallocate(.pStud,sizeof(tPV)*.lStudCnt)
         .pStud[.lStudCnt-1] = tPV
+        .pStud[.lStudCnt-1].pMatOrg = 0
       next N
    end with
 end sub
@@ -647,7 +650,7 @@ sub DrawFemaleShape( fX as single , fY as single , fZ as single , fRadius as sin
 end sub
 #endif
 
-#if 0
+#ifdef ShadowCalcMatrix
 sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false , pRoot as DATFile ptr = NULL )
    #ifdef __NoRender
    bDraw=false
@@ -1136,11 +1139,20 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                   if iPrevRec>.bRecurse then iIdent -= 2
                   iPrevRec=.bRecurse '4
                   
+                  dim as single ptr pMatOri = NULL
+                  #if 0
+                     if .bFlagOriMat then 
+                        pMatOri = @.fOri(0)
+                        puts("with origin")
+                     else
+                        puts("without origin")
+                     end if
+                  #endif
+                  
                   #ifndef __Tester                   
                   #ifndef __NoRender
-                  if bDraw then
-                     
-                     if .bFlagOriMat then                        
+                  if bDraw then                     
+                     if .bFlagOriMat then
                         dim as single fMatrix(15) = { _                           
                           .fOri(0) , .fOri(3) , .fOri(6) , 0 , _ 'X scale ,    0?   ,   0?    , 0 
                           .fOri(1) , .fOri(4),  .fOri(7) , 0 , _ '  0?    , Y Scale ,   0?    , 0 
@@ -1148,9 +1160,9 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                             0      ,    0    ,    0     , 1 }
                           '-.fPosX  ,  -.fPosY , -.fPosZ  , 1 }   ' X Pos  ,  Y Pos  ,  Z Pos  , 1 
                         PushAndMultMatrix( @fMatrix(0) )
-                        #ifndef __Tester
+                        '#ifndef __Tester
                         puts("Origin!")
-                        #endif
+                        '#endif
                      end if
                      
                      'var pMat = @tMatrixStack(g_CurrentMatrix)
@@ -1300,6 +1312,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                                     DbgConnect(!"Stud += %i\n",iConCnt)
                                     'var p = pPart
                                     with *pMat
+                                       'printf(!"stud ori: %p\n",pMatOri)
                                        SnapAddStud( tSnap , iConCnt , type(fPX+.fPosX , fPY+.fPosY , fPZ+.fPosZ) )
                                     end with
                                  end if                                 

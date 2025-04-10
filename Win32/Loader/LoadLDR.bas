@@ -67,7 +67,7 @@ function LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as 
       if *pFile=0 then exit do 'last line of file so we're done SUCCESS
       iLineNum += 1 : pFile += 1 'now it point to the being of next line
    #endmacro
-   
+         
    var iPos = instrrev(sFromFile,"\") , iPos2 = instrrev(sFromFile,"/")
    if iPos2 > iPos then iPos = iPos2      
    var sShadowFile = mid(sFromFile,iPos+1)

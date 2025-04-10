@@ -46,6 +46,7 @@
 
 dim shared as HWND g_hCon=any,g_hContainer=any  'console/container
 dim shared as HWND g_hSearch=any,g_hStatus=any 'controls
+dim shared as HFONT g_hFontSearch
 dim shared as RECT g_rcCon = any , g_rcSearch
 dim shared as POINT g_rcCursor 
 dim shared as long g_ConWid,g_ConHei,g_FntWid,g_FntHei
@@ -114,6 +115,19 @@ function SearchContainerMessages( hWnd as HWND , iMsg as integer , wParam as WPA
    end select
    return DefWindowProc( hWnd , imsg , wParam , lParam)
 end function
+sub UpdateSearchWindowFont( hFont as HFONT )
+   g_hFontSearch = hFont   
+   var hTemp = CreateWindowExW( 0 , "listbox" , NULL , LBS_MULTICOLUMN , 0,0,300,300 , NULL , NULL, NULL, NULL )
+   SendMessage( hTemp , WM_SETFONT , cast(WPARAM,hFont) , false )
+   dim as RECT tRcItem = any
+   SendMessage( hTemp , LB_ADDSTRING , 0 , cast(LPARAM,@"1") )
+   SendMessage( hTemp , LB_ADDSTRING , 0 , cast(LPARAM,@"2") )
+   SendMessage( hTemp , LB_GETITEMRECT , 1 , cast(LPARAM,@tRcItem) )   
+   g_SearchRowHei = tRcItem.top
+   DestroyWindow( hTemp )
+   SendMessage( g_hSearch , WM_SETFONT , cast(WPARAM,hFont) , false )
+end sub
+   
 sub InitSearchWindow()
    
    #ifdef Standalone
@@ -154,16 +168,11 @@ sub InitSearchWindow()
       g_hStatus = CTL(wcStatus)
    #endif   
    g_hContainer = CreateWindowEx( cMainStyleEx, SearchContainer, SearchContainer ,cMainStyle,0, 0, 0, 0,g_hCon , NULL, hInstance, NULL ) 'HWND_MESSAGE   
-   g_hSearch = CreateWindowEx( 0 , "listbox" , NULL , cListBoxStyle , 0,0,300,100 , g_hContainer , NULL, hInstance, NULL )
+   g_hSearch = CreateWindowExW( 0 , "listbox" , NULL , cListBoxStyle , 0,0,300,100 , g_hContainer , NULL, hInstance, NULL )
    SetLayeredWindowAttributes( g_hContainer , 0 , 192 , LWA_ALPHA )   
-   
-   dim as RECT tRcItem = any
-   SendMessage( g_hSearch , LB_ADDSTRING , 0 , cast(LPARAM,@"1") )
-   SendMessage( g_hSearch , LB_ADDSTRING , 0 , cast(LPARAM,@"2") )
-   SendMessage( g_hSearch , LB_GETITEMRECT , 1 , cast(LPARAM,@tRcItem) )
-   SendMessage( g_hSearch , LB_RESETCONTENT , 0,0 )   
-   g_SearchRowHei = tRcItem.top
-   
+         
+   UpdateSearchWindowFont( GetStockObject(DEFAULT_GUI_FONT) )
+      
    #ifdef Standalone
    SetForegroundWindow( g_hCon )
    #endif
@@ -250,7 +259,7 @@ end type
 static shared as FilteredListDump tFilteredDump
 static shared as long g_iFilteredCount
 
-function GetPartDescription( iPart as long ) as string
+function GetPartDescription( iPart as long , byref bUnnoficial as byte=0 ) as string
    var pPart = PartStructFromIndex(iPart)   
    var sDesc = trim(pPart->zDesc), iPos=0      
    'if g_FilterParts then return sDesc
@@ -270,8 +279,8 @@ function GetPartDescription( iPart as long ) as string
       exit while
    wend
    'print pPart->zName
-   if pPart->iFolder=2 then return "[Unnoficial] "+sDesc
-   return " "+sDesc
+   if pPart->iFolder=2 then bUnnoficial = 1 : return "[Unnoficial] "+sDesc
+   bUnnoficial = 0 : return " "+sDesc
 end function
 function IsPartFiltered( pPart as SearchPartStruct ptr ) as boolean   
    if pPart=NULL then return true
@@ -309,9 +318,9 @@ function UpdateSearch(sSearch as string) as long
    SendMessage( g_hSearch , LB_RESETCONTENT , 0,0 )
    
    var hDC = GetDC(g_hSearch)
-   var hFont = cast(HFONT , SendMessage( g_hSearch , WM_GETFONT , 0 , 0 ))
+   'var hFont = cast(HFONT , SendMessage( g_hSearch , WM_GETFONT , 0 , 0 ))
    var iBigWid = 0, iCharWid = 0
-   SelectObject( hDC , hFont )
+   SelectObject( hDC , g_hFontSearch )
    
    dim as SIZE tSize
    dim as string sShowDesc
@@ -330,17 +339,33 @@ function UpdateSearch(sSearch as string) as long
          end if
          g_iFilteredCount += 1 : continue for
       end if      
-      var sDesc = GetPartDescription(iPart)
+      dim as byte bIsUnnoficial = any
+      var sDesc = GetPartDescription(iPart,bIsUnnoficial)
       'sDesc[0]=asc("~")
       if g_FilterParts andalso (sDesc[0]=asc("=") orelse sDesc[0]=asc("_")) then g_iFilteredCount += 1 : continue for
       if N >= cfg_MaxSearchParts then continue for
-      if SendMessage( g_hSearch , LB_FINDSTRING , 0 , cast(LPARAM,strptr(sName)) ) <> LB_ERR then         
-         sName = "Unoff\"+sName
-      end if
+      
+      'if SendMessage( g_hSearch , LB_FINDSTRING , 0 , cast(LPARAM,strptr(sName)) ) <> LB_ERR then         
+      '   sName = "Unoff\"+sName
+      'end if
+      
+      dim as wstring*512 wName = any
+      if bIsUnnoficial then      
+         dim as long N
+         for N = 0 to len(sName)-1
+            wName[N*2] = sName[N]
+            wName[N*2+1] = &h332 '35E
+         next N
+         wName[N*2]=0
+      else
+         wName = sName
+      end if      
+      
       GetTextExtentPoint32( hDC , sName , len(sName) , @tSize )
-      if iCharWid=0 then iCharWid = tSize.CX\len(sName)
+      if iCharWid=0 then iCharWid = (tSize.CX+(len(sName)-1))\len(sName)
       if tSize.CX >  iBigWid then iBigWid = tSize.CX      
-      var iIdx = SendMessage( g_hSearch , LB_ADDSTRING , 0 , cast(LPARAM,strptr(sName)) )
+      
+      var iIdx = SendMessageW( g_hSearch , LB_ADDSTRING , 0 , cast(LPARAM,@wName) )
       SendMessage( g_hSearch , LB_SETITEMDATA  , iIdx , iPart )                  
       if iFound=0 then sShowDesc = sDesc 
       iFound += 1      
@@ -359,7 +384,7 @@ function UpdateSearch(sSearch as string) as long
    else
       SetWindowLong( g_hSearch , GWL_STYLE , GetWindowLong( g_hSearch ,GWL_STYLE) and (not WS_HSCROLL) )
    end if
-   SetWindowPos( g_hSearch , NULL , 0,0 , (iBigWid+iCharWid)*iCols , iRows*g_SearchRowHei+iScrollHei , SWP_NOMOVE or SWP_NOZORDER or SWP_NOACTIVATE ) 
+   SetWindowPos( g_hSearch , NULL , 0,0 , (iBigWid+iCharWid)*iCols , iRows*g_SearchRowHei+iScrollHei+g_SearchRowHei\8 , SWP_NOMOVE or SWP_NOZORDER or SWP_NOACTIVATE ) 
    
    dim as POINT rCpt = g_rcCursor
    ClientToScreen( g_hCon , @rCpt )

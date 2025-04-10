@@ -22,6 +22,7 @@
 'TODO (06/03/25): check bug regarding wheel positioning and the line numbers
 'TODO (25/03/25): re-organize the LS2LDR code, so that it looks better and explain better
 'TODO (01/04/25): make enable auto-completion menu to work / add shortcut to open graphics window
+'TODO (08/04/25): verify child shadow library
 
 'the model is no longer updating, say if I remove a part, or all parts, or change something.
 
@@ -73,7 +74,7 @@ dim shared g_hCurMenu as any ptr , g_CurItemID as long , g_CurItemState as long
 
 dim shared as HANDLE g_hResizeEvent
 dim shared as hwnd g_GfxHwnd
-dim shared as byte g_DoQuit , g_Show3D
+dim shared as byte g_DoQuit , g_Show3D , g_Dock3D
 dim shared as string g_CurrentFilePath
 
 #define GiveUp(_N) return false
@@ -126,7 +127,8 @@ dim shared as string g_CurrentFilePath
       __EndSubMenu()            
    __EndSubMenu()
    __SubMenu( "&View" )
-      __Entry( meView_ToggleGW    , "&Graphics Window"    , _Ctrl , VK_G   , @View_ToggleGW ) ' , MFT_RADIOCHECK or MFS_CHECKED )      
+      __Entry( meView_ToggleGW    , "&Graphics Window"    , _Ctrl        , VK_G   , @View_ToggleGW ) ' , MFT_RADIOCHECK or MFS_CHECKED )      
+      __Entry( meView_ToggleGWDock, "&Dock GW in Main"    , _Ctrl+_Shift , VK_L   , @View_ToggleGWDock )
       __Separator()
       __Entry( meView_ResetView   , "Reset View parts"    !"\tBACKSPACE" , , , @View_Key      , MFS_GRAYED )
       __Entry( meView_NextPart    , "View &Next part"     !"\t+"         , , , @View_Key      , MFS_GRAYED )
@@ -160,6 +162,12 @@ dim shared as string g_CurrentFilePath
 #undef EnumEntry
 #undef MayEnumEntry
 #undef MayEnumSubMenu
+
+'#define ViewerShowInfo
+#define DebugShadow
+
+declare sub DockGfxWindow()
+declare sub File_SaveAs()
 
 sub LogError( sError as string )   
    var f = freefile()
@@ -319,7 +327,7 @@ namespace Viewer
                      tSz = tSzTemp
                   else
                      g_CurDraw = ((g_CurDraw+2) mod (g_DrawCount+1))-1
-                     printf(!"g_CurDraw = %i    \r",g_CurDraw)
+                     printf(!"g_CurDraw = %i    \r",g_CurDraw)                     
                   end if
                case asc("-"),asc("_")
                   if bShiftPressed then
@@ -332,6 +340,34 @@ namespace Viewer
                      g_CurDraw = ((g_CurDraw+g_DrawCount+1) mod (g_DrawCount+1))-1
                      printf(!"g_CurDraw = %i    \r",g_CurDraw)
                   end if               
+               case asc("S")-asc("@") 'shadow
+                  if g_CurDraw >=0 then
+                     'FindFile(
+                     'FindShadowFile(
+                     with pModel->tParts(g_CurDraw)
+                        if .bType=1 then                              
+                           var sFile = GetPartNameByIndex(._1.lModelIndex)
+                           if FindShadowFile(sFile) then 
+                              shell "start notepad "+sFile
+                           else
+                              MessageBox( g_GfxHwnd , sFile , "Shadow file not found" , MB_ICONWARNING )
+                           end if
+                        end if
+                     end with
+                  end if
+               case asc("M")-asc("@") 'Model
+                  if g_CurDraw >=0 then                     
+                     with pModel->tParts(g_CurDraw)
+                        if .bType=1 then                              
+                           var sFile = GetPartNameByIndex(._1.lModelIndex)
+                           if FindFile(sFile) then 
+                              shell "start notepad "+sFile
+                           else
+                              MessageBox( g_GfxHwnd , sFile , "Model file not found" , MB_ICONWARNING )
+                           end if
+                        end if
+                     end with
+                  end if
                end select
                select case e.scancode
                case fb.SC_LSHIFT : bShiftPressed or= 1
@@ -414,13 +450,15 @@ namespace Viewer
                      if abs(xMid-.xMax) > g_zFar then g_zFar = abs(xMid-.xMax)  
                      if abs(yMid-.yMax) > g_zFar then g_zFar = abs(yMid-.yMax)  
                      if abs(zMid-.zMax) > g_zFar then g_zFar = abs(zMid-.zMax)
-                     printf(!"X %f > %f (%g ldu)\n",.xMin,.xMax,(.xMax-.xMin))
-                     printf(!"Y %f > %f (%g ldu)\n",.yMin,.yMax,(.yMax-.yMin))
-                     printf(!"Z %f > %f (%g ldu)\n",.zMin,.zMax,(.zMax-.zMin))
-                     printf(!"Lines: %i - Optis: %i - Trigs: %i - Quads: %i - Verts: %i\n", _
-                        g_TotalLines , g_TotalOptis , g_TotalTrigs , g_TotalQuads , _
-                        g_TotalLines*2+g_TotalOptis*2+g_TotalTrigs*3+g_TotalQuads*4 _
-                     )
+                     #ifdef ViewerShowInfo
+                        printf(!"X %f > %f (%g ldu)\n",.xMin,.xMax,(.xMax-.xMin))
+                        printf(!"Y %f > %f (%g ldu)\n",.yMin,.yMax,(.yMax-.yMin))
+                        printf(!"Z %f > %f (%g ldu)\n",.zMin,.zMax,(.zMax-.zMin))
+                        printf(!"Lines: %i - Optis: %i - Trigs: %i - Quads: %i - Verts: %i\n", _
+                           g_TotalLines , g_TotalOptis , g_TotalTrigs , g_TotalQuads , _
+                           g_TotalLines*2+g_TotalOptis*2+g_TotalTrigs*3+g_TotalQuads*4 _
+                        )
+                     #endif
                      if bResetAttributes then
                         fPositionX = 0 '((.xMin + .xMax)\-2)-.xMin
                         fPositionY = (.yMin + .yMax)\-2
@@ -430,7 +468,9 @@ namespace Viewer
                   end with
                                  
                   CheckCollisionModel( pModel , atCollision() )
-                  printf(!"Parts: %i , Collisions: %i \n",g_PartCount,ubound(atCollision)\2)
+                  #ifdef ViewerShowInfo
+                     printf(!"Parts: %i , Collisions: %i \n",g_PartCount,ubound(atCollision)\2)
+                  #endif
                   
                   exit do 'loaded fine
                   
@@ -622,7 +662,6 @@ sub Button_Compile()
       EndCatch()
    EndTry()
 end sub
-declare sub File_SaveAs()
 '**************** Main Menu Layout **************
 sub File_New()
    if GetWindowTextLength( CTL(wcEdit) ) then
@@ -705,7 +744,7 @@ sub File_SaveAs()
       File_Save()      
    end with
 end sub
-sub File_Exit()
+sub File_Exit()   
    SendMessage( CTL(wcMain) , WM_CLOSE , 0,0 )
 end sub
 sub Edit_Undo()
@@ -757,11 +796,23 @@ end sub
 sub View_ToggleGW()
    var iToggledState = g_CurItemState xor MFS_CHECKED
    g_Show3D = (iToggledState and MFS_CHECKED)<>0
-   if g_GfxHwnd then ShowWindow( g_GfxHwnd , iif( g_Show3D , SW_SHOWNA , SW_HIDE ) )
+   if g_GfxHwnd then      
+      ShowWindow( g_GfxHwnd , iif( g_Show3D , SW_SHOWNA , SW_HIDE ) )
+      if g_Show3D then
+         SetWindowPos( g_GfxHwnd , HWND_TOPMOST , 0,0,0,0 , SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE)
+         SetWindowPos( g_GfxHwnd , HWND_NOTOPMOST , 0,0,0,0 , SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE)
+      end if
+   end if   
    Menu.MenuState( g_hCurMenu,g_CurItemID, iToggledState )
    for N as long = meView_ResetView to meView_PrevBoxPart 'View.*
       EnableMenuItem( g_hCurMenu , N , iif( iToggledState and MFS_CHECKED , MF_ENABLED , MF_GRAYED ) )
    next N
+end sub
+sub View_ToggleGWDock()
+   var iToggledState = g_CurItemState xor MFS_CHECKED
+   g_Dock3D = (iToggledState and MFS_CHECKED)<>0
+   if g_Dock3D andalso g_GfxHwnd then DockGfxWindow()
+   Menu.MenuState( g_hCurMenu,g_CurItemID, iToggledState )   
 end sub
 sub View_Key()
    if IsWindow(g_GfxHwnd)=0 then exit sub
@@ -937,7 +988,7 @@ function CreateMainAccelerators() as HACCEL
    return CreateAcceleratorTable( @AccelList(0) , ubound(AccelList)+1 )
 end function
 
-sub DockGfxWindow()   
+sub DockGfxWindow()
    dim as RECT RcWnd=any,RcGfx=any,RcCli=any,RcDesk
    GetWindowRect( GetDesktopWindow() , @RcDesk )
    GetWindowRect( g_GfxHwnd , @RcGfx )
@@ -947,12 +998,17 @@ sub DockGfxWindow()
    dim as POINT tPtRight = type(RcCli.Right-3,0)
    ClientToScreen( CTL(wcMain) , @tPtRight )   
    var hPlace = HWND_TOP
-   if tPtRight.x >= (RcDesk.right-8) then 
-      hPlace = HWND_TOPMOST : tPtRight.x -= (RcGfx.right - RcGfx.left)
+   'if tPtRight.x >= (RcDesk.right-8) then 
+   '   hPlace = HWND_TOPMOST : tPtRight.x -= (RcGfx.right - RcGfx.left)
+   'end if
+   RcDesk.right += 10 'This can be acquired with GetSystemMetrics?
+   var GfxWid = (RcGfx.right - RcGfx.left)
+   if (tPtRight.x+GfxWid) >= RcDesk.right then 
+      hPlace = HWND_TOPMOST : tPtRight.x = RcDesk.right-GfxWid
    end if
    'gfx.tOldPt.x = -65537
-   SetWindowPos( g_GfxHwnd , hPlace , tPtRight.x-4 ,iYPos , 0,0 , SWP_NOSIZE or SWP_NOACTIVATE )
-   NotifySelChange( wcEdit )
+   SetWindowPos( g_GfxHwnd , hPlace , tPtRight.x-4 ,iYPos , 0,0 , SWP_NOSIZE or SWP_NOACTIVATE or ((g_Dock3D=0) and SWP_NOMOVE) )
+   'NotifySelChange( wcEdit ) ??Why this was here??
 end sub   
 sub ResizeMainWindow( bCenter as boolean = false )         
    'Calculate Client Area Size
@@ -979,7 +1035,9 @@ sub ResizeMainWindow( bCenter as boolean = false )
    end if
       
    'recalculate control sizes based on window size
+   ShowWindow( g_hContainer , SW_HIDE )
    ResizeLayout( hWnd , g_tMainCtx.tForm , RcCli.right , RcCli.bottom )
+   if g_hSearch then UpdateSearchWindowFont( g_tMainCtx.hFnt(wfStatus).HFONT )      
    MoveWindow( CTL(wcStatus) ,0,0 , 0,0 , TRUE )
    dim as long aWidths(2-1) = {RcCli.right*.85,-1}
    SendMessage( CTL(wcStatus) , SB_SETPARTS , 2 , cast(LPARAM,@aWidths(0)) )
@@ -989,10 +1047,14 @@ sub ResizeMainWindow( bCenter as boolean = false )
 end sub
 
 static shared as any ptr OrgEditProc
-function WndProcEdit ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LPARAM ) as LRESULT
+function WndProcEdit ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LPARAM ) as LRESULT   
    select case message
+   case WM_KEYDOWN      
+      if wParam=VK_ESCAPE then          
+         return CallWindowProc( OrgEditProc , hWnd , EM_SETSEL , -1 , 0 )            
+      end if      
    case WM_CHAR
-      select case wParam
+      select case wParam      
       case 3,24 'Ctrl-C / Ctrl-X
          var lResu = CallWindowProc( OrgEditProc , hWnd , message , wParam, lParam )      
          GetClipboard() : return lResu
@@ -1014,12 +1076,130 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
    #include "LSModules\ControlsMacros.bas"
    
    select case( message )       
-   case WM_DRAWITEM
+   case WM_DRAWITEM   'item in a control is being drawn (owner draw)
       var wID = clng(wParam) , ptDrw = cast(LPDRAWITEMSTRUCT,lparam)
       select case wId
       case wcLines : Lines_Draw( CTL(wcEdit) , *ptDrw )
       end select
-   case WM_CREATE 'Window was created
+   
+   case WM_TIMER
+      dim as Matrix4x4 tMat
+      tMat = g_tIdentityMatrix
+      static as double dBeg : if dBeg = 0 then dBeg = timer
+      MatrixRotateX( tMat , tMat , timer-dBeg )
+      dim as zstring*256 zOutput = any
+      with tMat
+         sprintf(zOutput,!"1 %i %f %f %f %g %g %g %g %g %g %g %g %g %s\r\n",16,.fPosX,.fPosY,.fPosZ, _
+            .m(0),.m(1),.m(2),.m(4),.m(5),.m(6),.m(8),.m(9),.m(10) , "3011.dat" )
+      end with
+      Viewer.LoadMemory( zOutput , "memory.ldr" )
+   case WM_MENUSELECT 'track newest menu handle/item/state
+      var iID = cuint(LOWORD(wParam)) , fuFlags = cuint(HIWORD(wParam)) , hMenu = cast(HMENU,lParam) 
+      if hMenu then g_CurItemID = iID : g_hCurMenu = hMenu            
+      return 0
+   case WM_NOTIFY     'notification from window/control
+      var wID = cast(long,wParam) , pnmh = cptr(LPNMHDR,lParam)
+      select case wID
+      case wcEdit
+         select case pnmh->code         
+         case EN_SELCHANGE
+            with *cptr(SELCHANGE ptr,lParam)
+               'static as CHARRANGE tPrev = type(-1,-1)
+               var iRow = SendMessage( CTL(wID) , EM_EXLINEFROMCHAR , 0 , .chrg.cpMax )
+               var iCol = .chrg.cpMax - SendMessage( CTL(wID) , EM_LINEINDEX  , iRow , 0 )               
+               dim as zstring*64 zPart = any : sprintf(zPart,"%i : %i",iRow+1,iCol+1)
+               'printf(!"(%s) > %i to %i    \r",,,.chrg.cpMin,.chrg.cpMax)
+               SendMessage( CTL(wcStatus) , SB_SETTEXT , spCursor , cast(LPARAM,@zPart) ) 
+               RichEdit_TopRowChange( CTL(wID) )
+               RichEdit_SelChange( CTL(wID) , iRow , iCol )
+            end with
+         end select
+      end select
+      return 0
+   case WM_COMMAND    'Event happened to a control (child window)
+      var wNotifyCode = cint(HIWORD(wParam)), wID = LOWORD(wParam) , hwndCtl = cast(.HWND,lParam)      
+      if hwndCtl=0 andalso wNotifyCode=0 then wNotifyCode = -1      
+      select case wNotifyCode
+      case -1         'Command from Menu
+         if wID <> g_CurItemID then return 0 'not valid menu event
+         dim as MENUITEMINFO tItem = type( sizeof(MENUITEMINFO) , MIIM_DATA or MIIM_STATE )  
+         GetMenuItemInfo( g_hCurMenu , wID , false , @tItem )
+         g_CurItemState = tItem.fState
+         if tItem.dwItemData then
+           dim MenuItemCallback as sub () = cast(any ptr,tItem.dwItemData)
+           MenuItemCallback()        
+         end if
+         g_CurItemID = 0 : g_hCurMenu = 0
+      case  1         'Accelerator
+         ProcessAccelerator( wID )
+      case else
+         select case wID                  
+         case wcEdit
+            select case wNotifyCode
+            case EN_SETFOCUS               
+               ShowWindow( g_hContainer , g_SearchVis   )               
+            case EN_KILLFOCUS
+               'printf(!"%p (%p) (%p)\n",GetFocus(),g_hContainer,CTL(wcEdit))
+               'if GetForegroundWindow() <> g_hContainer then 
+               var hFocus = GetFocus()
+               if hFocus=0 orelse (hFocus <> g_hSearch andalso hFocus<>g_hContainer andalso hFocus <> CTL(wcEdit)) then
+                  ShowWindow( g_hContainer , SW_HIDE )
+               end if
+            case EN_VSCROLL
+               RichEdit_TopRowChange( hwndCtl )
+            end select
+         case wcButton
+            select case wNotifyCode
+            case BN_CLICKED
+               Button_Compile()            
+            end select
+         end select
+      end select      
+      
+      return 0
+    
+   case WM_SIZE       'window is sizing/was sized
+      ResizeMainWindow()
+      return 0
+   case WM_MOVE       'window is moving/was moved
+      DockGfxWindow()
+   case WM_USER+1 'gfx resized
+      SetEvent(g_hResizeEvent)
+      DockGfxWindow()
+   case WM_USER+2 'gfx moved
+      DockGfxWindow()
+   case WM_USER+3 'Resize Number border
+      SetControl( wcLines , cMarginL , _BtP(wcButton,0.5) , _pct((.18+1.52*g_RowDigits)) , _pct(53) , CTL(wcLines) )
+      ResizeMainWindow()      
+   case WM_ACTIVATE  'Activated/Deactivated
+      if g_GfxHwnd andalso g_Show3D then
+         var fActive = LOWORD(wParam) , fMinimized = HIWORD(wParam) , hwndPrevious = cast(HWND,lParam)
+         if fActive then            
+            DockGfxWindow()            
+            SetWindowPos( g_GfxHwnd , HWND_TOPMOST , 0,0,0,0 , SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE)
+            SetWindowPos( g_GfxHwnd , HWND_NOTOPMOST , 0,0,0,0 , SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE)
+            'SetFocus( CTL(wcMain) )
+         else
+            if fMinimized then                              
+               ShowWindow( g_GfxHwnd , SW_HIDE )
+            else
+               SetWindowPos( g_GfxHwnd , HWND_NOTOPMOST , 0,0 , 0,0 , SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE )
+            end if
+         end if
+      end if
+   #if 0
+   case WM_ACTIVATEAPP
+      var fActive = wParam
+      'if GetForegroundWindow() <> g_hContainer then fActive = (GetFocus = CTL(wcEdit))
+      if fActive then
+         ShowWindow( g_hContainer , g_SearchVis   )
+      else
+         ShowWindow( g_hContainer , SW_HIDE )
+      end if
+   #endif
+   case WM_ENTERMENULOOP , WM_ENTERSIZEMOVE  
+     ShowWindow( g_hContainer , SW_HIDE )
+   case WM_CREATE  'Window was created
                   
       if CTL(wcMain) then return 0
       _InitForm()
@@ -1052,6 +1232,7 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
       
       InitSearchWindow()
       Menu.Trigger( meCompletion_Enable )
+      Menu.Trigger( meView_ToggleGWDock )
       'Menu.Trigger( meCompletion_Variations )
       
       'SetWindowPos( g_hContainer , 0 , 0,0,100,100 , SWP_NOZORDER or SWP_SHOWWINDOW or SWP_NOMOVE )
@@ -1061,108 +1242,12 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
       'LoadFileIntoEditor( exePath+"\sample.ls" )
       SetForegroundWindow( ctl(wcMain) )
       SetFocus( ctl(wcEdit) )
-      return 0
-          
-   case WM_MENUSELECT 'track newest menu handle/item/state
-      var iID = cuint(LOWORD(wParam)) , fuFlags = cuint(HIWORD(wParam)) , hMenu = cast(HMENU,lParam) 
-      if hMenu then g_CurItemID = iID : g_hCurMenu = hMenu            
-      return 0
-   case WM_NOTIFY
-      var wID = cast(long,wParam) , pnmh = cptr(LPNMHDR,lParam)
-      select case wID
-      case wcEdit
-         select case pnmh->code
-         case EN_SELCHANGE
-            with *cptr(SELCHANGE ptr,lParam)
-               'static as CHARRANGE tPrev = type(-1,-1)
-               var iRow = SendMessage( CTL(wID) , EM_EXLINEFROMCHAR , 0 , .chrg.cpMax )
-               var iCol = .chrg.cpMax - SendMessage( CTL(wID) , EM_LINEINDEX  , iRow , 0 )               
-               dim as zstring*64 zPart = any : sprintf(zPart,"%i : %i",iRow+1,iCol+1)
-               'printf(!"(%s) > %i to %i    \r",,,.chrg.cpMin,.chrg.cpMax)
-               SendMessage( CTL(wcStatus) , SB_SETTEXT , spCursor , cast(LPARAM,@zPart) ) 
-               RichEdit_TopRowChange( CTL(wID) )
-               RichEdit_SelChange( CTL(wID) , iRow , iCol )
-            end with
-         end select
-      end select
-      return 0
-   case WM_COMMAND 'Event happened to a control (child window)
-      var wNotifyCode = cint(HIWORD(wParam)), wID = LOWORD(wParam) , hwndCtl = cast(.HWND,lParam)      
-      if hwndCtl=0 andalso wNotifyCode=0 then wNotifyCode = -1      
-      select case wNotifyCode
-      case -1         'Command from Menu
-         if wID <> g_CurItemID then return 0 'not valid menu event
-         dim as MENUITEMINFO tItem = type( sizeof(MENUITEMINFO) , MIIM_DATA or MIIM_STATE )  
-         GetMenuItemInfo( g_hCurMenu , wID , false , @tItem )
-         g_CurItemState = tItem.fState
-         if tItem.dwItemData then
-           dim MenuItemCallback as sub () = cast(any ptr,tItem.dwItemData)
-           MenuItemCallback()        
-         end if
-         g_CurItemID = 0 : g_hCurMenu = 0
-      case  1         'Accelerator
-         ProcessAccelerator( wID )
-      case else
-         select case wID                  
-         case wcEdit
-            select case wNotifyCode
-            case EN_SETFOCUS               
-               ShowWindow( g_hContainer , g_SearchVis   )               
-            case EN_KILLFOCUS
-               if GetForegroundWindow() <> g_hContainer then 
-                  ShowWindow( g_hContainer , SW_HIDE )
-               end if
-            case EN_VSCROLL
-               RichEdit_TopRowChange( hwndCtl )
-            end select
-         case wcButton
-            select case wNotifyCode
-            case BN_CLICKED
-               Button_Compile()            
-            end select
-         end select
-      end select      
+      
+      'SetTimer( hwnd , 1 , 100 , NULL )      
       
       return 0
-    
-   case WM_SIZE      
-      ResizeMainWindow()
-      return 0
-   case WM_MOVE
-      DockGfxWindow()
-   case WM_USER+1 'gfx resized
-      SetEvent(g_hResizeEvent)
-      DockGfxWindow()
-   case WM_USER+2 'gfx moved
-      DockGfxWindow()
-   case WM_USER+3 'Resize Number border
-      SetControl( wcLines , cMarginL , _BtP(wcButton,0.5) , _pct((.18+1.52*g_RowDigits)) , _pct(53) , CTL(wcLines) )
-      ResizeMainWindow()      
-   case WM_ACTIVATE  'Activated/Deactivated
-      if g_GfxHwnd andalso g_Show3D then
-         var fActive = LOWORD(wParam) , fMinimized = HIWORD(wParam) , hwndPrevious = cast(HWND,lParam)
-         if fActive then
-            ShowWindow( g_GfxHwnd , SW_SHOWNA )            
-            DockGfxWindow()
-         else
-            if fMinimized then                              
-               ShowWindow( g_GfxHwnd , SW_HIDE )
-            else
-               SetWindowPos( g_GfxHwnd , HWND_NOTOPMOST , 0,0 , 0,0 , SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE )
-            end if
-         end if
-      end if
-   #if 0
-   case WM_ACTIVATEAPP
-      var fActive = wParam
-      'if GetForegroundWindow() <> g_hContainer then fActive = (GetFocus = CTL(wcEdit))
-      if fActive then
-         ShowWindow( g_hContainer , g_SearchVis   )
-      else
-         ShowWindow( g_hContainer , SW_HIDE )
-      end if
-   #endif
-   case WM_CLOSE
+          
+   case WM_CLOSE   'close button was clicked
       if GetWindowTextLength( CTL(wcEdit) ) then
          #define sMsg !"All unsaved data will be lost, quit anyway?"
          if MessageBox( CTL(wcMain) , sMsg , "File->Quit" , MB_ICONQUESTION or MB_YESNO ) <> IDYES then return 0
@@ -1224,13 +1309,23 @@ sub WinMain ()
    ' *** all messages(events) will be read converted/dispatched here ***
    ShowWindow( hWnd , SW_SHOW )
    UpdateWindow( hWnd )
-  
+     
+   dim as HWND hOldFocus = cast(HWND,-1)
    while( GetMessage( @tMsg, NULL, 0, 0 ) <> FALSE )    
-      if TranslateAccelerator( hWnd , hAcceleratos , @tMsg ) then continue while
+      if TranslateAccelerator( hWnd , hAcceleratos , @tMsg ) then continue while      
       if IsDialogMessage( hWnd , @tMsg ) then continue while
       TranslateMessage( @tMsg )
       DispatchMessage( @tMsg )    
       ProcessMessage( tMsg )
+      var hFocus = GetFocus()
+      if hFocus <> hOldFocus then
+         hOldFocus = hFocus
+         if g_hContainer andalso g_hSearch then
+            if hFocus=NULL orelse (hFocus <> g_hSearch andalso hFocus <> g_hContainer andalso hFocus <> CTL(wcEdit)) then
+               ShowWindow( g_hContainer , SW_HIDE )
+            end if
+         end if
+      end if
    wend    
 
 end sub

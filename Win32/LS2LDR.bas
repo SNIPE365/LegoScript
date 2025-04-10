@@ -402,7 +402,7 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
       next N
    #endmacro
    
-   DebugParts()   
+   'DebugParts()   
    #if 1
       'generate LDRAW and check collisions
       if iStNext=0 andalso g_iPartCount>0 then      
@@ -496,22 +496,28 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
                   'pLeft/pRight are the snap matrix for the piece stud/clutch
                                           
                   with g_tPart(iRightPart_)                              
-                     if memcmp( @pLeftPart->tMatrix , @g_tBlankMatrix , sizeof(Matrix4x4) ) = 0 then
-                        'if memcmp( @pRightPart->tMatrix , @g_tBlankMatrix , sizeof(Matrix4x4) ) = 0 then                  
-                           .tMatrix = g_tIdentityMatrix
-                        'else
-                        '   .tMatrix =pRightPart->tMatrix
-                        'end if
-                     else
-                        .tMatrix = pLeftPart->tMatrix
-                     end if
+                     'if memcmp( @pLeftPart->tMatrix , @g_tBlankMatrix , sizeof(Matrix4x4) ) = 0 then                        
+                     '   'if memcmp( @pRightPart->tMatrix , @g_tBlankMatrix , sizeof(Matrix4x4) ) = 0 then                  
+                     '      .tMatrix = g_tIdentityMatrix
+                     '   'else
+                     '   '   .tMatrix =pRightPart->tMatrix
+                     '   'end if
+                     'else
+                     .tMatrix = pLeftPart->tMatrix
+                     'end if
                      with *(pLeft->pMatOrg)
                         '.fPosX = 0
                         '.fPosY = 100
                         '.fPosZ = 0
                      end with
-                     : if pLeft->pMatOrg then MultMatrix4x4( .tMatrix , .tMatrix , pLeft->pMatOrg )
-                     : if pRight->pMatOrg then MultMatrix4x4( .tMatrix , .tMatrix , pRight->pMatOrg )
+                     if pLeft->pMatOrg then 
+                        puts("Prev rotation")
+                        MultMatrix4x4( .tMatrix , .tMatrix , pLeft->pMatOrg )
+                     end if
+                     if pRight->pMatOrg then 
+                        puts("Auto Rotating")
+                        MultMatrix4x4( .tMatrix , .tMatrix , pRight->pMatOrg )
+                     end if
                      if .tLocation.fAX then MatrixRotateX( .tMatrix , .tMatrix , .tLocation.fAX )
                      if .tLocation.fAY then MatrixRotateY( .tMatrix , .tMatrix , .tLocation.fAY )
                      if .tLocation.fAZ then MatrixRotateZ( .tMatrix , .tMatrix , .tLocation.fAZ )
@@ -599,7 +605,7 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
          ''sleep
       end if
    #endif   
-   DebugParts()
+   'DebugParts()
          
    clear sToken(0),0,16*sizeof(fbStr) ': erase sToken
    clear sStatement,0,sizeof(fbStr)   ': sStatement = ""

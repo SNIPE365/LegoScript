@@ -150,7 +150,7 @@ sub MatrixRotateZ( tmOut as Matrix4x4 , tmIn as Matrix4x4 , fAngle as single )
    dim as single sMat(15) = { _
       cos(fAngle) , -sin(fAngle) , 0 , 0 , _
       sin(fAngle) ,  cos(fAngle) , 0 , 0 , _
-          0       ,      0       , 0 , 0 , _
+          0       ,      0       , 1 , 0 , _
           0       ,      0       , 0 , 1 _
    }   
    MultMatrix4x4WithVector3x3( tmOut , tmIn , @sMat(0) )
