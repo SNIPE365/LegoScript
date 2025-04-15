@@ -109,6 +109,9 @@ function SearchContainerMessages( hWnd as HWND , iMsg as integer , wParam as WPA
          select case wNotifyCode
          case LBN_SELCHANGE
             g_SearchChanged = true
+            #ifndef Standalone
+              SendMessage( g_hCon , WM_KEYDOWN , 0 , 0 )
+            #endif
          end select
       end select
       return 0
@@ -193,6 +196,7 @@ sub ProcessMessage( tMsg as MSG )
             end with            
             WriteConsoleInput( GetStdHandle(STD_INPUT_HANDLE) , @tEvent , 1 , @dwWritten )
          #else
+            SetFocus( g_hCon )            
             SendMessage( g_hCon , WM_CHAR , asc(" ") , 1 or (fb.SC_SPACE shl 16) or (1 shl 30) )
          #endif
          exit sub 'continue while
@@ -210,14 +214,14 @@ sub ProcessMessage( tMsg as MSG )
                   .wVirtualScanCode = (tMsg.lParam shr 16) and 255
                   .uChar.AsciiChar = iif(tMsg.wParam=VK_BACK,8,asc(" "))
                   .dwControlKeyState = 0
-               end with            
+               end with
                WriteConsoleInput( GetStdHandle(STD_INPUT_HANDLE) , @tEvent , 1 , @dwWritten )
             end if
          #else
-            if tMsg.wParam = VK_SPACE orelse tMsg.wParam = VK_BACK then             
-               tMsg.hwnd = g_hCon
+            if tMsg.wParam = VK_SPACE orelse tMsg.wParam = VK_BACK then
+               SetFocus( g_hCon ) : tMsg.hwnd = g_hCon
                TranslateMessage( @tMsg )
-               'DispatchMessage( @tMsg )
+               DispatchMessage( @tMsg )
             end if
             'SendMessage( g_hCon , WM_CHAR , asc(" ") , 1 or (fb.SC_SPACE shl 16) or (1 shl 30) )
          #endif
@@ -427,7 +431,7 @@ end sub
 
 type SearchQueryContext
    as byte bChanged=1 , bRecalcTokens=TRUE , iTokCnt=any , iCurTok=any , iMaxTok = 8
-   as long iCur,iTokStart=1,iTokEnd=1
+   as long iCur,iTokStart=1,iTokEnd=1,iRow,iCol
    as string sCaption , sStatusText , sToken = ""
    redim as string sTokenTxt(any)
 end type
@@ -476,8 +480,14 @@ function HandleTokens( sText as string , tCtx as SearchQueryContext ) as long
          var iPart = SendMessage( g_hSearch , LB_GETITEMDATA , iSel , 0 )
          var pPart = PartStructFromIndex(iPart), sPart = pPart->zName
          sPart = left(sPart,instrrev(sPart,".")-1)
-         SetWindowText( g_hStatus , GetPartDescription(iPart) )
+         SetWindowText( g_hStatus , GetPartDescription(iPart) )         
          sText = left(sText,.iTokStart-1)+sPart+mid(sText,.iTokEnd+1)
+         #ifndef Standalone
+            'update text in edit box without sending selection changed messages
+            var iRowBegin = SendMessage( CTL(wcEdit) , EM_LINEINDEX  , .iRow , 0 )
+            RichEdit_Replace(  CTL(wcEdit) , iRowBegin+.iTokStart-1 , iRowBegin+.iTokEnd , sPart , false )            
+         #endif
+         
          .iCur = (.iTokStart-1)+len(sPart)
          if .bChanged=0 then .bChanged=-1 'changed but don't need to research
       end if  
@@ -523,6 +533,30 @@ function HandleTokens( sText as string , tCtx as SearchQueryContext ) as long
       end if
    end with
 end function
+sub SearchAddPartSuffix( sText as string , tCtx as SearchQueryContext )
+   with tCtx
+      if g_SearchVis<>SW_HIDE andalso .iCur=.iTokEnd then
+         var iSel  = SendMessage( g_hSearch , LB_GETCURSEL , 0 , 0 )               
+         if iSel <> LB_ERR then               
+            var iPart = SendMessage( g_hSearch , LB_GETITEMDATA , iSel , 0 )                  
+            var sDesc = GetPartDescription( iPart )
+            for N as long = 0 to len(sDesc)-1
+               select case sDesc[N]
+               case asc("0") to asc("9"),asc("A") to asc("Z"),asc("a") to asc("z"): exit for
+               end select
+               sDesc[N]=asc(" ")
+            next N                  
+            if instr(sDesc,"hinge")=0 then
+               if instr(sDesc," plate") then 
+                  sText += "P"                  
+               elseif instr(sDesc," brick") then
+                  sText += "B"
+               end if
+            end if
+         end if
+      end if
+   end with
+end sub
 
 #ifdef Standalone
 function QueryText( sTextOrg as string ) as long   
@@ -672,28 +706,7 @@ function QueryText( sTextOrg as string ) as long
          case else          'printable  - add to the string
             ''if iKey<>32 andalso (len(sText)=0 orelse sText[iCur-1]=32) then bReCalcTokens=true 'recalc every space
             ''if iKey=32 then bRecalcTokens=true
-            if iKey=32 then
-               if g_SearchVis=SW_SHOWNA andalso .iCur=.iTokEnd then
-                  var iSel  = SendMessage( g_hSearch , LB_GETCURSEL , 0 , 0 )               
-                  if iSel <> LB_ERR then               
-                     var iPart = SendMessage( g_hSearch , LB_GETITEMDATA , iSel , 0 )                  
-                     var sDesc = GetPartDescription( iPart )
-                     for N as long = 0 to len(sDesc)-1
-                        select case sDesc[N]
-                        case asc("0") to asc("9"),asc("A") to asc("Z"),asc("a") to asc("z"): exit for
-                        end select
-                        sDesc[N]=asc(" ")
-                     next N                  
-                     if instr(sDesc,"hinge")=0 then
-                        if instr(sDesc," plate") then 
-                           sKey += "P"                  
-                        elseif instr(sDesc," brick") then
-                           sKey += "B"
-                        end if
-                     end if
-                  end if
-               end if
-            end if
+            if iKey=32 then SearchAddPartSuffix( sText , tCtx )            
             sText = left(sText,.iCur)+sKey+mid(sText,.iCur+1) 
             .iCur += len(sKey): if .iCur>iViewWid then iStart = iViewWid-.iCur         
             .bChanged = 1

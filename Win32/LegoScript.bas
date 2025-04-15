@@ -77,6 +77,10 @@ dim shared as hwnd g_GfxHwnd
 dim shared as byte g_DoQuit , g_Show3D , g_Dock3D
 dim shared as string g_CurrentFilePath
 
+declare sub DockGfxWindow()
+declare sub File_SaveAs()
+declare sub RichEdit_Replace( hCtl as HWND , iStart as long , iEnd as long , sText as string , bKeepSel as long = true )
+
 #define GiveUp(_N) return false
 
 #include "Loader\LoadLDR.bas"
@@ -164,10 +168,7 @@ dim shared as string g_CurrentFilePath
 #undef MayEnumSubMenu
 
 '#define ViewerShowInfo
-#define DebugShadow
-
-declare sub DockGfxWindow()
-declare sub File_SaveAs()
+'#define DebugShadow
 
 sub LogError( sError as string )   
    var f = freefile()
@@ -896,6 +897,8 @@ end function
 static shared as long g_iPrevTopRow = 0 , g_iPrevRowCount = 0 , g_RowDigits = 2
 static shared as zstring*128 g_zRows
 static shared as SearchQueryContext g_SQCtx
+static shared as string sLastSearch
+
 sub Lines_Draw( hEdit as HWND , tDraw as DRAWITEMSTRUCT )   
    with tDraw      
       dim PT as POINT = any
@@ -909,6 +912,16 @@ sub Lines_Draw( hEdit as HWND , tDraw as DRAWITEMSTRUCT )
       'SetTextAlign( .hdc , TA_RIGHT )
       'ExtTextOut( .hDC , .rcItem.right , .rcItem.top , ETO_CLIPPED or ETO_OPAQUE , @.rcItem , g_zRows , len(g_zRows) , NULL )
    end with
+end sub
+sub RichEdit_Replace( hCtl as HWND , iStart as long , iEnd as long , sText as string , bKeepSel as long = true )
+   var iMask = SendMessage( hCtl , EM_GETEVENTMASK   , 0 , 0 )                     
+   dim as CHARRANGE tRange = any
+   if bKeepSel then SendMessage( hCtl , EM_EXGETSEL , 0 , cast(LPARAM,@tRange) )
+   SendMessage( hCtl , EM_SETEVENTMASK , 0 , iMask and (not ENM_SELCHANGE))
+   SendMessage( hCtl , EM_SETSEL , iStart , iEnd ) 
+   SendMessage( hCtl , EM_REPLACESEL , false , cast(LPARAM,strptr(sText)) )
+   if bKeepSel then SendMessage( hCtl , EM_EXSETSEL , 0 , cast(LPARAM,@tRange) )
+   SendMessage( hCtl , EM_SETEVENTMASK , 0 , iMask)
 end sub
 sub RichEdit_TopRowChange( hCtl as HWND )
    var iTopRow = SendMessage( hCTL , EM_GETFIRSTVISIBLELINE , 0,0 )
@@ -934,9 +947,9 @@ sub RichEdit_TopRowChange( hCtl as HWND )
       'SetWindowText( CTL(wcLines) , zRows )      
    end if
 end sub
-sub RichEdit_SelChange( hCtl as HWND , iRow as long , iCol as long )   
-   
+sub RichEdit_SelChange( hCtl as HWND , iRow as long , iCol as long )
    'changed to edit (for now?) only matter if Auto Completion is enabled
+   g_SQCtx.iRow = iRow : g_SQCtx.iCol = iCol
    if Menu.IsChecked(meCompletion_Enable)=0 then exit sub
    
    #define zRow t.zRow_      
@@ -950,21 +963,47 @@ sub RichEdit_SelChange( hCtl as HWND , iRow as long , iCol as long )
    var iSz = SendMessage( hCtl , EM_GETLINE , iRow , cast(LRESULT,@t) )
    if iSz < 0 orelse iSz > 1023 then exit sub   
    var iWid = 80 : zRow[iSz-2]=0   
-   'printf( !"%i:%s\r",iSz,left(zRow+space(iWid-6),iWid-5) )   
+   'printf( !"%i:%s\t%f\r",iSz,left(zRow+space(iWid-6),iWid-5),timer )   
    with g_SQCtx
       if ubound(.sTokenTxt) < 0 then redim .sTokenTxt(.iMaxTok-1)      
       .bChanged = 1 : .iCur = iCol 'instr( iCol+1 , zRow , " " )-1
       'if .iCur < 0 then .iCur = iSz-2
    end with
-   dim as string sRow = zRow
+   sLastSearch = zRow
+   
    Try()
-      HandleTokens( sRow , g_SQCtx )
+      HandleTokens( sLastSearch , g_SQCtx )
       Catch()
          LogError( "Auto completion Crashed!!!" )
       EndCatch()
    EndTry()
    
 end sub
+function RichEdit_KeyPress( hCtl as HWND , iKey as long , iMod as long ) as long
+         
+   select case iKey     
+   case VK_TAB
+      if iMod=_Shift orelse iMod=0 then 'andalso len(.sToken)>1 then
+         var iCount = SendMessage( g_hSearch , LB_GETCOUNT , 0 , 0 )
+         var iSel   = SendMessage( g_hSearch , LB_GETCURSEL , 0 , 0 )
+         var iSelOrg = iSel
+         if iSel = LB_ERR then iSel=0 else iSel = (iSel+iCount+iif(iMod=0,1,-1)) mod iCount
+         SendMessage( g_hSearch , LB_SETCURSEL , iSel , 0 )
+         g_SearchChanged = true         
+      end if      
+   end select
+   
+   if g_SearchChanged then      
+      Try()
+         HandleTokens( sLastSearch , g_SQCtx )
+         Catch()
+            LogError( "Auto completion Crashed!!!" )
+         EndCatch()
+      EndTry()
+   end if
+   
+   return 0
+end function
 
 sub ProcessAccelerator( iID as long )
    select case iID
@@ -1048,13 +1087,36 @@ end sub
 
 static shared as any ptr OrgEditProc
 function WndProcEdit ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LPARAM ) as LRESULT   
+   static as long iMod   
+
    select case message
    case WM_KEYDOWN      
-      if wParam=VK_ESCAPE then          
-         return CallWindowProc( OrgEditProc , hWnd , EM_SETSEL , -1 , 0 )            
-      end if      
+      select case wParam
+      case VK_SHIFT   : iMod or= FSHIFT
+      case VK_MENU    : iMod or= FALT
+      case VK_CONTROL : iMod or= FCONTROL
+      case else
+         var iResu = RichEdit_KeyPress( hWnd , wParam , iMod ) 
+         if iResu then return iResu
+      end select      
+      if wParam=VK_ESCAPE then return CallWindowProc( OrgEditProc , hWnd , EM_SETSEL , -1 , 0 )
+   case WM_KEYUP
+      select case wParam
+      case VK_SHIFT   : iMod and= (not FSHIFT)
+      case VK_MENU    : iMod and= (not FALT)
+      case VK_CONTROL : iMod and= (not FCONTROL)
+      end select
+   case WM_ACTIVATE
+      iMod = 0
    case WM_CHAR
       select case wParam      
+      case asc(" ")
+         var sFix = "" : SearchAddPartSuffix( sFix , g_SQCtx )
+         if len(sFix) then
+            for N as long = 0 to len(sFix)
+               PostMessage( hWnd , WM_CHAR , sFix[N] , 0 )
+            next N         
+         end if
       case 3,24 'Ctrl-C / Ctrl-X
          var lResu = CallWindowProc( OrgEditProc , hWnd , message , wParam, lParam )      
          GetClipboard() : return lResu
@@ -1106,7 +1168,7 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
             with *cptr(SELCHANGE ptr,lParam)
                'static as CHARRANGE tPrev = type(-1,-1)
                var iRow = SendMessage( CTL(wID) , EM_EXLINEFROMCHAR , 0 , .chrg.cpMax )
-               var iCol = .chrg.cpMax - SendMessage( CTL(wID) , EM_LINEINDEX  , iRow , 0 )               
+               var iCol = .chrg.cpMax - SendMessage( CTL(wID) , EM_LINEINDEX  , iRow , 0 )
                dim as zstring*64 zPart = any : sprintf(zPart,"%i : %i",iRow+1,iCol+1)
                'printf(!"(%s) > %i to %i    \r",,,.chrg.cpMin,.chrg.cpMax)
                SendMessage( CTL(wcStatus) , SB_SETTEXT , spCursor , cast(LPARAM,@zPart) ) 
