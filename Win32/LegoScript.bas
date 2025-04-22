@@ -4,11 +4,13 @@
 #include once "windows.bi"
 #include once "win\commctrl.bi"
 #include once "win\commdlg.bi"
+#include once "win\cderr.bi"
 #include once "win\ole2.bi"
 #include once "win\Richedit.bi"
 #include once "win\uxtheme.bi"
 #include once "crt.bi"
 #include once "fbthread.bi"
+
 
 #undef File_Open
 #define Errorf(p...)
@@ -17,12 +19,14 @@
 ' !!! some pieces have unmatched studs vs clutch (and i suspect that's their design problem) !!!
 ' !!! because when using ldraw it does not matter the order, so they never enforced that     !!!
 
+''TODO (22/04/2025) mouse wheel click is not resetting the camera if the model is panned off screen.
 'TODO (20/03/25): process keys to toggle filters and to change the text/add type (plate/brick/etc...)
 'TODO (05/03/25): fix LS2LDR parsing bugs
 'TODO (06/03/25): check bug regarding wheel positioning and the line numbers
 'TODO (25/03/25): re-organize the LS2LDR code, so that it looks better and explain better
 'TODO (01/04/25): make enable auto-completion menu to work / add shortcut to open graphics window
 'TODO (08/04/25): verify child shadow library
+'TODO (21/04/25): prevent buffer overflow when doing a FIND/RESEARCH when the selected text is bigger than 32k
 
 'the model is no longer updating, say if I remove a part, or all parts, or change something.
 
@@ -97,17 +101,28 @@ declare sub RichEdit_Replace( hCtl as HWND , iStart as long , iEnd as long , sTe
 '******************** Menu Handling Helper Functions **************
 #macro ForEachMenuEntry( __Entry , __SubMenu , __EndSubMenu , __Separator )
    __SubMenu( "&File" )
-     __Entry( meFile_New    , "&New"              , _Ctrl        , VK_N , @File_New    )
-     __Entry( meFile_open   , "&Open"             , _Ctrl        , VK_O , @File_Open   )     
-     __Entry( meFile_Save   , "&Save"             , _Ctrl        , VK_S , @File_Save   )     
-     __Entry( meFile_SaveAs , "Save &As"          , _Ctrl+_Shift , VK_S , @File_SaveAs )     
+     __Entry( meFile_New      , "&New"              , _Ctrl        , VK_N , @File_New    )
+     __Entry( meFile_open     , "&Open"             , _Ctrl        , VK_O , @File_Open   )     
+     __Entry( meFile_Save     , "&Save"             , _Ctrl        , VK_S , @File_Save   )     
+     __Entry( meFile_SaveAs   , "Save &As"          , _Ctrl+_Shift , VK_S , @File_SaveAs )     
      __Separator()
-     __Entry( meFile_Exit   , "&Quit" !"\tAlt+F4" , _Ctrl        , VK_Q , @File_Exit   )
+     __Entry( meFile_Exit     , "&Quit" !"\tAlt+F4" , _Ctrl        , VK_Q , @File_Exit   )
    __EndSubMenu()   
    __SubMenu( "&Edit" )            
-      __Entry( meEdit_Undo  , "&Undo"  !"\tCtrl+Z" ,       ,      , @Edit_Undo ) ' , MFT_RADIOCHECK or MFS_CHECKED )
-      __Entry( meEdit_Copy  , "&Copy"  !"\tCtrl+C" ,       ,      , @Edit_Copy ) ', MFT_RADIOCHECK )
-      __Entry( meEdit_Build , "&Build"             , _Ctrl , VK_B , @Button_Compile )
+      __Entry( meEdit_Undo    , "&Undo"  !"\tCtrl+Z" ,              ,      , @Edit_Undo )
+      __Entry( meEdit_Redo    , "&Redo"              , _Ctrl+_Shift , VK_Z , @Edit_Redo )
+      __Separator()
+      __Entry( meEdit_Find    , "&Find"              , _Ctrl        , VK_F , @Edit_Find )
+      __Entry( meEdit_Replace , "Rep&lace"           , _Ctrl        , VK_R , @Edit_Replace )
+      __Separator()
+      __Entry( meEdit_SelAll  , "&Select All"        , _Ctrl        , VK_A , @Edit_SelectAll  )
+      __Separator()
+      __Entry( meEdit_Cut     , "C&ut"   !"\tCtrl+X" ,              ,      , @Edit_Cut  )
+      __Entry( meEdit_Copy    , "&Copy"  !"\tCtrl+C" ,              ,      , @Edit_Copy )      
+      __Entry( meEdit_Paste   , "&Paste" !"\tCtrl+V" ,              ,      , @Edit_Paste)
+      __Separator()
+      __Entry( meCode_Build   , "&Build"             , _Ctrl        , VK_B , @Button_Compile )
+      __Entry( meCode_Clear   , "Cl&ear output"      , _Ctrl+_Shift , VK_B , @Code_ClearOutput )
    __EndSubMenu()
    __SubMenu( "&Completion" )
       __Entry( meCompletion_Enable , "&Enable"   , _Ctrl , VK_E , @Completion_Enable )         
@@ -748,12 +763,159 @@ end sub
 sub File_Exit()   
    SendMessage( CTL(wcMain) , WM_CLOSE , 0,0 )
 end sub
+
+static shared as FINDREPLACE g_tFindRep
+static shared as long g_FindRepMsg
+static shared as string g_sLastQuery,g_sLastReplace
+
+function Edit_FindReplaceInit( bIsReplace as boolean ) as boolean
+   EnableMenuItem( g_WndMenu , meEdit_Find    , MF_BYCOMMAND or MF_GRAYED )
+   EnableMenuItem( g_WndMenu , meEdit_Replace , MF_BYCOMMAND or MF_GRAYED )
+   with g_tFindRep
+      if .lpstrFindWhat then return false
+      .lStructSize = sizeof(g_tFindRep)
+      if .hwndOwner=0 then .Flags = FR_DOWN
+      .hwndOwner        = CTL(wcMain)
+      .hInstance        = NULL      
+      .lpstrFindWhat    = callocate(32768)
+      .wFindWhatLen     = 32767
+      .lpstrReplaceWith = iif(bIsReplace,callocate(32768),NULL)
+      .wReplaceWithLen  = iif(bIsReplace,32767,0)
+      if bIsReplace then *.lpstrReplaceWith = g_sLastReplace
+      dim as WSTRING*32767 wTemp = any      
+      if SendMessageW( CTL(wcEdit) , EM_GETSELTEXT , 0 , cast(LPARAM,@wTemp) ) then
+         *.lpstrFindWhat = wTemp
+      else
+         *.lpstrFindWhat = g_sLastQuery      
+      end if
+   end with   
+   return true
+end function
+function Edit_FindReplaceAction( tFindRep as FINDREPLACE ) as LRESULT   
+   var hCtl = CTL(wcEdit)
+   with tFindRep
+      'printf(!"%p %p",@g_tFindRep,@tFindRep)
+      if (.Flags and FR_DIALOGTERM) then
+         if .lpstrFindWhat    then Deallocate(.lpstrFindWhat)    : .lpstrFindWhat    = NULL
+         if .lpstrReplaceWith then Deallocate(.lpstrReplaceWith) : .lpstrReplaceWith = NULL
+         EnableMenuItem( g_WndMenu , meEdit_Find    , MF_BYCOMMAND or MF_ENABLED )
+         EnableMenuItem( g_WndMenu , meEdit_Replace , MF_BYCOMMAND or MF_ENABLED )
+         .Flags and= (not FR_DIALOGTERM): return 0
+      end if
+      var bFlags = .Flags and ( FR_MATCHCASE or FR_WHOLEWORD or FR_DOWN )
+      dim as FINDTEXTEXW tFindEx = any
+      dim as CHARRANGE tRange = any
+      SendMessage( hCtl , EM_EXGETSEL , 0 , cast(LPARAM,@tRange) )      
+      'printf("{%i %i} ",tRange.cpMin,tRange.cpMax)
+      dim as wstring*32767 wTemp = *.lpstrFindWhat
+      tFindEx.lpstrText = @wTemp '.lpstrFindWhat
+      
+      var iMask = SendMessage( hCtl , EM_GETEVENTMASK   , 0 , 0 )                           
+      SendMessage( hCtl , EM_SETEVENTMASK , 0 , iMask and (not ENM_SELCHANGE) )
+      if (.Flags and FR_REPLACEALL) then SendMessage( hCtl , WM_SETREDRAW , false , 0 )
+      
+      dim as long lReplaced = 0, lReplaceLen = iif(.lpstrReplaceWith,strlen(.lpstrReplaceWith),0)
+      if (.Flags and FR_REPLACE) then
+         tFindEx.chrg = tRange
+         if SendMessageW( hCtl , EM_FINDTEXTEX , bFlags , cast(LPARAM,@tFindEx) )<>-1 then
+            if memcmp(@tFindEx.chrgText,@tRange,sizeof(tRange))=0 then
+               SendMessage( hCtl , EM_REPLACESEL  , true , cast(LPARAM,.lpstrReplaceWith) )
+               lReplaced += 1 : tRange.cpMax = tRange.cpMin+lReplaceLen
+            end if
+         end if
+      end if
+            
+      do         
+         tFindEx.chrg.cpMin = iif( ((bFlags and FR_DOWN)<>0) , tRange.cpMax , tRange.cpMin )
+         tFindEx.chrg.cpMax = iif(bFlags and FR_DOWN , -1 , 0)              
+                     
+         'printf("<%i %i> ",tRange.cpMin,tRange.cpMax)
+         'printf("{%i %i} ",tFindEx.chrg.cpMin,tFindEx.chrg.cpMax)
+         var iResu = SendMessageW( hCtl , EM_FINDTEXTEX , bFlags , cast(LPARAM,@tFindEx) )
+         if iResu <> -1 then
+            'printf("[%i %i %i] ",iResu,tFindEx.chrgText.cpMin,tFindEx.chrgText.cpMax)
+            'SetFocus( hCtl )
+            SendMessage( hCtl , EM_EXSETSEL , 0 , cast(LPARAM,@tFindEx.chrgText) )
+            if (.Flags and FR_REPLACEALL) then
+               SendMessage( hCtl , EM_REPLACESEL  , true , cast(LPARAM,.lpstrReplaceWith) )
+               lReplaced += 1 : tRange.cpMin = tFindEx.chrgText.cpMin 
+               tRange.cpMax = tRange.cpMin+lReplaceLen : continue do
+            end if               
+         else
+            if (.Flags and FR_REPLACEALL) then                
+               SendMessage( hCtl , WM_SETREDRAW , true , 0 )
+               if lReplaced then InvalidateRect( hCtl , NULL , true )
+            end if
+            if lReplaced=0 then
+               MessageBox( CTL(wcMain) , _
+                  iif( 1 , "No Results found" , "No More Results found" ) , _
+                  iif(.lpstrReplaceWith , "Replace" , "Find" ) , MB_ICONWARNING _
+               )
+            else
+               MessageBox( CTL(wcMain) , "Replaced " & lReplaced & " times", "Replace" , MB_ICONINFORMATION )            
+            end if
+         end if
+         exit do
+      loop
+      
+      if .lpstrFindWhat    then g_sLastQuery   = *.lpstrFindWhat
+      if .lpstrReplaceWith then g_sLastReplace = *.lpstrReplaceWith
+      
+      SendMessage( hCtl , EM_SETEVENTMASK , 0 , iMask )
+   end with
+   return 1
+end function
+
 sub Edit_Undo()
    puts(__FUNCTION__)
 end sub
-sub Edit_Copy()
+sub Edit_Redo()
    puts(__FUNCTION__)
 end sub
+sub Edit_Find()   
+   if Edit_FindReplaceInit( false )=false then exit sub
+   var hWnd = FindText( @g_tFindRep )
+   if hWnd=0 then 
+      var lErr = GetLastError() , lExtErr = CommDlgExtendedError()
+      printf(!"Failed: %X %X\n",lErr,lExtErr)      
+      #define SErr(_N) if (lExtErr = _N) then printf(!"%s\n",#_N)      
+      SErr(CDERR_FINDRESFAILURE)
+      SErr(CDERR_MEMLOCKFAILURE)
+      SErr(CDERR_INITIALIZATION)
+      SErr(CDERR_NOHINSTANCE)
+      SErr(CDERR_LOCKRESFAILURE)
+      SErr(CDERR_NOHOOK) 
+      SErr(CDERR_LOADRESFAILURE)
+      SErr(CDERR_NOTEMPLATE)
+      SErr(CDERR_LOADSTRFAILURE)
+      SErr(CDERR_STRUCTSIZE)
+      SErr(CDERR_MEMALLOCFAILURE)
+      SErr(FRERR_BUFFERLENGTHZERO)
+   end if
+end sub
+sub Edit_Replace()
+   if Edit_FindReplaceInit( true )=false then exit sub
+   if ReplaceText( @g_tFindRep ) = NULL then
+      puts("Replace failed")
+   end if
+end sub
+sub Edit_SelectAll()
+   SendMessage( GetFocus() , EM_SETSEL , 0 , -1 )
+end sub
+sub Edit_Cut()
+   SendMessage( GetFocus() , WM_CUT , 0,0 )
+end sub
+sub Edit_Copy()   
+   SendMessage( GetFocus() , WM_COPY , 0,0 )
+end sub
+sub Edit_Paste()
+   SendMessage( GetFocus() , WM_PASTE , 0,0 )
+end sub
+
+sub Code_ClearOutput()
+   SetWindowText( CTL(wcOutput) , "" )
+end sub
+
 sub Completion_Enable()
    puts(__FUNCTION__)
    var iToggledState = g_CurItemState xor MFS_CHECKED
@@ -1276,7 +1438,7 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
                   
       AddButtonA( wcButton , cMarginL , cMarginT , _pct(15) , cRow(1.25)  , "Build" )
       AddTextA  ( wcLines  , cMarginL , _NextRow , _pct(1.66*2) , _pct(53) ,  "" , SS_OWNERDRAW )
-      AddRichA  ( wcEdit   , _NextCol0, _SameRow , cMarginR , _pct(53) , "" , WS_HSCROLL or WS_VSCROLL or ES_AUTOHSCROLL or ES_DISABLENOSCROLL  )
+      AddRichA  ( wcEdit   , _NextCol0, _SameRow , cMarginR , _pct(53) , "" , WS_HSCROLL or WS_VSCROLL or ES_AUTOHSCROLL or ES_DISABLENOSCROLL or ES_NOHIDESEL )
       AddRichA  ( wcOutput , cMarginL , _NextRow , cMarginR , _BottomP(-5) , "" , WS_HSCROLL or WS_VSCROLL or ES_AUTOHSCROLL or ES_READONLY )
       AddStatusA( wcStatus , "Ready." )
                   
@@ -1319,6 +1481,8 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
     PostQuitMessage(0) ' to quit
     return 0 
    end select
+   
+   if message = g_FindRepMsg then return Edit_FindReplaceAction( *cptr(FINDREPLACE ptr,lParam) )
    
    ' *** if program reach here default predefined action will happen ***
    return DefWindowProc( hWnd, message, wParam, lParam )
@@ -1375,7 +1539,7 @@ sub WinMain ()
    dim as HWND hOldFocus = cast(HWND,-1)
    while( GetMessage( @tMsg, NULL, 0, 0 ) <> FALSE )    
       if TranslateAccelerator( hWnd , hAcceleratos , @tMsg ) then continue while      
-      if IsDialogMessage( hWnd , @tMsg ) then continue while
+      if IsDialogMessage( GetActiveWindow() , @tMsg ) then continue while
       TranslateMessage( @tMsg )
       DispatchMessage( @tMsg )    
       ProcessMessage( tMsg )
@@ -1394,10 +1558,11 @@ end sub
 
 sAppName = "LegoScript"
 InitCommonControls()
-if LoadLibrary("Riched32.dll")=0 then
+if LoadLibrary("Riched20.dll")=0 then
   MessageBox(null,"Failed To Load richedit component",null,MB_ICONERROR)
   end
 end if
+g_FindRepMsg = RegisterWindowMessage(FINDMSGSTRING)
 
 function BeforeExit( dwCtrlType as DWORD ) as WINBOOL   
    GetClipboard() : system() : return 0 'never? :P
