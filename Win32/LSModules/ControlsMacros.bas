@@ -1,6 +1,6 @@
 #define cMarginL _pct(1.25)
 #define cMarginR _RightP(-1.25)
-#define cMarginT _pct(3)
+#define cMarginT _pct(1.25)
 #define cRow(_N) _pct((5)*_N)    
 '#define cBorderRow _BtN(wcRadOther,-19)
 '#define cBigRow _pct(10)    
@@ -11,6 +11,7 @@
 var IdPrevCtl=0 'previous control ID
     
 #define _NextRow  _BtP(IdPrevCtl,0.5)    
+#define _NextRow0  _BtP(IdPrevCtl,0)    
 #define _NextRowB _BtP(IdPrevCtl,1.5)    
 #define _NextCol  _RtP(IdPrevCtl,1)
 #define _NextCol0 _RtN(IdPrevCtl,0)

@@ -24,9 +24,8 @@
 'TODO (05/03/25): fix LS2LDR parsing bugs
 'TODO (06/03/25): check bug regarding wheel positioning and the line numbers
 'TODO (25/03/25): re-organize the LS2LDR code, so that it looks better and explain better
-'TODO (01/04/25): make enable auto-completion menu to work / add shortcut to open graphics window
-'TODO (08/04/25): verify child shadow library
 'TODO (21/04/25): prevent buffer overflow when doing a FIND/RESEARCH when the selected text is bigger than 32k
+'TODO (05/05/25): make (new save/save-as) update tab/title names
 
 'the model is no longer updating, say if I remove a part, or all parts, or change something.
 
@@ -37,6 +36,7 @@ enum StatusParts
 end enum
 enum WindowControls
   wcMain
+  wcTabs
   wcButton
   wcLines
   wcEdit
@@ -66,6 +66,12 @@ type FormContext
   as ControlStruct     hCTL(wcLast) 'controls
   as FontStruct        hFnt(wfLast) 'fonts  
 end type
+type TabStruct
+   hEdit      as hwnd
+   sFilename  as string
+end type
+redim shared g_tTabs(0) as TabStruct 
+dim shared as long g_iTabCount = 1 , g_iCurTab = 0
 
 const g_sMainFont  = "verdana" , g_sFixedFont = "consolas"
 
@@ -109,9 +115,7 @@ sub LogError( sError as string )
 end sub
 
 #include "LsModules\LSMenu.bas"
-
 #include "LsModules\LSViewer.bas"
-
 #include "LSModules\LSActions.bas"
 
 function CreateMainMenu() as HMENU
@@ -139,7 +143,9 @@ function CreateMainMenu() as HMENU
          #else
             #define _sAlt
          #endif
-         #if _Accelerator >= asc("A") and _Accelerator <= asc("Z")
+         #if _Accelerator >= VK_F1 and _Accelerator <= VK_F24
+            #define _sKey "F" & (_Accelerator-((VK_F1)-1))
+         #elseif _Accelerator >= asc("A") and _Accelerator <= asc("Z")           
            #define _sKey +chr(_Accelerator)
          #else
             #define _sKey s##_Accelerator
@@ -401,7 +407,7 @@ end function
 
 ' *************** Procedure Function ****************
 function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LPARAM ) as LRESULT
-   
+      
    var pCtx = (@g_tMainCtx)      
    #include "LSModules\Controls.bas"
    #include "LSModules\ControlsMacros.bas"
@@ -431,8 +437,14 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
    case WM_NOTIFY     'notification from window/control
       var wID = cast(long,wParam) , pnmh = cptr(LPNMHDR,lParam)
       select case wID
+      case wcTabs
+         select case pnmh->code
+         case TCN_SELCHANGE
+            var iIDX = TabCtrl_GetCurSel( CTL(wID) )            
+            ChangeToTab( iIDX , true )
+         end select
       case wcEdit
-         select case pnmh->code         
+         select case pnmh->code                  
          case EN_SELCHANGE
             with *cptr(SELCHANGE ptr,lParam)
                'static as CHARRANGE tPrev = type(-1,-1)
@@ -544,10 +556,11 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
       InitFont( wfStatus  , g_sMainFont  , 10 )  'status bar font
       InitFont( wfEdit    , g_sFixedFont  , 16 ) 'edit controls font
                   
-      AddButtonA( wcButton , cMarginL , cMarginT , _pct(15) , cRow(1.25)  , "Build" )
-      AddTextA  ( wcLines  , cMarginL , _NextRow , _pct(2*1.66*2) , _pct(53) ,  "" , SS_OWNERDRAW )
-      AddRichA  ( wcEdit   , _NextCol0, _SameRow , cMarginR , _pct(53) , "" , WS_HSCROLL or WS_VSCROLL or ES_AUTOHSCROLL or ES_DISABLENOSCROLL or ES_NOHIDESEL )
-      AddRichA  ( wcOutput , cMarginL , _NextRow , cMarginR , _BottomP(-5) , "" , WS_HSCROLL or WS_VSCROLL or ES_AUTOHSCROLL or ES_READONLY )
+      AddTabsA  ( wcTabs   , cMarginL  , cMarginT  , _pct(85) , cRow(1.25) , cRow(1.25) )
+      AddButtonA( wcButton , _NextCol  , _SameRow  , cMarginR , cRow(1.25) , "Build" )
+      AddTextA  ( wcLines  , cMarginL  , _NextRow0 , _pct(2*1.66*2) , _pct(53) ,  "" , SS_OWNERDRAW )
+      AddRichA  ( wcEdit   , _NextCol0 , _SameRow  , cMarginR , _pct(53) , "" , WS_HSCROLL or WS_VSCROLL or ES_AUTOHSCROLL or ES_DISABLENOSCROLL or ES_NOHIDESEL )
+      AddRichA  ( wcOutput , cMarginL  , _NextRow  , cMarginR , _BottomP(-5) , "" , WS_HSCROLL or WS_VSCROLL or ES_AUTOHSCROLL or ES_READONLY )
       AddStatusA( wcStatus , "Ready." )
                   
       SetControlsFont( wfEdit   , wcLines , wcEdit , wcOutput )
@@ -557,6 +570,13 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
       SendMessage( CTL(wcEdit) , EM_EXLIMITTEXT , 0 , 16*1024*1024 ) '16mb text limit
       SendMessage( CTL(wcEdit) , EM_SETEVENTMASK , 0 , ENM_SELCHANGE or ENM_KEYEVENTS or ENM_SCROLL )
       OrgEditProc = cast(any ptr,SetWindowLongPtr( CTL(wcEdit) , GWLP_WNDPROC , cast(LONG_PTR,@WndProcEdit) ))
+      
+      dim as TC_ITEM tItem = type( TCIF_TEXT or TCIF_PARAM , 0,0 , @"Unnamed" , 0,-1 , 0 ) 
+      with g_tTabs(0)
+         TabCtrl_InsertItem( CTL(wcTabs) , 0 , @tItem )
+         .hEdit = CTL(wcEdit) : .sFilename = ""
+      end with
+      SetControlsFont( wfStatus, wcTabs )
                           
       WaitForSingleObject( hEventGfxReady , INFINITE )    
       CloseHandle( hEventGfxReady )

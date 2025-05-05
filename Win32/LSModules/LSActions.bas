@@ -50,6 +50,37 @@ function LoadFileIntoEditor( sFile as string ) as boolean
    SetFocus( CTL(wcButton) )
    return true
 end function
+sub ChangeToTab( iNewTab as long , bForce as boolean = false ) 
+   if iNewTab < 0 orelse iNewTab >= g_iTabCount then exit sub
+   'var iCurTab = TabCtrl_GetCurSel( CTL(wcTabs) )   
+   'if bForce=0 andalso iCurTab = iNewTab then exit sub
+   with g_tTabs(iNewTab)      
+      var hWndOld = CTL(wcEdit) , hParent = GetParent(.hEdit)
+      if hWndOld = .hEdit then exit sub
+      var hFont = g_tMainCtx.hFnt(g_tMainCtx.hCtl(wcEdit).bFont).hFont
+      CTL(wcEdit) = .hEdit : g_iCurTab = iNewTab
+      'swap control IDs (so that only one control have the current tab ID)
+      SetWindowLong( hWndOld , GWL_ID , 0 ) : SetWindowLong( .hEdit  , GWL_ID , wcEdit )
+      dim as RECT tRC = any : GetWindowRect( hWndOld , @tRC )
+      ScreenToClient( hParent , cast(POINT ptr,@tRC)+0 )
+      ScreenToClient( hParent , cast(POINT ptr,@tRC)+1 )      
+      SendMessage( .hEdit , WM_SETFONT , cast(WPARAM,hFont) , false )
+      SetWindowPos( .hEdit , 0 , tRC.left , tRc.top , tRc.right-tRc.left , tRc.Bottom-tRc.top , SWP_NOZORDER or SWP_SHOWWINDOW )
+      ShowWindow( hWndOld , SW_HIDE )
+      g_CurrentFilePath = .sFilename
+      SetWindowText( CTL(wcMain) , sAppName + " - " + .sFilename )
+      TabCtrl_SetCurSel( CTL(wcTabs) , iNewTab )
+      NotifySelChange( wcEdit )      
+   end with
+end sub
+function CloneHwnd( hWnd as HWND ) as HWND
+   var wClass   = cast(zstring ptr , GetClassLong( hWnd , GCW_ATOM ) )
+   var hInst    = cast(HINSTANCE, GetWindowLong(hWnd,GWL_HINSTANCE))
+   var hParent  = cast(HWND     , GetWindowLong(hWnd,GWL_HWNDPARENT))
+   var lStyle   = GetWindowLong(hWnd,GWL_STYLE)
+   var lStyleEx = GetWindowLong(hWnd,GWL_EXSTYLE)
+   return CreateWindowEx( lStyleEx , wClass , NULL , lStyle , 0,0,0,0 , hParent , 0 , hInst , NULL )
+end function
 
 sub Do_Compile()   
    SetWindowText( CTL(wcStatus) , "Building..." )   
@@ -93,18 +124,16 @@ sub File_New()
    SetFocus( CTL(wcEdit) )
 end sub
 sub File_Open()
-   
-   if GetWindowTextLength( CTL(wcEdit) ) then
-      #define sMsg !"All unsaved data will be lost, continue?"
-      if MessageBox( CTL(wcMain) , sMsg , "File->Open" , MB_ICONQUESTION or MB_YESNO ) <> IDYES then exit sub
-   end if
-   
+         
    dim as OPENFILENAME tOpen
    dim as zstring*32768 zFile = any : zFile[0]=0
    with tOpen
       .lStructSize = sizeof(tOpen)
       .hwndOwner = CTL(wcMain)
-      .lpstrFilter = @!"LegoScript Files\0*.ls\0All Files\0*.*\0\0"
+      .lpstrFilter = @ _
+         !"LegoScript Files\0*.ls\0" _
+         !"LDraw Files\0*.ldr\0" _
+         !"All Files\0*.*\0\0"
       .nFilterIndex = 0 '.ls
       .lpstrFile = @zFile
       .nMaxFile = 32767
@@ -114,6 +143,29 @@ sub File_Open()
       .Flags = OFN_FILEMUSTEXIST or OFN_PATHMUSTEXIST or OFN_NOCHANGEDIR
       if GetOpenFileName( @tOpen ) = 0 then exit sub      
       print "["+*.lpstrFile+"]"
+      
+      var iNewTab = 0
+      if g_iTabCount>1 orelse len(g_tTabs(0).sFilename) orelse GetWindowTextLength( CTL(wcEdit) )<>0 then
+         iNewTab = g_iTabCount 'create new TAB
+         redim preserve g_tTabs(g_iTabCount) : g_iTabCount += 1
+         var hWnd = CloneHwnd( CTL(wcEdit) )
+         g_tTabs( iNewTab ).hEdit = hWnd
+         SendMessage( hWnd , EM_EXLIMITTEXT , 0 , 16*1024*1024 ) '16mb text limit
+         SendMessage( hWnd , EM_SETEVENTMASK , 0 , ENM_SELCHANGE or ENM_KEYEVENTS or ENM_SCROLL )
+         dim as TC_ITEM tItem = type( TCIF_TEXT , 0,0 , @" " , 0,-1 , 0 ) 
+         TabCtrl_InsertItem( CTL(wcTabs) , iNewTab , @tItem )         
+      end if
+      
+      var sFile = *.lpstrFile
+      with g_tTabs(iNewTab)
+         var iPos = instrrev(sFile,"\") , iPos2 = instrrev(sFile,"/")
+         if iPos2 > iPos then iPos = iPos2
+         .sFilename = sFile
+         sFile = mid(sFile,iPos+1)
+         dim as TC_ITEM tItem = type( TCIF_TEXT , 0,0 , strptr(sFile) , 0,-1 , 0 ) 
+         TabCtrl_SetItem( CTL(wcTabs) , iNewTab , @tItem )
+      end with
+      ChangeToTab(iNewTab)
       LoadFileIntoEditor( *.lpstrFile )
    end with
 end sub
@@ -166,6 +218,27 @@ end sub
 sub File_Exit()   
    SendMessage( CTL(wcMain) , WM_CLOSE , 0,0 )
 end sub
+sub File_Close()
+   
+   if g_iTabCount = 1 then File_Exit() : exit sub   
+   if GetWindowTextLength( CTL(wcEdit) ) then
+      #define sMsg !"All unsaved data will be lost, continue?"
+      if MessageBox( CTL(wcMain) , sMsg , "File->Open" , MB_ICONQUESTION or MB_YESNO ) <> IDYES then exit sub
+   end if   
+   
+   var iNewTab = iif( g_iCurTab = g_iTabCount-1 , g_iCurTab , g_iCurTab+1 )
+   var iCurTab = g_iCurTab
+   ChangeToTab( iNewTab+(iNewTab=g_iCurTab) )
+   SendMessage( g_tTabs(iCurTab).hEdit , EM_SETEVENTMASK , 0 , 0 )
+   DestroyWindow( g_tTabs(iCurTab).hEdit )
+   for N as long = iCurTab+1 to g_iTabCount-1
+      g_tTabs(N-1) = g_tTabs(N)
+   next N
+   TabCtrl_DeleteItem( CTL(wcTabs) , iCurTab )
+   g_iTabCount -= 1 : Redim preserve g_tTabs(g_iTabCount)
+   g_iCurTab = iNewTab
+end sub
+
 
 static shared as FINDREPLACE g_tFindRep
 static shared as long g_FindRepMsg
@@ -269,6 +342,12 @@ function Edit_FindReplaceAction( tFindRep as FINDREPLACE ) as LRESULT
    return 1
 end function
 
+sub File_Import()
+   puts(__FUNCTION__)
+end sub
+sub File_Export()
+   puts(__FUNCTION__)
+end sub
 sub Edit_Undo()
    puts(__FUNCTION__)
 end sub
@@ -384,6 +463,7 @@ sub View_Key()
    if IsWindow(g_GfxHwnd)=0 then exit sub
    dim vk as long , sft as byte
    select case g_CurItemID
+   case meView_ResetCamera : vk = VK_DELETE   : sft = 1
    case meView_ResetView   : vk = VK_BACK     'Backspace
    case meView_NextPart    : vk = VK_ADD      '+
    case meView_PrevPart    : vk = VK_SUBTRACT '-

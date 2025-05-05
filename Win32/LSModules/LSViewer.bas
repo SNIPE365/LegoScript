@@ -64,8 +64,9 @@ namespace Viewer
                fZoom = -3+(iWheel/12)
             case fb.EVENT_MOUSE_BUTTON_PRESS
                if e.button = fb.BUTTON_MIDDLE then 
-                  iPrevWheel = iWheel
-                  fZoom = -3
+                  iPrevWheel = iWheel : fZoom = -3
+                  fRotationX = 120 : fRotationY = 20
+                  fPositionX = 0 : fPositionY = 0 
                end if
                if e.button = fb.BUTTON_LEFT   then bLeftPressed  = true
                if e.button = fb.BUTTON_RIGHT  then bRightPressed = true
@@ -140,6 +141,12 @@ namespace Viewer
                case fb.SC_LSHIFT : bShiftPressed or= 1
                case fb.SC_RSHIFT : bShiftPressed or= 2
                case fb.SC_TAB   : bBoundingBox = not bBoundingBox
+               case fb.SC_DELETE
+                  if bShiftPressed then
+                     iPrevWheel = iWheel : fZoom = -3
+                     fRotationX = 120 : fRotationY = 20
+                     fPositionX = 0 : fPositionY = 0 
+                  end if
                end select
             case fb.EVENT_KEY_RELEASE
                select case e.scancode
