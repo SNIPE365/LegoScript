@@ -11,7 +11,6 @@
 #include once "crt.bi"
 #include once "fbthread.bi"
 
-
 #undef File_Open
 #define Errorf(p...)
 #define Debugf(p...)
@@ -25,9 +24,7 @@
 'TODO (06/03/25): check bug regarding wheel positioning and the line numbers
 'TODO (25/03/25): re-organize the LS2LDR code, so that it looks better and explain better
 'TODO (21/04/25): prevent buffer overflow when doing a FIND/RESEARCH when the selected text is bigger than 32k
-'TODO (05/05/25): make (new save/save-as) update tab/title names
-
-'the model is no longer updating, say if I remove a part, or all parts, or change something.
+'TODO (05/05/25): finish "show output" button, and add a potential side window
 
 '*************** Enumerating our control id's ***********
 enum StatusParts
@@ -37,9 +34,10 @@ end enum
 enum WindowControls
   wcMain
   wcTabs
-  wcButton
+  wcButton  
   wcLines
   wcEdit
+  wcBtnMinOut
   wcOutput
   wcStatus
   wcLast
@@ -556,12 +554,16 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
       InitFont( wfStatus  , g_sMainFont  , 10 )  'status bar font
       InitFont( wfEdit    , g_sFixedFont  , 16 ) 'edit controls font
                   
-      AddTabsA  ( wcTabs   , cMarginL  , cMarginT  , _pct(85) , cRow(1.25) , cRow(1.25) )
-      AddButtonA( wcButton , _NextCol  , _SameRow  , cMarginR , cRow(1.25) , "Build" )
-      AddTextA  ( wcLines  , cMarginL  , _NextRow0 , _pct(2*1.66*2) , _pct(53) ,  "" , SS_OWNERDRAW )
-      AddRichA  ( wcEdit   , _NextCol0 , _SameRow  , cMarginR , _pct(53) , "" , WS_HSCROLL or WS_VSCROLL or ES_AUTOHSCROLL or ES_DISABLENOSCROLL or ES_NOHIDESEL )
-      AddRichA  ( wcOutput , cMarginL  , _NextRow  , cMarginR , _BottomP(-5) , "" , WS_HSCROLL or WS_VSCROLL or ES_AUTOHSCROLL or ES_READONLY )
-      AddStatusA( wcStatus , "Ready." )
+      AddTabsA  ( wcTabs      , cMarginL  , cMarginT  , _pct(85) , cRow(1.25) , cRow(1.25) )
+      AddButtonA( wcButton    , _NextCol  , _SameRow  , cMarginR , cRow(1.25) , "Build" )
+      AddTextA  ( wcLines     , cMarginL  , _NextRow0 , _pct(2*1.66*2) , _pct(53) ,  "" , SS_OWNERDRAW )
+      AddRichA  ( wcEdit      , _NextCol0 , _SameRow  , cMarginR , _pct(53) , "" , WS_HSCROLL or WS_VSCROLL or ES_AUTOHSCROLL or ES_DISABLENOSCROLL or ES_NOHIDESEL )
+      AddRichA  ( wcOutput    , cMarginL  , _NextRow  , cMarginR , _BottomP(-5) , "" , WS_HSCROLL or WS_VSCROLL or ES_AUTOHSCROLL or ES_READONLY )
+      'AddButtonA( wcBtnMinOut , _RtP(wcOutput,-4) , _SameRow , _pct(4) , cRow(1) , "O" , BS_AUTOCHECKBOX or BS_PUSHLIKE )
+      'AddButtonA( wcBtnMinOut , _pct(0) , _pct(0) , _num(16) , _num(16) , "O" , BS_AUTOCHECKBOX or BS_PUSHLIKE )
+      AddStatusA( wcStatus    , "Ready." )
+      
+      'SetParent( CTL(wcBtnMinOut) , CTL(wcOutput) )
                   
       SetControlsFont( wfEdit   , wcLines , wcEdit , wcOutput )
       SetControlsFont( wfStatus , wcStatus )

@@ -68,7 +68,11 @@ sub ChangeToTab( iNewTab as long , bForce as boolean = false )
       SetWindowPos( .hEdit , 0 , tRC.left , tRc.top , tRc.right-tRc.left , tRc.Bottom-tRc.top , SWP_NOZORDER or SWP_SHOWWINDOW )
       ShowWindow( hWndOld , SW_HIDE )
       g_CurrentFilePath = .sFilename
-      SetWindowText( CTL(wcMain) , sAppName + " - " + .sFilename )
+      if len(.sFilename) then 
+         SetWindowText( CTL(wcMain) , sAppName + " - " + .sFilename )
+      else
+         SetWindowText( CTL(wcMain) , sAppName + " - Unnamed")
+      end if
       TabCtrl_SetCurSel( CTL(wcTabs) , iNewTab )
       NotifySelChange( wcEdit )      
    end with
@@ -113,15 +117,61 @@ sub Button_Compile()
    EndTry()
 end sub
 '**************** Main Menu Layout **************
-sub File_New()
-   if GetWindowTextLength( CTL(wcEdit) ) then
-      #define sMsg !"All unsaved data will be lost, continue?"
-      if MessageBox( CTL(wcMain) , sMsg , "File->New" , MB_ICONQUESTION or MB_YESNO ) <> IDYES then exit sub
+
+sub UpdateTabName( iTab as long )
+   if cuint(iTab) >= g_iTabCount then exit sub   
+   with g_tTabs(iTab)
+      dim as string sFile = "Unnamed"
+      if len(.sFilename) then
+         var iPos = instrrev(.sFilename,"\") , iPos2 = instrrev(.sFilename,"/")
+         if iPos2 > iPos then iPos = iPos2          
+         sFile = mid(.sFilename,iPos+1)      
+      end if
+      dim as TC_ITEM tItem = type( TCIF_TEXT , 0,0 , strptr(sFile) , 0,-1 , 0 ) 
+      TabCtrl_SetItem( CTL(wcTabs) , iTab , @tItem )   
+      if iTab = g_iCurTab then
+         if len(.sFilename) then 
+            SetWindowText( CTL(wcMain) , sAppName + " - " + .sFilename )
+         else
+            SetWindowText( CTL(wcMain) , sAppName + " - Unnamed")
+         end if
+      end if
+   end with   
+end sub
+function NewTab( sNewFile as string ) as long   
+   var iNewTab = 0 , sFile = sNewFile 'byval
+   if len(g_tTabs(g_iCurTab).sFilename) orelse GetWindowTextLength( CTL(wcEdit) )<>0 then
+      iNewTab = g_iTabCount 'create new TAB
+      redim preserve g_tTabs(g_iTabCount) : g_iTabCount += 1
+      var hWnd = CloneHwnd( CTL(wcEdit) )
+      g_tTabs( iNewTab ).hEdit = hWnd
+      SendMessage( hWnd , EM_EXLIMITTEXT , 0 , 16*1024*1024 ) '16mb text limit
+      SendMessage( hWnd , EM_SETEVENTMASK , 0 , ENM_SELCHANGE or ENM_KEYEVENTS or ENM_SCROLL )
+      dim as TC_ITEM tItem = type( TCIF_TEXT , 0,0 , @" " , 0,-1 , 0 ) 
+      TabCtrl_InsertItem( CTL(wcTabs) , iNewTab , @tItem )         
    end if
-   SetWindowText( CTL(wcEdit) , "" )
-   SetWindowText( CTL(wcMain) , sAppName + " - Unnamed")
-   NotifySelChange( wcEdit )
-   SetFocus( CTL(wcEdit) )
+   
+   with g_tTabs(iNewTab)
+      if len(sFile) then      
+         var iPos = instrrev(sFile,"\") , iPos2 = instrrev(sFile,"/")
+         if iPos2 > iPos then iPos = iPos2
+         .sFilename = sFile
+         sFile = mid(sFile,iPos+1)
+         dim as TC_ITEM tItem = type( TCIF_TEXT , 0,0 , strptr(sFile) , 0,-1 , 0 ) 
+         TabCtrl_SetItem( CTL(wcTabs) , iNewTab , @tItem )      
+      else
+         sFile = "Unnamed"      
+         .sFilename = ""      
+         dim as TC_ITEM tItem = type( TCIF_TEXT , 0,0 , strptr(sFile) , 0,-1 , 0 ) 
+         TabCtrl_SetItem( CTL(wcTabs) , iNewTab , @tItem )      
+      end if
+   end with
+   return iNewTab
+end function
+
+
+sub File_New()
+   ChangeToTab( NewTab( "" ) )
 end sub
 sub File_Open()
          
@@ -143,30 +193,16 @@ sub File_Open()
       .Flags = OFN_FILEMUSTEXIST or OFN_PATHMUSTEXIST or OFN_NOCHANGEDIR
       if GetOpenFileName( @tOpen ) = 0 then exit sub      
       print "["+*.lpstrFile+"]"
-      
-      var iNewTab = 0
-      if g_iTabCount>1 orelse len(g_tTabs(0).sFilename) orelse GetWindowTextLength( CTL(wcEdit) )<>0 then
-         iNewTab = g_iTabCount 'create new TAB
-         redim preserve g_tTabs(g_iTabCount) : g_iTabCount += 1
-         var hWnd = CloneHwnd( CTL(wcEdit) )
-         g_tTabs( iNewTab ).hEdit = hWnd
-         SendMessage( hWnd , EM_EXLIMITTEXT , 0 , 16*1024*1024 ) '16mb text limit
-         SendMessage( hWnd , EM_SETEVENTMASK , 0 , ENM_SELCHANGE or ENM_KEYEVENTS or ENM_SCROLL )
-         dim as TC_ITEM tItem = type( TCIF_TEXT , 0,0 , @" " , 0,-1 , 0 ) 
-         TabCtrl_InsertItem( CTL(wcTabs) , iNewTab , @tItem )         
-      end if
-      
-      var sFile = *.lpstrFile
-      with g_tTabs(iNewTab)
-         var iPos = instrrev(sFile,"\") , iPos2 = instrrev(sFile,"/")
-         if iPos2 > iPos then iPos = iPos2
-         .sFilename = sFile
-         sFile = mid(sFile,iPos+1)
-         dim as TC_ITEM tItem = type( TCIF_TEXT , 0,0 , strptr(sFile) , 0,-1 , 0 ) 
-         TabCtrl_SetItem( CTL(wcTabs) , iNewTab , @tItem )
-      end with
-      ChangeToTab(iNewTab)
-      LoadFileIntoEditor( *.lpstrFile )
+      var sFile = *.lpstrFile, sFileL = lcase(sFile)
+      for N as long = 0 to g_iTabCount-1
+         with g_tTabs(N)
+            if lcase(.sFileName) = sFileL then
+               ChangeToTab(N): exit sub
+            end if
+         end with
+      next N      
+      ChangeToTab(NewTab( sFile ))                  
+      LoadFileIntoEditor( sFile )
    end with
 end sub
 sub File_Save()
@@ -188,6 +224,8 @@ sub File_Save()
    end if
    print #f, sScript;
    close #f
+   g_tTabs(g_iCurTab).sFilename = g_CurrentFilePath
+   UpdateTabName( g_iCurTab )
 end sub
 sub File_SaveAs()
    dim as OPENFILENAME tOpen
@@ -212,19 +250,23 @@ sub File_SaveAs()
       end if
       close #f
       g_CurrentFilePath = *.lpstrFile
-      File_Save()      
+      File_Save()
    end with
 end sub
 sub File_Exit()   
    SendMessage( CTL(wcMain) , WM_CLOSE , 0,0 )
 end sub
 sub File_Close()
-   
-   if g_iTabCount = 1 then File_Exit() : exit sub   
+      
    if GetWindowTextLength( CTL(wcEdit) ) then
       #define sMsg !"All unsaved data will be lost, continue?"
       if MessageBox( CTL(wcMain) , sMsg , "File->Open" , MB_ICONQUESTION or MB_YESNO ) <> IDYES then exit sub
    end if   
+   
+   if g_iTabCount = 1 then 
+      var iNewTab = NewTab( "" ) : SetWindowText( CTL(wcEdit) , "" )
+      if g_iTabCount = 1 then ChangeToTab(iNewTab) : exit sub
+   end if
    
    var iNewTab = iif( g_iCurTab = g_iTabCount-1 , g_iCurTab , g_iCurTab+1 )
    var iCurTab = g_iCurTab
@@ -237,6 +279,7 @@ sub File_Close()
    TabCtrl_DeleteItem( CTL(wcTabs) , iCurTab )
    g_iTabCount -= 1 : Redim preserve g_tTabs(g_iTabCount)
    g_iCurTab = iNewTab
+   
 end sub
 
 

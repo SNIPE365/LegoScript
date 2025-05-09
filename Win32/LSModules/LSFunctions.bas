@@ -1,5 +1,5 @@
 scope 'add separators
-   var sSeparators = !"\9 \r\n/"
+   var sSeparators = !"\9 \r\n/;"
    for N as long = 0 to len(sSeparators)-1
       g_bSeparators( sSeparators[N] ) or= stToken
    next N
@@ -109,7 +109,7 @@ end function
 
 function FindPartName( sName as string ) as long
    if len(sName) < 1 then return ErrInfo(ecNotFound)
-   for N as long = 0 to g_iPartCount-1
+   for N as long = 1 to g_iPartCount-1
       with g_tPart(N)
          if .sName = sName then return N
       end with

@@ -93,11 +93,13 @@ type PartConnLS
    bResv(1)   as byte    'padding
 end type
 
-const _cPartMin=255 , _cConnMin=255
+const _cPartMin=255 , _cConnMin=255 , _NULLPARTNAME = 0
 static shared as byte g_bSeparators(255)
 redim shared as PartStructLS g_tPart(_cPartMin)
 redim shared as PartConnLS   g_tConn(_cConnMin)
-static shared as long g_iPartCount , g_iConnCount = 0
+static shared as long g_iPartCount=1 , g_iConnCount = 0
+static shared as SnapPV g_NullSnap
+'g_NullSnap.pMatOrg = @g_tIdentityMatrix
 
 #include "LSModules\LSFunctions.bas"
 
@@ -112,7 +114,7 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
    'split tokens
    dim as string sStatement, sToken(15), sResult
    dim as long iStStart=1,iStNext,iLineNumber=1,iTokenLineNumber=1
-   sOutput = "" : g_iPartCount = 0 : g_iConnCount = 0
+   sOutput = "" : g_iPartCount = 1 : g_iConnCount = 0
    
    #define TokenLineNumber(_N) (cptr(fbStr ptr,@sToken(_N))->iSize)
    
@@ -127,6 +129,11 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
       #define LinkerError( _text ) sOutput += "Error: " & _text & !"\r\n" : sResult=""
       #define LinkerWarning( _text ) sOutput += "Warning: " & _text & !"\r\n" 
    #endif
+      
+   with g_tPart(_NULLPARTNAME)
+      .tMatrix = g_tIdentityMatrix
+      .bConnected = true
+   end with   
    
    'Parsing LS and generate connections
    while 1
@@ -235,7 +242,7 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
       
       #define tLeft(_N)  tConn.iLeft##_N
       #define tRight(_N) tConn.iRight##_N
-                        
+      
       do 
          #define sRelToken(_N) sToken(iCurToken+(_N))
          #define sCurToken sToken(iCurToken)
@@ -253,33 +260,40 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
                ParserError("'"+sPart+"' primative not found")
                'puts("bad primative?")
                exit do
-            end if
+            end if            
             iCurToken += 2            
          else 'otherwise it must be an existing part name
-            #define sName sCurToken
-            if IsValidPartName( sName )=false then ParserError("'"+sName+"' is not a valid primative or part name")
-            iName = FindPartName( sName )
-            if iName < 0 then ParserError( "part name not declared" )
+            #define sName sCurToken            
+            if sName = "NULL" then               
+               iName = _NULLPARTNAME               
+            else
+               if IsValidPartName( sName )=false then ParserError("'"+sName+"' is not a valid primative or part name")
+               iName = FindPartName( sName )               
+               if iName < 0 then ParserError( "part name not declared" )
+            end if
             iCurToken += 1 : bExisting = true
          end if         
          'if there's no more parameters than it's just a part declaration
-         'print ,tLeft(Part) , tRight(Part) , iCurToken ; iTokCnt
+         ''puts( tLeft(Part) & " , " & tRight(Part) & " , " & iCurToken & ":" & iTokCnt )
+         
          if iCurToken = iTokCnt then 
             if tLeft(Part)<0 then exit do
-            ParserError("missing operands in the right side")
+            if iName <> _NULLPARTNAME then ParserError("missing operands in the right side")
          end if         
          rem otherwise it's a processed block (assignment?)
 
          rem first for the LEFT side then for the RIGHT side
+         
          if tLeft(Part) < 0 then tLeft(Part) = iName else tRight(Part) = iName
          if tLeft(Part) = tRight(Part) then ParserError("a part can't connect to itself")
 
          rem can only define rotation/offset once
          dim as byte bDefinedXRot , bDefinedYRot , bDefinedZRot
          dim as byte bDefinedXOff , bDefinedYOff , bDefinedZOff
-
-         rem so read tokens to add characteristics
+         
+         'other wise read tokens to add characteristics
          with g_tPart(iName)
+            dim as byte bAttIgnored = 0
             do 
                if iCurToken = iTokCnt then                
                   if tLeft(Part) < 0 then ParserError("premature end of statement")                  
@@ -288,6 +302,10 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
                iCurToken += 1
                var sThisToken = sRelToken(-1)               
                'parse characteristic
+               if iName = _NULLPARTNAME andalso sThisToken[0] <> asc("=") then                  
+                  if bAttIgnored=0 then bAttIgnored=1 : ParserWarning("NULL part attribute ignored")
+                  continue do
+               end if                     
                select case sThisToken[0]
                case asc("s"),asc("c"): 'stud/clutch (connector)   (last token from the side)
                   #define curPart g_tPart(iName)
@@ -369,7 +387,7 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
             loop
          end with         
       loop
-            
+      
       with tConn      
          if .iLeftPart <> ecNotFound andalso .iRightPart <> ecNotFound then
             AddConnection( tConn ) 'lsfunctions.bas
@@ -420,15 +438,15 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
          do
             dim as byte bDidConnect , bHaveStrayConnections 
             ''print "#","left","used","right","used"
-            for I as long = 0 to g_iConnCount-1               
+            for I as long = 0 to g_iConnCount-1
                with g_tConn(I)
                   'decide what to do based on which sides are connected
-                  ''print I , .iLeftPart , g_tPart(.iLeftPart).bConnected , .iRightPart , g_tPart(.iRightPart).bConnected
+                  ''puts( I & " , " & .iLeftPart & ":" & g_tPart(.iLeftPart).bConnected  & " , " &  .iRightPart  & ":" &  g_tPart(.iRightPart).bConnected)
                   if g_tPart(.iLeftPart).bConnected=false then 'if left side isnt connected
                      if g_tPart(.iRightPart).bConnected then     'and right side is connected then SWAP and connect
                         swap .iLeftPart , .iRightPart : swap .iLeftType , .iRightType
-                        swap .iLeftNum  , .iRightNum
-                     else                                        'and right side is also disconnected then check for stray
+                        swap .iLeftNum  , .iRightNum : I -= 1 : continue for
+                     else                                        'and right side is also disconnected then check for stray                        
                         if bFirstConnect then
                            '------------------------------------------------------------------------
                            '------------------------ first part positioning ------------------------
@@ -469,20 +487,29 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
                   '   .iLeftPart  & "{" & .iLeftType  & ":" & .iLeftNum  & "} = " & _
                   '   .iRightPart & "{" & .iRightType & ":" & .iRightNum & "}"
                   'dim as single FromX,FromY,FromZ , ToX,ToY,ToZ
-                  var pModel = g_tModels(g_tPart(.iLeftPart).iModelIndex).pModel 
-                  var pSnap = cptr(PartSnap ptr,pModel->pData)            
-                  select case .iLeftType
-                  case spStud   : pLeft = pSnap->pStud  +.iLeftNum-1
-                  case spClutch : pLeft = pSnap->pClutch+.iLeftNum-1
-                  case else     : puts("Error")
-                  end select
-                  pModel = g_tModels(g_tPart(.iRightPart).iModelIndex).pModel 
-                  pSnap = cptr(PartSnap ptr,pModel->pData)
-                  select case .iRightType
-                  case spStud   : pRight = pSnap->pStud  +.iRightNum-1
-                  case spClutch : pRight = pSnap->pClutch+.iRightNum-1
-                  case else     : puts("Error")
-                  end select
+                  dim pSnap as PartSnap ptr  = NULL , pModel as DATFile ptr = NULL 
+                  if .iLeftPart = _NULLPARTNAME then
+                     pLeft = @g_NullSnap
+                  else
+                     pModel = g_tModels(g_tPart(.iLeftPart).iModelIndex).pModel 
+                     pSnap = cptr(PartSnap ptr,pModel->pData)            
+                     select case .iLeftType
+                     case spStud   : pLeft = pSnap->pStud  +.iLeftNum-1
+                     case spClutch : pLeft = pSnap->pClutch+.iLeftNum-1
+                     case else     : puts("Error")
+                     end select
+                  end if
+                  if .iRightPart = _NULLPARTNAME then
+                     pLeft = @g_NullSnap
+                  else                  
+                     pModel = g_tModels(g_tPart(.iRightPart).iModelIndex).pModel 
+                     pSnap = cptr(PartSnap ptr,pModel->pData)
+                     select case .iRightType
+                     case spStud   : pRight = pSnap->pStud  +.iRightNum-1
+                     case spClutch : pRight = pSnap->pClutch+.iRightNum-1
+                     case else     : puts("Error")
+                     end select
+                  end if                  
                   'print pLeft->fPX , pLeft->fPY , pLeft->fPZ
                   'print pRight->fPX , pRight->fPY , pRight->fPZ
                   'type SnapPV
@@ -494,7 +521,6 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
                   g_tPart(.iRightPart).bConnected = true : bDidConnect = true
                   
                   'pLeft/pRight are the snap matrix for the piece stud/clutch
-                                          
                   with g_tPart(iRightPart_)                              
                      'if memcmp( @pLeftPart->tMatrix , @g_tBlankMatrix , sizeof(Matrix4x4) ) = 0 then                        
                      '   'if memcmp( @pRightPart->tMatrix , @g_tBlankMatrix , sizeof(Matrix4x4) ) = 0 then                  
@@ -505,11 +531,16 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
                      'else
                      .tMatrix = pLeftPart->tMatrix
                      'end if
-                     with *(pLeft->pMatOrg)
-                        '.fPosX = 0
-                        '.fPosY = 100
-                        '.fPosZ = 0
-                     end with
+                     
+                     #if 0
+                        with *(pLeft->pMatOrg)
+                           '.fPosX = 0
+                           '.fPosY = 100
+                           '.fPosZ = 0
+                        end with
+                     #endif
+                     
+                     ''puts("pLeft:" & pLeft & " // pRight:" & pRight)
                      if pLeft->pMatOrg then 
                         puts("Prev rotation")
                         MultMatrix4x4( .tMatrix , .tMatrix , pLeft->pMatOrg )
@@ -517,11 +548,11 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
                      if pRight->pMatOrg then 
                         puts("Auto Rotating")
                         MultMatrix4x4( .tMatrix , .tMatrix , pRight->pMatOrg )
-                     end if
+                     end if                     
                      if .tLocation.fAX then MatrixRotateX( .tMatrix , .tMatrix , .tLocation.fAX )
                      if .tLocation.fAY then MatrixRotateY( .tMatrix , .tMatrix , .tLocation.fAY )
                      if .tLocation.fAZ then MatrixRotateZ( .tMatrix , .tMatrix , .tLocation.fAZ )
-                     
+                                                               
                      _fPX = pLeft->fPX : _fPY = pLeft->fPY : _fPZ = pLeft->fPZ               
                      'if pLeft->pMatOrg then MultiplyMatrixVector( @tVec3(0) , pLeft->pMatOrg )
                      'MultiplyMatrixVector( @tVec3(0) , @pLeftPart->tMatrix )
@@ -532,10 +563,11 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
                      dim as single tVec3R(2) = { pRight->fPX , pRight->fPY , pRight->fPZ }
                      'if pRight->pMatOrg then MultiplyMatrixVector( @tVec3R(0) , pRight->pMatOrg )
                      'MultiplyMatrixVector( @tVec3R(0) , @.tMatrix )
-                     
+                                                               
                      _fPX = ptLocation->fPX - (_fPX + tVec3R(0)) + .tLocation.fPX '.fPX
                      _fPY = ptLocation->fPY + (_fPY - tVec3R(1)) + .tLocation.fPY '.fPY
                      _fPZ = ptLocation->fPZ + (_fpZ + tVec3R(2)) + .tLocation.fPZ '.fPZ
+                                         
                      
                      'if .tLocation.fPX = 0 andalso .tLocation.fPY=0 andalso .tLocation.fPZ=0 then
                         .tLocation.fPX = _fPX : .tLocation.fPY = _fPY : .tLocation.fPZ = _fPZ
@@ -552,7 +584,7 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
                      tPart.xMin = tPart.xMin+.1+.tLocation.fPX : tPart.xMax = tPart.xMax-.1+.tLocation.fPX
                      tPart.yMin = tPart.yMin+.1+.tLocation.fPY : tPart.yMax = tPart.yMax-.1+.tLocation.fPY
                      tPart.zMin = tPart.zMin+.1+.tLocation.fPZ : tPart.zMax = tPart.zMax-.1+.tLocation.fPZ               
-                        
+                                                               
                      #if 0
                         for N as long = 0 to g_iPartCount-1
                            if N = iRightPart_ then continue for
@@ -589,10 +621,9 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
                   end with            
                   'puts("1 0 40 -24 -20 1 0 0 0 1 0 0 0 1 3001.dat")
                   'puts("1 0 0 0 0 1 0 0 0 1 0 0 0 1 3001.dat")
-                  
                end with
             next I   
-            
+                        
             ''print "First? ";bFirstConnect , "New? ";bDidConnect , "More? ";bHaveStrayConnections : sleep 
             ''print "-----------------------------------------------------------------------"
             if bDidConnect=false then 'there was no connections made?
@@ -756,7 +787,7 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
             if iName >=0 andalso g_tPart(iName).bFoundPart = 0 then ParserWarning("'"+sPart+"' primative not found")
             iCurToken += 2            
          else 'otherwise it must be an existing part name
-            #define sName sCurToken
+            #define sName sCurToken            
             if IsValidPartName( sName )=false then ParserError("'"+sName+"' is not a valid primative or part name")
             iName = FindPartName( sName )
             if iName < 0 then ParserError( "part name not declared" )
