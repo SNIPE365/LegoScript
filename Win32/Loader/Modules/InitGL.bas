@@ -40,6 +40,7 @@
 
 'const ScrWid=640,ScrHei=480
 
+
 function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    
    'screencontrol( fb.SET_GL_NUM_SAMPLES , 4 )
@@ -50,8 +51,8 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    dim as HWND hwndGFX
    screencontrol fb.GET_WINDOW_HANDLE , *cptr(uinteger ptr,@hwndGFX)   
          
-   'var lCurStyle = GetWindowLong(hwndGFX,GWL_STYLE) and (not (WS_MINIMIZEBOX or WS_MAXIMIZEBOX))
-   var lCurStyle = GetWindowLong(hwndGFX,GWL_STYLE) and (not WS_MAXIMIZEBOX)
+   'var lCurStyle = GetWindowLong(hwndGFX,GWL_STYLE) and (not (WS_MINIMIZEBOX or WS_MAXIMIZEBOX))   
+   var lCurStyle = GetWindowLong(hwndGFX,GWL_STYLE) or WS_MAXIMIZEBOX
    var lCurStyleEx = GetWindowLong(hwndGFX,GWL_EXSTYLE)
    SetWindowLong( hwndGFX , GWL_STYLE , lCurStyle or WS_SIZEBOX )
    'SetWindowLong( hwndGFX , GWL_EXSTYLE , lCurStyleEx or WS_EX_TOOLWINDOW )
