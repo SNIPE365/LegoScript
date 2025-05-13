@@ -3,6 +3,7 @@ namespace Viewer
    dim shared as byte g_LoadFile = 0
    dim shared as string g_sGfxFile , g_sFileName
    dim shared as any ptr g_Mutex
+   dim shared as boolean bShowCollision
    
    function LoadMemory( sContents as string , sName as string = "Unnamed.ls" ) as boolean
       MutexLock( g_Mutex )
@@ -23,7 +24,7 @@ namespace Viewer
       Mutexunlock( g_Mutex )
       return bLoadResult
    end function
-         
+
    sub MainThread( hReadyEvent as any ptr )
       
       g_Mutex = MutexCreate()
@@ -140,7 +141,8 @@ namespace Viewer
                select case e.scancode
                case fb.SC_LSHIFT : bShiftPressed or= 1
                case fb.SC_RSHIFT : bShiftPressed or= 2
-               case fb.SC_TAB   : bBoundingBox = not bBoundingBox
+               case fb.SC_TAB    : bBoundingBox = not bBoundingBox
+               case fb.SC_SPACE  : bShowCollision = not bShowCollision
                case fb.SC_DELETE
                   if bShiftPressed then
                      iPrevWheel = iWheel : fZoom = -3
@@ -348,7 +350,7 @@ namespace Viewer
          end if
          
          var iCollisions = ubound(atCollision)
-         if iCollisions andalso instr(g_sFileName,".dat")=0 then
+         if bShowCollision andalso iCollisions<>0 andalso instr(g_sFileName,".dat")=0 then
             glEnable( GL_POLYGON_STIPPLE )      
             static as ulong aStipple(32-1)
             dim as long iMove = (timer*8) and 7

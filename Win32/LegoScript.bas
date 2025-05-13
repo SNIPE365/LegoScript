@@ -18,13 +18,15 @@
 ' !!! some pieces have unmatched studs vs clutch (and i suspect that's their design problem) !!!
 ' !!! because when using ldraw it does not matter the order, so they never enforced that     !!!
 
-''TODO (22/04/2025) mouse wheel click is not resetting the camera if the model is panned off screen.
+'TODO (13/05/25): split LS2LDR function so that tokenized content can be used in query
+'TODO (13/05/25): Add Menu entries for the Query window/buttons , use arrows for the "show/hide output"
+'TODO (13/05/25): fix insertion/close tab bugs when doing execute() (clone hwnd bug????????????)
+'TODO (13/05/25): load/save settings for Legoscript main window
+'TODO (25/03/25): re-organize the LS2LDR code, so that it looks better and explain better
 'TODO (20/03/25): process keys to toggle filters and to change the text/add type (plate/brick/etc...)
 'TODO (05/03/25): fix LS2LDR parsing bugs
 'TODO (06/03/25): check bug regarding wheel positioning and the line numbers
-'TODO (25/03/25): re-organize the LS2LDR code, so that it looks better and explain better
 'TODO (21/04/25): prevent buffer overflow when doing a FIND/RESEARCH when the selected text is bigger than 32k
-'TODO (05/05/25): finish "show output" button, and add a potential side window
 
 '*************** Enumerating our control id's ***********
 enum StatusParts
@@ -37,11 +39,18 @@ enum WindowControls
   wcButton  
   wcLines
   wcEdit
+  wcRadOutput
+  wcRadQuery
+  wcBtnExec
+  wcBtnLoad
+  wcBtnSave
   wcBtnMinOut
   wcOutput
+  wcQuery
   wcStatus
   wcLast
 end enum
+
 enum WindowFonts
    wfDefault
    wfEdit
@@ -56,6 +65,7 @@ end enum
 
 #define CTL(_I) g_tMainCtx.hCtl(_I).hwnd
 
+#include Once "LSModules\ColoredButtons.bas"
 #include once "LSModules\TryCatch.bas"
 #include once "LSModules\Layout.bas"
 
@@ -67,6 +77,7 @@ end type
 type TabStruct
    hEdit      as hwnd
    sFilename  as string
+   iLinked    as long   = -1
 end type
 redim shared g_tTabs(0) as TabStruct 
 dim shared as long g_iTabCount = 1 , g_iCurTab = 0
@@ -301,6 +312,9 @@ function CreateMainAccelerators() as HACCEL
 end function
 
 sub DockGfxWindow()
+   static as integer iOnce=0
+   if g_GfxHwnd=0 then exit sub
+   ''if IsWindowVisible(g_GfxHwnd)=0 then ShowWindow( g_GfxHwnd , SW_SHOW )
    dim as RECT RcWnd=any,RcGfx=any,RcCli=any,RcDesk
    GetWindowRect( GetDesktopWindow() , @RcDesk )
    GetWindowRect( g_GfxHwnd , @RcGfx )
@@ -319,8 +333,9 @@ sub DockGfxWindow()
       hPlace = HWND_TOPMOST : tPtRight.x = RcDesk.right-GfxWid
    end if
    'gfx.tOldPt.x = -65537
-   SetWindowPos( g_GfxHwnd , hPlace , tPtRight.x-4 ,iYPos , 0,0 , SWP_NOSIZE or SWP_NOACTIVATE or ((g_Dock3D=0) and SWP_NOMOVE) )
+   SetWindowPos( g_GfxHwnd , hPlace , tPtRight.x-4 ,iYPos , 0,0 , SWP_NOSIZE or SWP_NOACTIVATE or ((g_Dock3D=0 orelse iOnce<>0) and SWP_NOMOVE) )
    'NotifySelChange( wcEdit ) ??Why this was here??
+   iOnce = 1
 end sub   
 sub ResizeMainWindow( bCenter as boolean = false )         
    'Calculate Client Area Size
@@ -470,32 +485,37 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
            dim MenuItemCallback as sub () = cast(any ptr,tItem.dwItemData)
            MenuItemCallback()        
          end if
-         g_CurItemID = 0 : g_hCurMenu = 0
+         g_CurItemID = 0 : g_hCurMenu = 0 : return 0
       case  1         'Accelerator
          ProcessAccelerator( wID )
-      case else
-         select case wID                  
-         case wcEdit
-            select case wNotifyCode
-            case EN_SETFOCUS               
-               ShowWindow( g_hContainer , g_SearchVis   )               
-            case EN_KILLFOCUS
-               'printf(!"%p (%p) (%p)\n",GetFocus(),g_hContainer,CTL(wcEdit))
-               'if GetForegroundWindow() <> g_hContainer then 
-               var hFocus = GetFocus()
-               if hFocus=0 orelse (hFocus <> g_hSearch andalso hFocus<>g_hContainer andalso hFocus <> CTL(wcEdit)) then
-                  ShowWindow( g_hContainer , SW_HIDE )
-               end if
-            case EN_VSCROLL
-               RichEdit_TopRowChange( hwndCtl )
-            end select
-         case wcButton
-            select case wNotifyCode
-            case BN_CLICKED
-               Button_Compile()            
-            end select
+         return 0
+      case BN_CLICKED 'Clicked action for different buttons
+         select case wID
+         case wcButton    : Button_Compile()
+         case wcRadOutput : Output_SetMode()
+         case wcRadQuery  : Output_SetMode()
+         case wcBtnExec   : Output_QueryExecute()
+         case wcBtnLoad   : Output_Load()
+         case wcBtnSave   : Output_Save()
+         case wcBtnMinOut : Output_ShowHide()
          end select
       end select      
+      select case wID
+      case wcEdit     'Main editor control actions
+         select case wNotifyCode
+         case EN_SETFOCUS               
+            ShowWindow( g_hContainer , g_SearchVis   )               
+         case EN_KILLFOCUS
+            'printf(!"%p (%p) (%p)\n",GetFocus(),g_hContainer,CTL(wcEdit))
+            'if GetForegroundWindow() <> g_hContainer then 
+            var hFocus = GetFocus()
+            if hFocus=0 orelse (hFocus <> g_hSearch andalso hFocus<>g_hContainer andalso hFocus <> CTL(wcEdit)) then
+               ShowWindow( g_hContainer , SW_HIDE )
+            end if
+         case EN_VSCROLL
+            RichEdit_TopRowChange( hwndCtl )
+         end select
+      end select
       
       return 0
     
@@ -542,65 +562,7 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
    case WM_ENTERMENULOOP , WM_ENTERSIZEMOVE  
      ShowWindow( g_hContainer , SW_HIDE )
    case WM_CREATE  'Window was created
-                  
-      if CTL(wcMain) then return 0
-      _InitForm()
-      
-      var hEventGfxReady = CreateEvent( NULL , FALSE , FALSE , NULL )    
-      g_hResizeEvent = CreateEvent( NULL , FALSE , FALSE , NULL )
-      ThreadDetach( ThreadCreate( @Viewer.MainThread , hEventGfxReady ) )
-      
-      InitFont( wfDefault , g_sMainFont   , 12 ) 'default application font
-      InitFont( wfStatus  , g_sMainFont  , 10 )  'status bar font
-      InitFont( wfEdit    , g_sFixedFont  , 16 ) 'edit controls font
-                  
-      AddTabsA  ( wcTabs      , cMarginL  , cMarginT  , _pct(85) , cRow(1.25) , cRow(1.25) )
-      AddButtonA( wcButton    , _NextCol  , _SameRow  , cMarginR , cRow(1.25) , "Build" )
-      AddTextA  ( wcLines     , cMarginL  , _NextRow0 , _pct(2*1.66*2) , _pct(53) ,  "" , SS_OWNERDRAW )
-      AddRichA  ( wcEdit      , _NextCol0 , _SameRow  , cMarginR , _pct(53) , "" , WS_HSCROLL or WS_VSCROLL or ES_AUTOHSCROLL or ES_DISABLENOSCROLL or ES_NOHIDESEL )
-      AddRichA  ( wcOutput    , cMarginL  , _NextRow  , cMarginR , _BottomP(-5) , "" , WS_HSCROLL or WS_VSCROLL or ES_AUTOHSCROLL or ES_READONLY )
-      'AddButtonA( wcBtnMinOut , _RtP(wcOutput,-4) , _SameRow , _pct(4) , cRow(1) , "O" , BS_AUTOCHECKBOX or BS_PUSHLIKE )
-      'AddButtonA( wcBtnMinOut , _pct(0) , _pct(0) , _num(16) , _num(16) , "O" , BS_AUTOCHECKBOX or BS_PUSHLIKE )
-      AddStatusA( wcStatus    , "Ready." )
-      
-      'SetParent( CTL(wcBtnMinOut) , CTL(wcOutput) )
-                  
-      SetControlsFont( wfEdit   , wcLines , wcEdit , wcOutput )
-      SetControlsFont( wfStatus , wcStatus )
-      
-      SetWindowTheme( CTL(wcEdit) , "" , "" )
-      SendMessage( CTL(wcEdit) , EM_EXLIMITTEXT , 0 , 16*1024*1024 ) '16mb text limit
-      SendMessage( CTL(wcEdit) , EM_SETEVENTMASK , 0 , ENM_SELCHANGE or ENM_KEYEVENTS or ENM_SCROLL )
-      OrgEditProc = cast(any ptr,SetWindowLongPtr( CTL(wcEdit) , GWLP_WNDPROC , cast(LONG_PTR,@WndProcEdit) ))
-      
-      dim as TC_ITEM tItem = type( TCIF_TEXT or TCIF_PARAM , 0,0 , @"Unnamed" , 0,-1 , 0 ) 
-      with g_tTabs(0)
-         TabCtrl_InsertItem( CTL(wcTabs) , 0 , @tItem )
-         .hEdit = CTL(wcEdit) : .sFilename = ""
-      end with
-      SetControlsFont( wfStatus, wcTabs )
-                          
-      WaitForSingleObject( hEventGfxReady , INFINITE )    
-      CloseHandle( hEventGfxReady )
-      if g_GfxHwnd = 0 then return -1 'failed
-      
-      InitSearchWindow()
-      Menu.Trigger( meCompletion_Enable )
-      Menu.Trigger( meView_ToggleGWDock )
-      'Menu.Trigger( meCompletion_Variations )
-      
-      'SetWindowPos( g_hContainer , 0 , 0,0,100,100 , SWP_NOZORDER or SWP_SHOWWINDOW or SWP_NOMOVE )
-      'ShowWindow( g_hContainer , SW_SHOW )
-      ResizeMainWindow( true )    
-      File_New()    
-      'LoadFileIntoEditor( exePath+"\sample.ls" )
-      SetForegroundWindow( ctl(wcMain) )
-      SetFocus( ctl(wcEdit) )
-      
-      'SetTimer( hwnd , 1 , 100 , NULL )      
-      
-      return 0
-          
+      #include "LSModules\LSMainCreate.bas"          
    case WM_CLOSE   'close button was clicked
       if GetWindowTextLength( CTL(wcEdit) ) then
          #define sMsg !"All unsaved data will be lost, quit anyway?"
@@ -655,7 +617,7 @@ sub WinMain ()
    var hMenu = CreateMainMenu()
    var hAcceleratos = CreateMainAccelerators()
    
-   hWnd = CreateWindowEx(0,sAppName,sAppName, WS_TILEDWINDOW or WS_CLIPCHILDREN, _
+   hWnd = CreateWindowEx(WS_EX_COMPOSITED,sAppName,sAppName, WS_TILEDWINDOW or WS_CLIPCHILDREN, _
    200,200,g_WndWid,g_WndHei,null,hMenu,g_AppInstance,0)
    
    'SetClassLong( hwnd , GCL_HBRBACKGROUND , CLNG(GetSysColorBrush(COLOR_INFOBK)) )

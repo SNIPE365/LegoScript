@@ -77,46 +77,14 @@ sub ChangeToTab( iNewTab as long , bForce as boolean = false )
       NotifySelChange( wcEdit )      
    end with
 end sub
-function CloneHwnd( hWnd as HWND ) as HWND
+function CloneHwnd( hWnd as HWND , iIncStyles as integer = 0 ) as HWND
    var wClass   = cast(zstring ptr , GetClassLong( hWnd , GCW_ATOM ) )
    var hInst    = cast(HINSTANCE, GetWindowLong(hWnd,GWL_HINSTANCE))
    var hParent  = cast(HWND     , GetWindowLong(hWnd,GWL_HWNDPARENT))
-   var lStyle   = GetWindowLong(hWnd,GWL_STYLE)
+   var lStyle   = GetWindowLong(hWnd,GWL_STYLE)   
    var lStyleEx = GetWindowLong(hWnd,GWL_EXSTYLE)
-   return CreateWindowEx( lStyleEx , wClass , NULL , lStyle , 0,0,0,0 , hParent , 0 , hInst , NULL )
+   return CreateWindowEx( lStyleEx , wClass , NULL , lStyle or iIncStyles , 0,0,0,0 , hParent , 0 , hInst , NULL )
 end function
-
-sub Do_Compile()   
-   SetWindowText( CTL(wcStatus) , "Building..." )   
-   var iMaxLen = GetWindowTextLength( CTL(wcEdit) )
-   var sScript = space(iMaxLen)
-   if GetWindowText( CTL(wcEdit) , strptr(sScript) , iMaxLen+1 )<>iMaxLen then 
-      puts("Failed to retrieve text content...")
-      SetWindowText( CTL(wcStatus) , "Build failed." )
-      exit sub  
-   end if
-   dim as string sOutput, sError
-   sOutput = LegoScriptToLDraw( sScript , sError )   
-   SetWindowText( CTL(wcOutput) , iif(len(sError)=0,sOutput,sError) )   
-   if len(sOutput) then
-      if lcase(right(g_CurrentFilePath,3)) = ".ls" then
-         Viewer.LoadMemory( sOutput , left(g_CurrentFilePath,len(g_CurrentFilePath)-3)+".ldr" )
-      else
-         Viewer.LoadMemory( sOutput , g_CurrentFilePath+".ldr" )
-      end if
-   end if
-   SetWindowText( CTL(wcStatus) , iif(len(sOutput),"Ready.","Script error.") )
-   
-end sub
-sub Button_Compile()
-   Try()
-      Do_Compile()
-      Catch()
-         LogError( "Compilation Crashed!!!" )
-      EndCatch()
-   EndTry()
-end sub
-'**************** Main Menu Layout **************
 
 sub UpdateTabName( iTab as long )
    if cuint(iTab) >= g_iTabCount then exit sub   
@@ -138,38 +106,62 @@ sub UpdateTabName( iTab as long )
       end if
    end with   
 end sub
-function NewTab( sNewFile as string ) as long   
+function NewTab( sNewFile as string , iLinked as long = -1 ) as long   
    var iNewTab = 0 , sFile = sNewFile 'byval
-   if len(g_tTabs(g_iCurTab).sFilename) orelse GetWindowTextLength( CTL(wcEdit) )<>0 then
+   if iLinked < -1 then iLinked = -1 else if iLinked >= g_iTabCount then iLinked = -1
+   'if the current tab is empty and it's not linked and ....
+   'if we're not linking to tab then reuse same tab instead of creating a new one
+   var bIsLinked = (g_tTabs(g_iCurTab).iLinked <> -1)
+   var bHasText  = GetWindowTextLength( CTL(wcEdit) )<>0
+   var bHaveName = len(g_tTabs(g_iCurTab).sFilename)
+   if iLinked<>-1 orelse bIsLinked orelse bHaveName orelse bHasText then
       iNewTab = g_iTabCount 'create new TAB
       redim preserve g_tTabs(g_iTabCount) : g_iTabCount += 1
-      var hWnd = CloneHwnd( CTL(wcEdit) )
+      if iLinked <> -1 then
+         iNewTab = iLinked+1
+         while iNewTab < (g_iTabCount-1) andalso g_tTabs(iNewTab).iLinked = iLinked
+            iNewTab += 1
+         wend         
+         for N as long = 0 to (g_iTabCount-2)
+            if g_tTabs(N).iLinked > iLinked then g_tTabs(N).iLinked += 1
+         next N         
+         for N as long = (g_iTabCount-1) to iLinked+1 step -1
+            g_tTabs(N) = g_tTabs(N-1)
+         next N
+      end if         
+      var cStyle = ES_MULTILINE or ES_WANTRETURN or WS_HSCROLL or WS_VSCROLL or ES_AUTOHSCROLL or ES_DISABLENOSCROLL or ES_NOHIDESEL
+      var hWnd = CloneHwnd( CTL(wcEdit) , cStyle )
+      SetWindowTheme( hWnd , "" , "" )
       g_tTabs( iNewTab ).hEdit = hWnd
       SendMessage( hWnd , EM_EXLIMITTEXT , 0 , 16*1024*1024 ) '16mb text limit
       SendMessage( hWnd , EM_SETEVENTMASK , 0 , ENM_SELCHANGE or ENM_KEYEVENTS or ENM_SCROLL )
       dim as TC_ITEM tItem = type( TCIF_TEXT , 0,0 , @" " , 0,-1 , 0 ) 
       TabCtrl_InsertItem( CTL(wcTabs) , iNewTab , @tItem )         
    end if
-   
+      
    with g_tTabs(iNewTab)
-      if len(sFile) then      
+      .iLinked = iLinked
+      if iLinked <> -1 then
+         dim as zstring*384 zName = any
+         dim as TC_ITEM tItem = type( TCIF_TEXT , 0,0 , @zName,384,-1 , 0 ) 
+         TabCtrl_GetItem( CTL(wcTabs) , iLinked , @tItem )      
+         var iPosi = instrrev(zName,".") : if iPosi=0 then iPosi = len(zName)+1
+         sFile = left(zName,iPosi-1)+"_1"+mid(zName,iPosi)
+      elseif len(sFile) then      
          var iPos = instrrev(sFile,"\") , iPos2 = instrrev(sFile,"/")
-         if iPos2 > iPos then iPos = iPos2
+         if iPos2 > iPos then iPos = iPos2         
          .sFilename = sFile
-         sFile = mid(sFile,iPos+1)
-         dim as TC_ITEM tItem = type( TCIF_TEXT , 0,0 , strptr(sFile) , 0,-1 , 0 ) 
-         TabCtrl_SetItem( CTL(wcTabs) , iNewTab , @tItem )      
+         sFile = mid(sFile,iPos+1)         
       else
          sFile = "Unnamed"      
-         .sFilename = ""      
-         dim as TC_ITEM tItem = type( TCIF_TEXT , 0,0 , strptr(sFile) , 0,-1 , 0 ) 
-         TabCtrl_SetItem( CTL(wcTabs) , iNewTab , @tItem )      
+         .sFilename = ""               
       end if
+      dim as TC_ITEM tItem = type( TCIF_TEXT , 0,0 , strptr(sFile) , 0,-1 , 0 ) 
+      TabCtrl_SetItem( CTL(wcTabs) , iNewTab , @tItem )      
    end with
+   InvalidateRect( CTL(wcTabs) , NULL , true )
    return iNewTab
 end function
-
-
 sub File_New()
    ChangeToTab( NewTab( "" ) )
 end sub
@@ -273,15 +265,104 @@ sub File_Close()
    ChangeToTab( iNewTab+(iNewTab=g_iCurTab) )
    SendMessage( g_tTabs(iCurTab).hEdit , EM_SETEVENTMASK , 0 , 0 )
    DestroyWindow( g_tTabs(iCurTab).hEdit )
-   for N as long = iCurTab+1 to g_iTabCount-1
-      g_tTabs(N-1) = g_tTabs(N)
+   for N as long = 0 to g_iTabCount-1
+      if g_tTabs(N).iLinked > iCurTab then g_tTabs(N).iLinked -= 1
+   next N
+   for N as long = iCurTab+1 to g_iTabCount-1               
+      g_tTabs(N-1) = g_tTabs(N)      
    next N
    TabCtrl_DeleteItem( CTL(wcTabs) , iCurTab )
+   InvalidateRect( CTL(wcTabs) , NULL , true )
    g_iTabCount -= 1 : Redim preserve g_tTabs(g_iTabCount)
    g_iCurTab = iNewTab
    
 end sub
 
+sub Do_Compile()   
+   SetWindowText( CTL(wcStatus) , "Building..." )   
+   var iMaxLen = GetWindowTextLength( CTL(wcEdit) )
+   var sScript = space(iMaxLen)
+   if GetWindowText( CTL(wcEdit) , strptr(sScript) , iMaxLen+1 )<>iMaxLen then 
+      puts("Failed to retrieve text content...")
+      SetWindowText( CTL(wcStatus) , "Build failed." )
+      exit sub  
+   end if
+   dim as string sOutput, sError
+   sOutput = LegoScriptToLDraw( sScript , sError )   
+   SetWindowText( CTL(wcOutput) , iif(len(sError)=0,sOutput,sError) )   
+   if len(sOutput) then
+      if lcase(right(g_CurrentFilePath,3)) = ".ls" then
+         Viewer.LoadMemory( sOutput , left(g_CurrentFilePath,len(g_CurrentFilePath)-3)+".ldr" )
+      else
+         Viewer.LoadMemory( sOutput , g_CurrentFilePath+".ldr" )
+      end if
+   end if
+   SetWindowText( CTL(wcStatus) , iif(len(sOutput),"Ready.","Script error.") )
+   
+end sub
+sub Button_Compile()
+   Try()
+      Do_Compile()
+      Catch()
+         LogError( "Compilation Crashed!!!" )
+      EndCatch()
+   EndTry()
+end sub
+sub Output_SetMode()
+   var iOutput = SendMessage( CTL(wcRadOutput) , BM_GETCHECK , 0 , 0 )
+   EnableWindow( CTL(wcBtnExec) , iOutput=0 )
+   EnableWindow( CTL(wcBtnLoad) , iOutput=0 )   
+   ShowWindow( CTL(wcOutput) , iif(iOutput  ,SW_SHOWNA,SW_HIDE) )
+   ShowWindow( CTL(wcQUery)  , iif(iOutput=0,SW_SHOWNA,SW_HIDE) )
+   var hFocus = GetFocus()
+   if hFocus = CTL(wcRadOutput) orelse hFocus = CTL(wcRadQuery) then
+      SetFocus( iif(iOutput , CTL(wcOutput) , CTL(wcQuery)) )
+   end if   
+end sub
+sub Output_QueryExecute()
+   var iCurTab = g_iCurTab , iNewTab = 0
+   'if the tab is linked then we process the linked tab and output on current tab
+   if g_tTabs(iCurTab).iLinked <> -1 then       
+      iNewTab = iCurTab : iCurTab = g_tTabs(iCurTab).iLinked
+   else 'otherwise if the next tab is linked to this then we output on that next tab
+      if iCurTab < (g_iTabCount-1) andalso g_tTabs(iCurTab+1).iLinked = iCurTab then
+         iNewTab = iCurTab+1
+      else 'and if the next tab is not linked to current then we create a new one linked to current
+         iNewTab = NewTab( "" , iCurTab )
+      end if
+   end if
+   'iCurTab = tab to process , iNewTab = tab to output
+   var sQuery = space(SendMessage( CTL(wcQuery) , WM_GETTEXTLENGTH , 0,0 ))
+   SendMessage( CTL(wcQuery) , WM_GETTEXT , len(sQuery)+1 , cast(LPARAM,strptr(sQuery)) )      
+   puts("'"+sQuery+"'")   
+   var sText = space(SendMessage( g_tTabs( iCurTab ).hEdit , WM_GETTEXTLENGTH , 0,0 ))
+   SendMessage( g_tTabs( iCurTab ).hEdit , WM_GETTEXT , len(sText)+1 , cast(LPARAM,strptr(sText)) )
+   SendMessage( g_tTabs(iNewTab).hEdit  , WM_SETTEXT , 0 , cast(LPARAM,strptr(sText)) )   
+   
+   ChangeToTab( iNewTab )
+end sub
+sub Output_Load()
+   puts(__FUNCTION__)
+end sub
+sub Output_Save()
+   puts(__FUNCTION__)
+end sub
+sub Output_ShowHide()
+   var iOpen = SendMessage( CTL(wcBtnMinOut) , BM_GETCHECK , 0 , 0 )
+   g_tMainCtx.hCTL( wcEdit ).tH = iif(iOpen , _pct(53) , _BottomP(-5) )
+   g_tMainCtx.hCTL( wcLines ).tH = g_tMainCtx.hCTL( wcEdit ).tH
+   g_tMainCtx.hCTL( wcBtnMinOut ).tX = iif(iOpen, _RtP(wcOutput,-4) , _RtP(wcOutput,-3))   
+   for I as long = wcRadOutput to wcBtnMinOut-1
+      ShowWindow( CTL(I) , iif(iOpen,SW_SHOWNA,SW_HIDE) )
+   next I      
+   var hWnd = CTL(wcMain)
+   dim as RECT RcCli=any : GetClientRect(hWnd,@RcCli)      
+   ResizeLayout( hWnd , g_tMainCtx.tForm , RcCli.right , RcCli.bottom )
+   if GetFocus() = CTL(wcBtnMinOut) then
+      var iOutput = SendMessage( CTL(wcRadOutput) , BM_GETCHECK , 0 , 0 )
+      SetFocus( iif(iOpen , CTL(iif(iOutput,wcOutput,wcQuery)) , CTL(wcEdit)) )
+   end if   
+end sub
 
 static shared as FINDREPLACE g_tFindRep
 static shared as long g_FindRepMsg
@@ -492,7 +573,7 @@ sub View_ToggleGW()
       end if
    end if   
    Menu.MenuState( g_hCurMenu,g_CurItemID, iToggledState )
-   for N as long = meView_ResetView to meView_PrevBoxPart 'View.*
+   for N as long = meView_ShowCollision to meView_PrevBoxPart 'View.*
       EnableMenuItem( g_hCurMenu , N , iif( iToggledState and MFS_CHECKED , MF_ENABLED , MF_GRAYED ) )
    next N
 end sub
@@ -501,6 +582,22 @@ sub View_ToggleGWDock()
    g_Dock3D = (iToggledState and MFS_CHECKED)<>0
    if g_Dock3D andalso g_GfxHwnd then DockGfxWindow()
    Menu.MenuState( g_hCurMenu,g_CurItemID, iToggledState )   
+end sub
+sub View_ToggleKey()
+   if IsWindow(g_GfxHwnd)=0 then exit sub
+   dim vk as long , sft as byte
+   
+   select case g_CurItemID
+   case meView_ShowCollision 
+      Menu.MenuState( g_WndMenu,meView_ShowCollision, iif(Viewer.bShowCollision=0,MFS_CHECKED,0) )
+      vk = VK_SPACE
+   case else : puts("bad View_ToggleKey()"): exit sub
+   end select
+   
+   if sft then SendMessage( g_GfxHwnd , WM_KEYDOWN , VK_SHIFT , 0 ) 'scShift )
+   SendMessage( g_GfxHwnd , WM_KEYDOWN , vk , 0 )   
+   SendMessage( g_GfxHwnd , WM_KEYUP  , vk , 0 )
+   if sft then SendMessage( g_GfxHwnd , WM_KEYUP   , VK_SHIFT , 0 ) 'scShift )
 end sub
 sub View_Key()
    if IsWindow(g_GfxHwnd)=0 then exit sub
