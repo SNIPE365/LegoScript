@@ -213,7 +213,15 @@ sub ResizeLayout( hWnd as HWND , tForm as FormStruct , iWidth as long , iHeight 
       var hCurFont = .pFnt[cint(.pCtl[N].bFont)].hFont , hCtl = .pCtl[N].hwnd
       if hCtl = 0 then continue for
       'if N then SendMessage( hCtl , WM_SETREDRAW , false , 0 )
-      if hCtl then SendMessage( hCtl , WM_SETFONT,cast(wparam, hCurFont),false )
+      if hCtl then 
+         #ifdef g_bChangingFont
+            g_bChangingFont = true
+         #endif
+         SendMessage( hCtl , WM_SETFONT,cast(wparam, hCurFont),false )
+         #ifdef g_bChangingFont
+            g_bChangingFont = false
+         #endif
+      end if
     next N
     ReleaseDC( hWnd , hDC )
     for N as integer = 0 to .iFntCnt-1
@@ -229,12 +237,14 @@ sub ResizeLayout( hWnd as HWND , tForm as FormStruct , iWidth as long , iHeight 
     var hCtl = GetWindow(hWnd,GW_CHILD)        
     do
       var N = GetDlgCtrlID( hCtl )
-      with tForm.pCtl[N]
-        if .hwnd then
-          ControlUpdateLayout( tForm , N, R )
-        end if
-        if R then DeferWindowPos(hResize,.hwnd,0,.iX,.iY,.iW,iif(.iH2,.iH2,.iH),_SWP_Flags)        
-      end with              
+      if N then
+         with tForm.pCtl[N]
+           if .hwnd then
+             ControlUpdateLayout( tForm , N, R )
+           end if
+           if R then DeferWindowPos(hResize,.hwnd,0,.iX,.iY,.iW,iif(.iH2,.iH2,.iH),_SWP_Flags)        
+         end with
+      end if
       hCtl = GetWindow( hCtl , GW_HWNDNEXT )
     loop while hCtl
   next R

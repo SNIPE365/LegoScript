@@ -105,7 +105,93 @@ static shared as SnapPV g_NullSnap
 
 'TODO: now check the remainder tokens, clutch/studs
 
-#If 1
+function LS_GetNextStatement( sScript as string , iStStart as long , Out_sStatement as string , InOut_iLineNumber as long ) as long
+   if iStStart >= len(sScript) then Out_sStatement = "" : return 0
+   dim as long iStNext = instr(iStStart,sScript,";")
+   if iStNext=0 then iStNext = len(sScript)
+   var pzFb = cptr(fbStr ptr,@Out_sStatement)
+   with *pzFb
+      .pzData = cptr(ubyte ptr,strptr(sScript))+iStStart-1
+      .iLen = iif(iStNext,iStNext,1+len(sScript))-(iStStart)         
+      while .iLen>0 andalso (g_bSeparators(.pzData[0]) and stToken)
+         select case .pzData[0] 'special chars
+         case asc("/"): exit while
+         case asc(!"\n"): InOut_iLineNumber += 1
+         case asc(!"\r"): if .pzData[1]=asc(!"\n") then .pzData += 1 : .iLen -= 1 : InOut_iLineNumber += 1
+         end select
+         .pzData += 1 : .iLen -= 1
+      wend
+      while .iLen>0 andalso (g_bSeparators(.pzData[.iLen-1]) and stToken)
+         select case .pzData[.iLen-1] 'special chars
+         case asc("/") : exit while
+         case asc(!"\n"): InOut_iLineNumber += 1
+         case asc(!"\r"): if .pzData[.iLen]=asc(!"\n") then .iLen -= 1 : InOut_iLineNumber += 1
+         end select
+         .iLen -= 1
+      wend
+      if .iLen=0 then 
+         if iStNext=len(sScript) then iStNext=0
+         Out_sStatement = ""
+      end if
+   end with
+   return iStNext
+end function
+function LS_SplitTokens( sStatement as string , Out_sToken() as string , byref InOut_iLineNumber as long = 0 , byref Out_iErrToken as long = 0 ) as long
+   dim as long iTokStart=0,iTokCnt=0,iTokEnd=len(sStatement)
+   'split tokens
+   'print "["+sStatement+"]"
+   var pzStatement = cptr(ubyte ptr,strptr(sStatement))
+   Out_iErrToken = 0
+   do
+      #define iCurToken iTokCnt-1
+      if iTokCnt > ubound(Out_sToken) then Out_iErrToken = iCurToken : exit do
+      with *cptr(fbStr ptr,@Out_sToken(iTokCnt))
+         .pzData = pzStatement+iTokStart
+         'skipping start of next token till a "non token separator" is found
+         while (g_bSeparators(.pzData[0]) and stToken)
+            if .pzData[0]=0 then exit do
+            .pzData += 1 : iTokStart += 1               
+            select case .pzData[-1] 'special characters
+            case asc(!"\n") 'new line (LF)
+               InOut_iLineNumber += 1
+            case asc(!"\r")   'new line (CRLF)
+               if .pzData[0]=asc(!"\n") then .pzData += 1 : iTokStart += 1 : InOut_iLineNumber += 1
+            case asc("/")    'escaping (commenting?)
+               if .pzData[0]=asc("/") then     'comment till EOL
+                  while iTokStart < iTokEnd andalso .pzData[0]<>asc(!"\r") andalso .pzData[0]<>asc(!"\n")
+                     .pzData += 1 : iTokStart += 1
+                  wend
+               elseif .pzData[0]=asc("*") then 'comment till *\
+                  .pzData += 1 : iTokStart += 1
+                  while iTokStart < iTokEnd andalso .pzData[0]
+                     .pzData += 1 : iTokStart += 1
+                     if .pzData[-1]=asc("*") andalso .pzData[0]=asc("/") then
+                        .pzData += 1 : iTokStart += 1 : exit while
+                     end if
+                  wend
+               end if
+            end select
+            if iTokStart >= iTokEnd then .iSize = InOut_iLineNumber : exit do
+         wend
+         'locating end/size of current token
+         ''print .pzData[0],chr(.pzData[0])
+         if (g_bSeparators(.pzData[0]) and (not stToken)) then
+            .iLen = 1 : iTokStart += 1
+         else
+            .iLen = 0
+            while g_bSeparators(.pzData[.iLen])=0
+               if iTokStart >= iTokEnd then exit while
+               .iLen += 1 : iTokStart += 1
+            wend
+         end if
+         .iSize = InOut_iLineNumber
+         if .iLen <= 0 then exit do
+         iTokCnt += 1
+      end with         
+   loop
+   return iTokCnt
+end function
+
 function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as string
    
    '<PartCode> <PartName> <PartPosition> =
@@ -113,7 +199,7 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
    
    'split tokens
    dim as string sStatement, sToken(15), sResult
-   dim as long iStStart=1,iStNext,iLineNumber=1,iTokenLineNumber=1
+   dim as long iStStart=1,iLineNumber=1,iTokenLineNumber=1
    sOutput = "" : g_iPartCount = 1 : g_iConnCount = 0
    
    #define TokenLineNumber(_N) (cptr(fbStr ptr,@sToken(_N))->iSize)
@@ -138,83 +224,16 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
    'Parsing LS and generate connections
    while 1
       'get next statement
-      iStNext = instr(iStStart,sScript,";")
-      var pzFb = cptr(fbStr ptr,@sStatement)
-      with *pzFb
-         .pzData = cptr(ubyte ptr,strptr(sScript))+iStStart-1
-         .iLen = iif(iStNext,iStNext,1+len(sScript))-(iStStart)         
-         while .iLen>0 andalso (g_bSeparators(.pzData[0]) and stToken)
-            select case .pzData[0] 'special chars
-            case asc("/"): exit while
-            case asc(!"\n"): iLineNumber += 1
-            case asc(!"\r"): if .pzData[1]=asc(!"\n") then .pzData += 1 : .iLen -= 1 : iLineNumber += 1
-            end select
-            .pzData += 1 : .iLen -= 1
-         wend
-         while .iLen>0 andalso (g_bSeparators(.pzData[.iLen-1]) and stToken)
-            select case .pzData[.iLen-1] 'special chars
-            case asc("/") : exit while
-            case asc(!"\n"): iLineNumber += 1
-            case asc(!"\r"): if .pzData[.iLen]=asc(!"\n") then .iLen -= 1 : iLineNumber += 1
-            end select
-            .iLen -= 1
-         wend
-         if .iLen=0 then 
-            if iStNext=0 then exit while
-            iStStart = iStNext+1 : continue while
-         end if
-      end with
-      dim as long iTokStart=0,iTokNext,iTokCnt=0,iTokEnd=len(sStatement)
-      'split tokens
-      'print "["+sStatement+"]"
-      var pzStatement = cptr(ubyte ptr,strptr(sStatement))      
-      do
-         #define iCurToken iTokCnt-1
-         if iTokCnt > ubound(sToken) then ParserError("Too many tokens")            
-         with *cptr(fbStr ptr,@sToken(iTokCnt))
-            .pzData = pzStatement+iTokStart
-            'skipping start of next token till a "non token separator" is found
-            while (g_bSeparators(.pzData[0]) and stToken)
-               if .pzData[0]=0 then exit do
-               .pzData += 1 : iTokStart += 1               
-               select case .pzData[-1] 'special characters
-               case asc(!"\n") 'new line (LF)
-                  iLineNumber += 1
-               case asc(!"\r")   'new line (CRLF)
-                  if .pzData[0]=asc(!"\n") then .pzData += 1 : iTokStart += 1 : iLineNumber += 1
-               case asc("/")    'escaping (commenting?)
-                  if .pzData[0]=asc("/") then     'comment till EOL
-                     while iTokStart < iTokEnd andalso .pzData[0]<>asc(!"\r") andalso .pzData[0]<>asc(!"\n")
-                        .pzData += 1 : iTokStart += 1
-                     wend
-                  elseif .pzData[0]=asc("*") then 'comment till *\
-                     .pzData += 1 : iTokStart += 1
-                     while iTokStart < iTokEnd andalso .pzData[0]
-                        .pzData += 1 : iTokStart += 1
-                        if .pzData[-1]=asc("*") andalso .pzData[0]=asc("/") then
-                           .pzData += 1 : iTokStart += 1 : exit while
-                        end if
-                     wend
-                  end if
-               end select
-               if iTokStart >= iTokEnd then .iSize = iLineNumber : exit do
-            wend
-            'locating end/size of current token
-            ''print .pzData[0],chr(.pzData[0])
-            if (g_bSeparators(.pzData[0]) and (not stToken)) then
-               .iLen = 1 : iTokStart += 1
-            else
-               .iLen = 0
-               while g_bSeparators(.pzData[.iLen])=0
-                  if iTokStart >= iTokEnd then exit while
-                  .iLen += 1 : iTokStart += 1
-               wend
-            end if
-            .iSize = iLineNumber
-            if .iLen <= 0 then exit do
-            iTokCnt += 1
-         end with         
-      loop
+      var iStNext = LS_GetNextStatement(sScript,iStStart,sStatement,iLineNumber)      
+      if iStNext=0 then exit while
+      if len(sStatement)=0 then iStStart = iStNext+1 : continue while
+      
+      dim as long iErrToken = 0
+      var iTokCnt = LS_SplitTokens( sStatement , sToken() , iLineNumber , iErrToken )
+      if iTokCnt > ubound(sToken) then 
+         #define iCurToken iErrToken
+         ParserError("Too many tokens")            
+      end if
       
       iStStart = iStNext+1
       if iTokCnt=0 then if iStNext=0 then exit while else continue while
@@ -238,8 +257,7 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
       'Parse Tokens
       dim as long iCurToken=0
       dim as PartConnLS tConn 'expects 0's
-      tConn.iLeftPart = ecNotFound : tConn.iRightPart = ecNotFound
-      
+      tConn.iLeftPart = ecNotFound : tConn.iRightPart = ecNotFound      
       #define tLeft(_N)  tConn.iLeft##_N
       #define tRight(_N) tConn.iRight##_N
       
@@ -390,12 +408,14 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
       
       with tConn      
          if .iLeftPart <> ecNotFound andalso .iRightPart <> ecNotFound then
+            if tLeft(type)=spUnknown then ParserError("left part is missing connector")
+            if tRight(Type)=spUnknown then ParserError("right part is missing connector")
             AddConnection( tConn ) 'lsfunctions.bas
          end if
       end with
       
       if iStNext=0 then exit while      
-   wend
+   wend   
    
    #macro DebugParts()
       puts("sNam sPrimative  Colr Idx Ct Ok LocX LocY LocZ AngX AngY AngZ SX    1    2    4   SY    6    8    9   SZ")
@@ -423,7 +443,7 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
    'DebugParts()   
    #if 1
       'generate LDRAW and check collisions
-      if iStNext=0 andalso g_iPartCount>0 then      
+      if g_iPartCount>0 then 'iStNext=0 andalso 
          dim as zstring*256 zTemp=any
          dim as SnapPV ptr pLeft=any,pRight=any
          dim as single tVec3(2) = any
@@ -647,312 +667,6 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
    return sResult
    
 end function
-#else
-function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as string
-   
-   '<PartCode> <PartName> <PartPosition> =
-   '<PartName> <PartPosition> =
-   
-   'split tokens
-   dim as string sStatement, sToken(15), sResult
-   dim as long iStStart=1,iStNext,iLineNumber=1,iTokenLineNumber=1   
-   sOutput = "" : g_iPartCount = 0 : g_iConnCount = 0
-   
-   #define TokenLineNumber(_N) (cptr(fbStr ptr,@sToken(_N))->iSize)
-   
-   #ifdef __Standalone
-      #define ParserError( _text ) color 12:print "Error: ";SafeText(_text);" at line";TokenLineNumber(iCurToken);" '";SafeText(sStatement);"'" : sResult="" : color 7: exit while
-      #define ParserWarning( _text ) color 14:print "Warning: ";SafeText(_text);" at line";TokenLineNumber(iCurToken);" '";SafeText(sStatement);"'":color 7
-      #define LinkerError( _text ) color 12 : print "Error: ";_text; : sResult="" : color 7
-      #define LinkerWarning( _text ) color 14 : print "Warning: ";_text;
-   #else
-      #define ParserError( _text ) sOutput += "Error: " & SafeText(_text) & " at line" & TokenLineNumber(iCurToken) & " '" & SafeText(sStatement) & !"'\r\n" : sResult="" : exit while
-      #define ParserWarning( _text ) sOutput += "Warning: " & SafeText(_text) & " at line" & TokenLineNumber(iCurToken) & " '" & SafeText(sStatement) & !"'\r\n"
-      #define LinkerError( _text ) sOutput += "Error: " & _text & !"\r\n" : sResult=""
-      #define LinkerWarning( _text ) sOutput += "Warning: " & _text & !"\r\n" 
-   #endif
-   
-   while 1
-      'get next statement
-      iStNext = instr(iStStart,sScript,";")
-      var pzFb = cptr(fbStr ptr,@sStatement)
-      with *pzFb
-         .pzData = cptr(ubyte ptr,strptr(sScript))+iStStart-1
-         .iLen = iif(iStNext,iStNext,1+len(sScript))-(iStStart)         
-         while .iLen>0 andalso (g_bSeparators(.pzData[0]) and stToken)
-            select case .pzData[0] 'special chars
-            case asc("/"): exit while
-            case asc(!"\n"): iLineNumber += 1
-            case asc(!"\r"): if .pzData[1]=asc(!"\n") then .pzData += 1 : .iLen -= 1 : iLineNumber += 1
-            end select
-            .pzData += 1 : .iLen -= 1
-         wend
-         while .iLen>0 andalso (g_bSeparators(.pzData[.iLen-1]) and stToken)
-            select case .pzData[.iLen-1] 'special chars
-            case asc("/") : exit while
-            case asc(!"\n"): iLineNumber += 1
-            case asc(!"\r"): if .pzData[.iLen]=asc(!"\n") then .iLen -= 1 : iLineNumber += 1
-            end select
-            .iLen -= 1
-         wend
-         if .iLen=0 then 
-            if iStNext=0 then exit while
-            iStStart = iStNext+1 : continue while
-         end if
-      end with
-      dim as long iTokStart=0,iTokNext,iTokCnt=0,iTokEnd=len(sStatement)
-      'split tokens
-      'print "["+sStatement+"]"
-      var pzStatement = cptr(ubyte ptr,strptr(sStatement))            
-      do
-         #define iCurToken iTokCnt-1
-         if iTokCnt > ubound(sToken) then ParserError("Too many tokens")            
-         with *cptr(fbStr ptr,@sToken(iTokCnt))
-            .pzData = pzStatement+iTokStart
-            'skipping start of next token till a "non token separator" is found
-            while (g_bSeparators(.pzData[0]) and stToken)
-               if .pzData[0]=0 then exit do
-               .pzData += 1 : iTokStart += 1
-               select case .pzData[-1] 'special characters
-               case asc(!"\n")   'new line (LF)
-                  iLineNumber += 1
-               case asc(!"\r")   'new line (CRLF)
-                  if .pzData[0]=asc(!"\n") then .pzData += 1 : iTokStart += 1 : iLineNumber += 1
-               case asc("/")    'escaping (commenting?)
-                  if .pzData[0]=asc("/") then     'comment till EOL
-                     while iTokStart < iTokEnd andalso .pzData[0]<>asc(!"\r") andalso .pzData[0]<>asc(!"\n")
-                        .pzData += 1 : iTokStart += 1
-                     wend
-                  elseif .pzData[0]=asc("*") then 'comment till *\
-                     .pzData += 1 : iTokStart += 1
-                     while iTokStart < iTokEnd andalso .pzData[0]
-                        .pzData += 1 : iTokStart += 1
-                        if .pzData[-1]=asc("*") andalso .pzData[0]=asc("/") then
-                           .pzData += 1 : iTokStart += 1 : exit while
-                        end if
-                     wend
-                  end if
-               end select
-               if iTokStart >= iTokEnd then exit do
-            wend 
-            'locating end/size of current token
-            if (g_bSeparators(.pzData[0]) and (not stToken)) then
-               .iLen = 1 : iTokStart += 1
-            else
-               .iLen = 0
-               while g_bSeparators(.pzData[.iLen])=0
-                  if iTokStart >= iTokEnd then exit while
-                  .iLen += 1 : iTokStart += 1
-               wend               
-            end if
-            if .iLen <= 0 then exit do
-            .iSize = iLineNumber : iTokCnt += 1 
-         end with         
-      loop
-            
-      iStStart = iStNext+1
-      if iTokCnt=0 then if iStNext=0 then exit while else continue while
-      
-      'Display Tokens
-      for N as long = 0 to iTokCnt-1
-         if iTokenLineNumber <> TokenLineNumber(N) then 
-            print : iTokenLineNumber = TokenLineNumber(N)
-         end if         
-         print "{"+SafeText(sToken(N))+"}";
-      next N
-      print
-      
-      'Parse Tokens
-      dim as long iCurToken=0
-      dim as PartConnLS tConn 'expects 0's
-      tConn.iLeftPart = ecNotFound : tConn.iRightPart = ecNotFound
-      
-      #define tLeft(_N)  tConn.iLeft##_N
-      #define tRight(_N) tConn.iRight##_N
-  
-      do 
-         #define sRelToken(_N) sToken(iCurToken+(_N))
-         #define sCurToken sToken(iCurToken)
-         var iName=ecNotFound
-         
-         'if the first token is a primative (DAT) name then it's a declaration
-         if IsPrimative( sCurToken ) then
-            #define sPart sCurToken
-            #define sName sRelToken(1)
-            if len(sName)=0 orelse iCurToken >= iTokCnt then ParserError( "Expected part name, got end of statement" )
-            if IsValidPartName( sName )=false then ParserError("'"+sName+"' is not a valid part name")
-            iName = FindPartName( sName )
-            if iName >= 0 then ParserError( "Name already exists" )            
-            iName = AddPartName( sName , sPart  )            
-            if iName >=0 andalso g_tPart(iName).bFoundPart = 0 then ParserWarning("'"+sPart+"' primative not found")
-            iCurToken += 2            
-         else 'otherwise it must be an existing part name
-            #define sName sCurToken            
-            if IsValidPartName( sName )=false then ParserError("'"+sName+"' is not a valid primative or part name")
-            iName = FindPartName( sName )
-            if iName < 0 then ParserError( "part name not declared" )
-            iCurToken += 1
-         end if         
-         'if there's no more parameters than it's just a part declaration
-         
-         'print ,tLeft(Part) , tRight(Part) , iCurToken ; iTokCnt
-         if iCurToken = iTokCnt then 
-            if tLeft(Part)<0 then exit do
-            ParserError("missing operands in the right side")
-         end if
-         'otherwise it's a processed block (assignment?)
-         'so read tokens to add characteristics
-         
-         'first for the LEFT side then for the RIGHT side
-         if tLeft(Part) < 0 then tLeft(Part) = iName else tRight(Part) = iName
-         if tLeft(Part) = tRight(Part) then ParserError("a part can't connect to itself")
-                           
-         with g_tPart(iName)
-            do 
-               if iCurToken = iTokCnt then                
-                  if tLeft(Part) < 0 then ParserError("premature end of statement")                  
-                  exit do,do
-               end if
-               iCurToken += 1
-               var sThisToken = sRelToken(-1)
-               'parse characteristic
-               select case sThisToken[0]
-               case asc("s"),asc("c"): 'stud/clutch (connector)   (last token from the side)
-                  #define curPart g_tPart(iName)
-                  #define sFullName "'"+curPart.sName+"("+curPart.sPrimative+")'"
-                  if tRight(Part) < 0 then
-                     if tRight(Type) then ParserError("Expected '=', got '"+sThisToken+"'")
-                  else
-                     if tRight(Type) then ParserError("Expected end of statement, got '"+sThisToken+"'")
-                  end if
-                  var iConn = ReadTokenNumber(sThisToken,1)                  
-                  if iConn <= 0 then ParserError("invalid connector number")                  
-                  if LoadPartModel( g_tPart(iName) ) < 0 then ParserError("failed to load model")
-                  var pModel = g_tModels(curPart.iModelIndex).pModel 
-                  var pSnap = cptr(PartSnap ptr,pModel->pData)
-                  
-                  with *pSnap
-                     select case sThisToken[0]
-                     case asc("s")                        
-                        if iConn > .lStudCnt then ParserError("part "+sFullName+" only have " & .lStudCnt   & " studs.")
-                        if tRight(Part) < 0 then tLeft(Type)=spStud : tLeft(Num)=iConn else tRight(Type)=spStud : tRight(Num)=iConn
-                     case asc("c")
-                        if iConn > .lClutchCnt then ParserError("part "+sFullName+" only have " & .lClutchCnt & " clutches.")
-                        if tRight(Part) < 0 then tLeft(Type)=spClutch : tLeft(Num)=iConn else tRight(Type)=spClutch : tRight(Num)=iConn
-                     end select
-                     'printf(!"Studs=%i Clutchs=%i Aliases=%i Axles=%i Axlehs=%i Bars=%i Barhs=%i Pins=%i Pinhs=%i\n", _
-                     '.lStudCnt , .lClutchCnt , .lAliasCnt , .lAxleCnt , .lAxleHoleCnt ,.lBarCnt , .lBarHoleCnt , .lPinCnt , .lPinHoleCnt )
-                  end with
-                  if tLeft(Type) = tRight(Type) then ParserError("same type of connector")
-                     
-               case asc("="): 'assignment token
-                  if tRight(Part) >= 0 then               
-                     ParserError("expected end of statement, got '"+sThisToken+"'")
-                  end if
-                  continue do,do
-               case asc("#"): 'color token #nn #RGB #RRGGBB
-                  if .iColor >= 0 then ParserError("color attribute was already set for part '"+.sName+"'")
-                  var iColor = ParseColor( sThisToken )
-                  if iColor < 0 then
-                     ParserError("Invalid color format '"+sThisToken+"'")
-                  end if
-                  .iColor = iColor                  
-               case else
-                  ParserError("Unknown token '"+sThisToken+"'")
-               end select
-            loop
-         end with
-      loop
-      
-      AddConnection( tConn )
-      
-      if iStNext=0 then exit while      
-   wend   
-   if iStNext=0 andalso g_iPartCount>0 then      
-      dim as zstring*256 zTemp=any
-      dim as SnapPV ptr pLeft=any,pRight=any
-      with g_tPart(0)
-         'print .sName , .sPrimative , .iColor
-         var iColor = iif( .iColor<0 , 16 , .iColor )
-         sprintf(zTemp,!"1 %i %f %f %f 1 0 0 0 1 0 0 0 1 %s\r\n",iColor,.tLocation.fPX,.tLocation.fPY,.tLocation.fPZ,.sPrimative)
-         sResult += zTemp ': printf("%s",zTemp)
-      end with
-        
-      for I as long = 0 to g_iConnCount-1
-         with g_tConn(I)
-            'print _
-            '   .iLeftPart  & "{" & .iLeftType  & ":" & .iLeftNum  & "} = " & _
-            '   .iRightPart & "{" & .iRightType & ":" & .iRightNum & "}"
-            'dim as single FromX,FromY,FromZ , ToX,ToY,ToZ
-            var pModel = g_tModels(g_tPart(.iLeftPart).iModelIndex).pModel 
-            var pSnap = cptr(PartSnap ptr,pModel->pData)            
-            select case .iLeftType
-            case spStud   : pLeft = pSnap->pStud  +.iLeftNum-1
-            case spClutch : pLeft = pSnap->pClutch+.iLeftNum-1
-            case else     : print "Error"
-            end select
-            pModel = g_tModels(g_tPart(.iRightPart).iModelIndex).pModel 
-            pSnap = cptr(PartSnap ptr,pModel->pData)
-            select case .iRightType
-            case spStud   : pRight = pSnap->pStud  +.iRightNum-1
-            case spClutch : pRight = pSnap->pClutch+.iRightNum-1
-            case else     : print "Error"
-            end select
-            'print pLeft->fPX , pLeft->fPY , pLeft->fPZ
-            'print pRight->fPX , pRight->fPY , pRight->fPZ
-            'type SnapPV
-            '   as single fPX,fPY,fPZ 'position
-            '   as single fVX,fVy,fVZ 'direction vector
-            'end type
-            var ptLocation = @g_tPart(.iLeftPart).tLocation
-            dim as single fPX = ptLocation->fPX - (pLeft->fPX + pRight->fPX)
-            dim as single fPY = ptLocation->fPY + (pLeft->fPY - pRight->fPY)
-            dim as single fPZ = ptLocation->fPZ + pLeft->fPZ + pRight->fPZ
-            var iRightPart_ = .iRightPart
-            with g_tPart(iRightPart_)
-               if .tLocation.fPX = 0 andalso .tLocation.fPY=0 andalso .tLocation.fPZ=0 then
-                  .tLocation.fPX = fPX : .tLocation.fPY = fPY : .tLocation.fPZ = fPZ
-               elseif abs(.tLocation.fPX-fPX)>.001 orelse abs(.tLocation.fPY-fPY)>.001 orelse abs(.tLocation.fPZ-fPZ)>.001 then
-                  color 12 : print "Impossible Connection detected!" : color 7
-               end if
-               dim as PartSize tPart = any  : tPart = pModel->tSize
-               tPart.xMin += .tLocation.fPX : tPart.xMax += .tLocation.fPX
-               tPart.yMin =1+.tLocation.fPY : tPart.yMax += .tLocation.fPY
-               tPart.zMin =1+.tLocation.fPZ : tPart.zMax += .tLocation.fPZ
-               for N as long = 0 to g_iPartCount-1
-                  if N = iRightPart_ then continue for
-                  if .tLocation.fPX = 0 andalso .tLocation.fPY=0 andalso .tLocation.fPZ=0 then
-                     continue for
-                  end if
-                  with g_tPart(N)                     
-                     dim as PartSize tChk = any
-                     tChk = g_tModels(g_tPart(N).iModelIndex).pModel->tSize                     
-                     tChk.xMin += .tLocation.fPX : tChk.xMax += .tLocation.fPX
-                     tChk.yMin =1+.tLocation.fPY : tChk.yMax += .tLocation.fPY
-                     tChk.zMin =1+.tLocation.fPZ : tChk.zMax += .tLocation.fPZ
-                     if CheckCollision( tPart , tChk ) then
-                        color 12: printf(!"Collision! between part %s and %s\n",g_tPart(iRightPart_).sName,.sName): color 7
-                     end if
-                  end with
-               next N               
-               var iColor = iif(.iColor<0,16,.iColor)
-               sprintf(zTemp,!"1 %i %f %f %f 1 0 0 0 1 0 0 0 1 %s\r\n",iColor,fPX,fPY,fPZ,.sPrimative)
-               sResult += zTemp ': printf("%s",zTemp)               
-            end with            
-            'puts("1 0 40 -24 -20 1 0 0 0 1 0 0 0 1 3001.dat")
-            'puts("1 0 0 0 0 1 0 0 0 1 0 0 0 1 3001.dat")
-            
-         end with
-      next I
-   end if
-         
-   clear sToken(0),0,16*sizeof(fbStr) ': erase sToken
-   clear sStatement,0,sizeof(fbStr)   ': sStatement = ""   
-   
-   return sResult
-   
-end function
-#endif
 
 #ifdef __Standalone
 

@@ -6,8 +6,9 @@ g_hResizeEvent = CreateEvent( NULL , FALSE , FALSE , NULL )
 ThreadDetach( ThreadCreate( @Viewer.MainThread , hEventGfxReady ) )
 
 InitFont( wfDefault , g_sMainFont   , 12 ) 'default application font
-InitFont( wfStatus  , g_sMainFont  , 10 )  'status bar font
+InitFont( wfStatus  , g_sMainFont   , 10 )  'status bar font
 InitFont( wfEdit    , g_sFixedFont  , 16 ) 'edit controls font
+InitFont( wfArrows  , g_sArrowFont  , 12 )
             
 AddTabsA  ( wcTabs      , cMarginL  , cMarginT  , _pct(85) , cRow(1.25) , cRow(1.25) )
 AddButtonA( wcButton    , _NextCol  , _SameRow  , cMarginR , cRow(1.25) , "Build" )
@@ -18,7 +19,7 @@ AddButtonA( wcRadQuery  , _NextCol0 , _SameRow  , _pct(15) , cRow(1) , "Query"  
 AddButtonA( wcBtnExec   , _NextCol3 , _SameRow  , _pct(15) , cRow(1) , "Execute" , WS_GROUP )
 AddButtonA( wcBtnLoad   , _NextCol  , _SameRow  , _pct(15) , cRow(1) , "Load"  )
 AddButtonA( wcBtnSave   , _NextCol  , _SameRow  , _pct(15) , cRow(1) , "Save" )
-AddButtonAT( wcBtnMinOut , _RtP(wcOutput,-4) , _SameRow , _pct(4) , cRow(1) , "O" , BS_AUTOCHECKBOX or BS_PUSHLIKE )
+AddButtonAT( wcBtnMinOut , _RtP(wcOutput,-4) , _SameRow , _pct(4) , cRow(1) , !"\x71" , BS_AUTOCHECKBOX or BS_PUSHLIKE )
 AddEditA  ( wcOutput    , cMarginL  , _NextRow  , cMarginR , _BottomP(-5) , "" , WS_HSCROLL or WS_VSCROLL or ES_AUTOHSCROLL or ES_READONLY )
 AddEditA  ( wcQuery    , cMarginL  , _SameRow  , cMarginR , _BottomP(-5) , "" , WS_HSCROLL or WS_VSCROLL or ES_AUTOHSCROLL )
 AddStatusA( wcStatus    , "Ready." )
@@ -26,6 +27,7 @@ AddStatusA( wcStatus    , "Ready." )
 
 SetControlsFont( wfEdit   , wcLines , wcEdit , wcOutput )
 SetControlsFont( wfStatus , wcStatus )
+SetControlsFont( wfArrows , wcBtnMinOut )
 
 SetWindowTheme( CTL(wcEdit) , "" , "" )
 SetWindowTheme( CTL(wcOutput) , "" , "" )

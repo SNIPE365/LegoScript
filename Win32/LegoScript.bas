@@ -18,9 +18,11 @@
 ' !!! some pieces have unmatched studs vs clutch (and i suspect that's their design problem) !!!
 ' !!! because when using ldraw it does not matter the order, so they never enforced that     !!!
 
-'TODO (13/05/25): split LS2LDR function so that tokenized content can be used in query
-'TODO (13/05/25): Add Menu entries for the Query window/buttons , use arrows for the "show/hide output"
-'TODO (13/05/25): fix insertion/close tab bugs when doing execute() (clone hwnd bug????????????)
+
+'TODO (16/05/25): clutches [slide=true] are real clutches??
+'TODO (13/05/25): Add Menu entries for the Query window/buttons 
+'TODO (13/05/25): add multi-file selection for open dialog.
+'TODO (16/05/25): TAB structure must keep the selection position
 'TODO (13/05/25): load/save settings for Legoscript main window
 'TODO (25/03/25): re-organize the LS2LDR code, so that it looks better and explain better
 'TODO (20/03/25): process keys to toggle filters and to change the text/add type (plate/brick/etc...)
@@ -55,6 +57,7 @@ enum WindowFonts
    wfDefault
    wfEdit
    wfStatus
+   wfArrows
    wfLast
 end enum
 enum Accelerators
@@ -64,6 +67,8 @@ enum Accelerators
 end enum
 
 #define CTL(_I) g_tMainCtx.hCtl(_I).hwnd
+
+dim shared as boolean g_bChangingFont = false
 
 #include Once "LSModules\ColoredButtons.bas"
 #include once "LSModules\TryCatch.bas"
@@ -82,7 +87,7 @@ end type
 redim shared g_tTabs(0) as TabStruct 
 dim shared as long g_iTabCount = 1 , g_iCurTab = 0
 
-const g_sMainFont  = "verdana" , g_sFixedFont = "consolas"
+const g_sMainFont  = "verdana" , g_sFixedFont = "consolas" , g_sArrowFont = "Wingdings 3"
 
 dim shared as FormContext g_tMainCtx
 dim shared as hinstance g_AppInstance  'instance
@@ -232,6 +237,10 @@ sub RichEdit_TopRowChange( hCtl as HWND )
    end if
 end sub
 sub RichEdit_SelChange( hCtl as HWND , iRow as long , iCol as long )
+   
+   'puts(__FUNCTION__)
+   
+   
    'changed to edit (for now?) only matter if Auto Completion is enabled
    g_SQCtx.iRow = iRow : g_SQCtx.iCol = iCol
    if Menu.IsChecked(meCompletion_Enable)=0 then exit sub
@@ -264,7 +273,9 @@ sub RichEdit_SelChange( hCtl as HWND , iRow as long , iCol as long )
    
 end sub
 function RichEdit_KeyPress( hCtl as HWND , iKey as long , iMod as long ) as long
-         
+   
+   'puts(__FUNCTION__)
+   
    select case iKey     
    case VK_TAB
       if iMod=_Shift orelse iMod=0 then 'andalso len(.sToken)>1 then
@@ -338,6 +349,9 @@ sub DockGfxWindow()
    iOnce = 1
 end sub   
 sub ResizeMainWindow( bCenter as boolean = false )         
+   static as boolean bResize
+   if bResize then exit sub
+   bResize = true
    'Calculate Client Area Size
    dim as RECT RcWnd=any,RcCli=any,RcDesk=any
    var hWnd = CTL(wcMain)
@@ -362,14 +376,15 @@ sub ResizeMainWindow( bCenter as boolean = false )
    end if
       
    'recalculate control sizes based on window size
-   ShowWindow( g_hContainer , SW_HIDE )
-   ResizeLayout( hWnd , g_tMainCtx.tForm , RcCli.right , RcCli.bottom )
+   ShowWindow( g_hContainer , SW_HIDE )      
+   ResizeLayout( hWnd , g_tMainCtx.tForm , RcCli.right , RcCli.bottom )   
+   
    if g_hSearch then UpdateSearchWindowFont( g_tMainCtx.hFnt(wfStatus).HFONT )      
    MoveWindow( CTL(wcStatus) ,0,0 , 0,0 , TRUE )
    dim as long aWidths(2-1) = {RcCli.right*.85,-1}
    SendMessage( CTL(wcStatus) , SB_SETPARTS , 2 , cast(LPARAM,@aWidths(0)) )
    DockGfxWindow()   
-   
+   bResize=false   
    
 end sub
 
@@ -459,8 +474,10 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
       case wcEdit
          select case pnmh->code                  
          case EN_SELCHANGE
+            if g_bChangingFont then return 0
             with *cptr(SELCHANGE ptr,lParam)
-               'static as CHARRANGE tPrev = type(-1,-1)
+               'static as CHARRANGE tPrev = type(-1,-2)
+               'if memcmp( @.chrg , tPrev , sizeof(tPrev))CHARRANGE
                var iRow = SendMessage( CTL(wID) , EM_EXLINEFROMCHAR , 0 , .chrg.cpMax )
                var iCol = .chrg.cpMax - SendMessage( CTL(wID) , EM_LINEINDEX  , iRow , 0 )
                dim as zstring*64 zPart = any : sprintf(zPart,"%i : %i",iRow+1,iCol+1)
