@@ -51,6 +51,8 @@ function LoadFileIntoEditor( sFile as string ) as boolean
    return true
 end function
 
+const cCloseLen = 4
+
 sub UpdateMainWindowCaption()
    with g_tTabs(g_iCurTab)
       if len(.sFilename) then 
@@ -60,8 +62,22 @@ sub UpdateMainWindowCaption()
          dim as TC_ITEM tItem = type( TCIF_TEXT )
          tItem.pszText = @zName : tItem.cchTextMax = sizeof(zName)-1
          TabCtrl_GetItem( CTL(wcTabs) , g_iCurTab , @tItem )
-         SetWindowText( CTL(wcMain) , sAppName + " - " +zName )
+         zName = left(zName,len(zName)-cCloseLen)
+         SetWindowText( CTL(wcMain) , sAppName + " - " +zName)
       end if
+   end with
+end sub
+sub UpdateTabCloseButton() 
+   dim as POINT tPt(1) = any
+   dim as RECT tRc = any : GetClientRect( CTL(wcMain) , @tRc )
+   TabCtrl_GetItemRect( CTL(wcTabs) , g_iCurTab , cptr(RECT ptr,@tPt(0)) )
+   tPt(1).x += g_tMainCtx.hCTL( wcTabs ).iX
+   with g_tMainCtx.hCTL( wcBtnClose )
+      .iX = tPt(1).x-.iW
+      var fPX = (.iX*100)\tRc.right
+      .tX = _pct(fPX)
+      SetWindowPos( CTL(wcBtnClose) , 0 , .iX,.iY , 0,0 , SWP_NOSIZE or SWP_NOZORDER )
+      InvalidateRect( CTL(wcBtnClose) , NULL , true )
    end with
 end sub
 sub ChangeToTab( iNewTab as long , bForce as boolean = false )    
@@ -70,7 +86,7 @@ sub ChangeToTab( iNewTab as long , bForce as boolean = false )
    'if bForce=0 andalso iCurTab = iNewTab then exit sub
    with g_tTabs(iNewTab)      
       var hWndOld = CTL(wcEdit) , hParent = GetParent(.hEdit)
-      if hWndOld = .hEdit then exit sub
+      if hWndOld = .hEdit then UpdateTabCloseButton() : exit sub
       var hFont = g_tMainCtx.hFnt(g_tMainCtx.hCtl(wcEdit).bFont).hFont
       CTL(wcEdit) = .hEdit : g_iCurTab = iNewTab
       'swap control IDs (so that only one control have the current tab ID)
@@ -88,7 +104,8 @@ sub ChangeToTab( iNewTab as long , bForce as boolean = false )
       UpdateMainWindowCaption()
       'NotifySelChange( wcEdit )
       SetFocus( CTL(wcEdit) )
-   end with
+      UpdateTabCloseButton() 
+   end with   
    'puts("new tab: " & iNewTab & " Tabs: " & g_iTabCount & " ? " & TabCtrl_GetItemCount( CTL(wcTabs) ) )
    if g_iTabCount <> TabCtrl_GetItemCount( CTL(wcTabs) ) then puts("{{Tab count mismatch!!!}}")
 end sub
@@ -106,7 +123,7 @@ function GetNewTabName(bReset as boolean=false) as string
    static as long iNum : iNum += 1         
    if g_iTabCount=1 then iNum=1
    if bReset then iNum=0 : return ""
-   return iif( iNum=1 , "Unnamed" , "Unnamed" & iNum )
+   return iif( iNum=1 , "Untitled" , "Untitled" & iNum )
 end function   
 sub UpdateTabName( iTab as long )
    if cuint(iTab) >= g_iTabCount then exit sub   
@@ -119,6 +136,7 @@ sub UpdateTabName( iTab as long )
       else
          sFile = GetNewTabName()         
       end if
+      sFile += space(cCloseLen)
       dim as TC_ITEM tItem = type( TCIF_TEXT , 0,0 , strptr(sFile) , 0,-1 , 0 ) 
       TabCtrl_SetItem( CTL(wcTabs) , iTab , @tItem )   
       if iTab = g_iCurTab then UpdateMainWindowCaption()
@@ -156,7 +174,7 @@ function NewTab( sNewFile as string , iLinked as long = -1 , iReplaceTab as long
       g_tTabs( iNewTab ).hEdit = hWnd
       SendMessage( hWnd , EM_EXLIMITTEXT , 0 , 16*1024*1024 ) '16mb text limit
       SendMessage( hWnd , EM_SETEVENTMASK , 0 , ENM_SELCHANGE or ENM_KEYEVENTS or ENM_SCROLL )
-      dim as TC_ITEM tItem = type( TCIF_TEXT , 0,0 , @" " , 0,-1 , 0 ) 
+      dim as TC_ITEM tItem = type( TCIF_TEXT , 0,0 , @"   " , 0,-1 , 0 ) 
       TabCtrl_InsertItem( CTL(wcTabs) , iNewTab , @tItem )         
    else
       'puts("Same tab")
@@ -170,6 +188,7 @@ function NewTab( sNewFile as string , iLinked as long = -1 , iReplaceTab as long
          dim as zstring*384 zName = any
          dim as TC_ITEM tItem = type( TCIF_TEXT , 0,0 , @zName,384,-1 , 0 ) 
          TabCtrl_GetItem( CTL(wcTabs) , iLinked , @tItem )      
+         zName = left(zName,len(zName)-cCloseLen)
          var iPosi = instrrev(zName,".") : if iPosi=0 then iPosi = len(zName)+1
          sFile = left(zName,iPosi-1)+"_1"+mid(zName,iPosi)
       elseif len(sFile) then      
@@ -182,6 +201,7 @@ function NewTab( sNewFile as string , iLinked as long = -1 , iReplaceTab as long
          'puts("new name: "+sFile & " (" & iNewTab & ")") 
          .sFilename = ""               
       end if
+      sFile += space(cCloseLen)
       dim as TC_ITEM tItem = type( TCIF_TEXT , 0,0 , strptr(sFile) , 0,-1 , 0 ) 
       TabCtrl_SetItem( CTL(wcTabs) , iNewTab , @tItem )      
    end with
@@ -312,6 +332,7 @@ sub File_Close()
    g_iTabCount -= 1 : Redim preserve g_tTabs(g_iTabCount)
    'and set current tab to the actual correct number
    iCurTab = iNewTab
+   UpdateTabCloseButton() 
    
 end sub
 

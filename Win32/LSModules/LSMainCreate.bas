@@ -9,7 +9,8 @@ InitFont( wfDefault , g_sMainFont   , 12 ) 'default application font
 InitFont( wfStatus  , g_sMainFont   , 10 )  'status bar font
 InitFont( wfEdit    , g_sFixedFont  , 16 ) 'edit controls font
 InitFont( wfArrows  , g_sArrowFont  , 12 )
-            
+
+AddButtonAT(wcBtnClose  , _pct(10)  , _pct(2) , _pct(3)  , _pct(4) , "X" )
 AddTabsA  ( wcTabs      , cMarginL  , cMarginT  , _pct(85) , cRow(1.25) , cRow(1.25) )
 AddButtonA( wcButton    , _NextCol  , _SameRow  , cMarginR , cRow(1.25) , "Build" )
 AddTextA  ( wcLines     , cMarginL  , _NextRow0 , _pct(2*1.66*2) , _pct(53) ,  "" , SS_OWNERDRAW )
@@ -55,6 +56,7 @@ ColoredControl.Colorize( CTL(wcBtnLoad)   , &HFF0000 )
 ColoredControl.Colorize( CTL(wcBtnSave)   , &H0000FF )
 ColoredControl.Colorize( CTL(wcBtnMinOut) , &H00FF00 )
 ColoredControl.Colorize( CTL(wcButton)    , &H00FF00 )
+ColoredControl.Colorize( CTL(wcBtnClose)  , &H0000FF )
 'ColoredControl.Colorize( CTL(wcOutput)    , &HFFF0F0 )
 ColoredControl.Colorize( CTL(wcQuery)     , &HFF8888 )
 
@@ -74,6 +76,7 @@ File_New()
 'LoadFileIntoEditor( exePath+"\sample.ls" )
 SetForegroundWindow( ctl(wcMain) )
 SetFocus( ctl(wcEdit) )
+ChangeToTab( 0 )
 
 'SetTimer( hwnd , 1 , 100 , NULL )      
 

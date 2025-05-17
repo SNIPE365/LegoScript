@@ -140,13 +140,14 @@ function LS_SplitTokens( sStatement as string , Out_sToken() as string , byref I
    dim as long iTokStart=0,iTokCnt=0,iTokEnd=len(sStatement)
    'split tokens
    'print "["+sStatement+"]"
-   var pzStatement = cptr(ubyte ptr,strptr(sStatement))
+   if len(sStatement)=0 then return 0 'no tokens
+   var pzStatement = cptr(ubyte ptr,strptr(sStatement))   
    Out_iErrToken = 0
-   do
+   do      
       #define iCurToken iTokCnt-1
       if iTokCnt > ubound(Out_sToken) then Out_iErrToken = iCurToken : exit do
-      with *cptr(fbStr ptr,@Out_sToken(iTokCnt))
-         .pzData = pzStatement+iTokStart
+      with *cptr(fbStr ptr,@Out_sToken(iTokCnt))         
+         .pzData = pzStatement+iTokStart         
          'skipping start of next token till a "non token separator" is found
          while (g_bSeparators(.pzData[0]) and stToken)
             if .pzData[0]=0 then exit do
@@ -172,7 +173,7 @@ function LS_SplitTokens( sStatement as string , Out_sToken() as string , byref I
                end if
             end select
             if iTokStart >= iTokEnd then .iSize = InOut_iLineNumber : exit do
-         wend
+         wend         
          'locating end/size of current token
          ''print .pzData[0],chr(.pzData[0])
          if (g_bSeparators(.pzData[0]) and (not stToken)) then
@@ -183,12 +184,12 @@ function LS_SplitTokens( sStatement as string , Out_sToken() as string , byref I
                if iTokStart >= iTokEnd then exit while
                .iLen += 1 : iTokStart += 1
             wend
-         end if
+         end if         
          .iSize = InOut_iLineNumber
          if .iLen <= 0 then exit do
          iTokCnt += 1
-      end with         
-   loop
+      end with      
+   loop   
    return iTokCnt
 end function
 
@@ -219,21 +220,24 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
    with g_tPart(_NULLPARTNAME)
       .tMatrix = g_tIdentityMatrix
       .bConnected = true
-   end with   
+   end with
+      
    
    'Parsing LS and generate connections
    while 1
+            
+      
       'get next statement
       var iStNext = LS_GetNextStatement(sScript,iStStart,sStatement,iLineNumber)      
       if iStNext=0 then exit while
       if len(sStatement)=0 then iStStart = iStNext+1 : continue while
-      
+                  
       dim as long iErrToken = 0
       var iTokCnt = LS_SplitTokens( sStatement , sToken() , iLineNumber , iErrToken )
       if iTokCnt > ubound(sToken) then 
          #define iCurToken iErrToken
          ParserError("Too many tokens")            
-      end if
+      end if            
       
       iStStart = iStNext+1
       if iTokCnt=0 then if iStNext=0 then exit while else continue while
@@ -253,7 +257,7 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
       #ifdef __Standalone
       puts("")
       #endif      
-      
+                  
       'Parse Tokens
       dim as long iCurToken=0
       dim as PartConnLS tConn 'expects 0's
@@ -301,10 +305,10 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
          rem otherwise it's a processed block (assignment?)
 
          rem first for the LEFT side then for the RIGHT side
-         
+                           
          if tLeft(Part) < 0 then tLeft(Part) = iName else tRight(Part) = iName
          if tLeft(Part) = tRight(Part) then ParserError("a part can't connect to itself")
-
+         
          rem can only define rotation/offset once
          dim as byte bDefinedXRot , bDefinedYRot , bDefinedZRot
          dim as byte bDefinedXOff , bDefinedYOff , bDefinedZOff
@@ -403,13 +407,15 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
                   ParserError("Unknown token '"+sThisToken+"'")
                end select               
             loop
-         end with         
+         end with            
+         
       loop
-      
+            
       with tConn      
          if .iLeftPart <> ecNotFound andalso .iRightPart <> ecNotFound then
-            if tLeft(type)=spUnknown then ParserError("left part is missing connector")
-            if tRight(Type)=spUnknown then ParserError("right part is missing connector")
+            if tLeft(Part)<>_NULLPARTNAME andalso tLeft(type)=spUnknown then ParserError("left part is missing connector")
+            if tRight(Part)<>_NULLPARTNAME andalso tRight(Type)=spUnknown then ParserError("right part is missing connector")
+            if tLeft(Part)=_NULLPARTNAME andalso tRight(Part) = _NULLPARTNAME then ParserError("meaningless connection with both parts being NULL")
             AddConnection( tConn ) 'lsfunctions.bas
          end if
       end with
@@ -439,7 +445,7 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
          end with
       next N
    #endmacro
-   
+         
    'DebugParts()   
    #if 1
       'generate LDRAW and check collisions

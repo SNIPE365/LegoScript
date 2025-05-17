@@ -19,6 +19,7 @@
 ' !!! because when using ldraw it does not matter the order, so they never enforced that     !!!
 
 
+'TODO (17/05/25): investigate crash when building before opening graphics window
 'TODO (16/05/25): clutches [slide=true] are real clutches??
 'TODO (13/05/25): Add Menu entries for the Query window/buttons 
 'TODO (13/05/25): add multi-file selection for open dialog.
@@ -37,6 +38,7 @@ enum StatusParts
 end enum
 enum WindowControls
   wcMain
+  wcBtnClose
   wcTabs
   wcButton  
   wcLines
@@ -508,6 +510,7 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
          return 0
       case BN_CLICKED 'Clicked action for different buttons
          select case wID
+         case wcBtnClose  : File_Close()
          case wcButton    : Button_Compile()
          case wcRadOutput : Output_SetMode()
          case wcRadQuery  : Output_SetMode()
@@ -538,6 +541,7 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
     
    case WM_SIZE       'window is sizing/was sized
       ResizeMainWindow()
+      UpdateTabCloseButton() 
       return 0
    case WM_MOVE       'window is moving/was moved
       DockGfxWindow()
@@ -633,7 +637,7 @@ sub WinMain ()
    
    var hMenu = CreateMainMenu()
    var hAcceleratos = CreateMainAccelerators()
-   
+         
    hWnd = CreateWindowEx(WS_EX_COMPOSITED,sAppName,sAppName, WS_TILEDWINDOW or WS_CLIPCHILDREN, _
    200,200,g_WndWid,g_WndHei,null,hMenu,g_AppInstance,0)
    
