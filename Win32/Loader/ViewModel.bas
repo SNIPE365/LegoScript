@@ -231,6 +231,7 @@ scope
 end scope
 
 dim as string sModel
+dim as DATFile ptr pModel
 
 #if 0 '1 = Load File , 0 = Load From clipboard
    if len(sFile)=0 then sFile=command(1)
@@ -240,31 +241,45 @@ dim as string sModel
       print "Failed to load '"+sFile+"'"
       sleep : system
    end if
-   var pModel = LoadModel( strptr(sModel) , sFile )
+   pModel = LoadModel( strptr(sModel) , sFile )
 #else
    sModel = command(1)
-   if instr(sModel,".dat") then
-      for N as long = 0 to len(sModel)
-         if sModel[N]=13 then sModel[N]=32
-      next N
+   var sEndsExt = lcase(right(sModel,4))
+   var IsFilename = (instr(sModel,chr(10))=0) andalso ((sEndsExt=".dat") orelse (sEndsExt=".ldr"))
+   if IsFilename then
+      print "loading from '"+sModel+"'"
+      if FileExists(sModel)=0 then FindFile(sModel)      
+      if LoadFile( sModel , sModel ) = 0 then
+         print "Failed to load '"+sModel+"'"
+         sleep : system
+      end if   
    else
-      sModel = GetClipboard() 
-      if instr(sModel,".dat") then
+      if instr(sModel,".dat")  then
+         print "loading from cmdline"
          for N as long = 0 to len(sModel)
             if sModel[N]=13 then sModel[N]=32
          next N
-      else 'if there isnt a model in the clipboard, then load this:
-         sModel = _    
-         "1 2 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 4070.dat" EOL _         
-         ' ------------------------------------------------------
-         
-         'sModel = _ 'all of lines belo should end with EOL _
-         '   "1 4 0 0 0 1 0 0 0 1 0 0 0 1 30068.dat"    EOL _
-         '   "1 1 0 -10 0 1 0 0 0 1 0 0 0 1 18654.dat"  EOL _
-         ' ------------------------------------------------------
-      end if
+      else
+         print "loading from clipboard"
+         sModel = GetClipboard() 
+         if instr(sModel,".dat") then
+            for N as long = 0 to len(sModel)
+               if sModel[N]=13 then sModel[N]=32
+            next N
+         else 'if there isnt a model in the clipboard, then load this:
+            sModel = _    
+            "1 2 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 4070.dat" EOL _         
+            ' ------------------------------------------------------
+            
+            'sModel = _ 'all of lines belo should end with EOL _
+            '   "1 4 0 0 0 1 0 0 0 1 0 0 0 1 30068.dat"    EOL _
+            '   "1 1 0 -10 0 1 0 0 0 1 0 0 0 1 18654.dat"  EOL _
+            ' ------------------------------------------------------
+         end if
+      end if            
    end if
-   var pModel = LoadModel( strptr(sModel) , "CopyPaste.ldr" )
+   pModel = LoadModel( strptr(sModel) , "CopyPaste.ldr" )
+   
 #endif
 
 InitOpenGL()

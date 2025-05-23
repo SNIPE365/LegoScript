@@ -616,7 +616,7 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
       redim preserve g_tModels( g_ModelCount )
       g_ModelCount += 1
    end if
-   
+         
    do
       if iLastPart > iLimitParts then 'allocate more entries if necessary
          iLimitParts += 4096 'we increase the allocation every N parts         

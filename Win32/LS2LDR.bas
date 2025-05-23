@@ -13,7 +13,10 @@
    #include once "Loader\PartSearch.bas"
    #include once "Loader\LoadLDR.bas"   
    #include once "Loader\Modules\Matrix.bas"
-   #include once "Loader\Modules\Model.bas"
+   #include once "Loader\Modules\Model.bas"   
+   
+   #define errorf(_Parms...) fprintf(stderr,_Parms)
+   
 #endif
 
 'TODO: apply the rotation to the position vector for the stud/clutch (ongoing)
@@ -206,10 +209,10 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
    #define TokenLineNumber(_N) (cptr(fbStr ptr,@sToken(_N))->iSize)
    
    #ifdef __Standalone
-      #define ParserError( _text ) color 12:print "Error: ";SafeText(_text);!"\r\nat line ";TokenLineNumber(iCurToken);" '";SafeText(sStatement);"'" : sResult="" : color 7: exit while
-      #define ParserWarning( _text ) color 14:print "Warning: ";SafeText(_text);!"\r\nat line ";TokenLineNumber(iCurToken);" '";SafeText(sStatement);"'":color 7
-      #define LinkerError( _text ) color 12 : print "Error: ";_text; : sResult="" : color 7
-      #define LinkerWarning( _text ) color 14 : print "Warning: ";_text;
+      #define ParserError( _text ) color 12:errorf(!"Error: %s\r\nat line %i '%s'\n",SafeText(_text),TokenLineNumber(iCurToken),SafeText(sStatement)) : sResult="" : color 7: exit while
+      #define ParserWarning( _text ) color 14:errorf(!"Warning: %s\r\nat line %i '%s'\n",SafeText(_text),TokenLineNumber(iCurToken),SafeText(sStatement)):color 7
+      #define LinkerError( _text ) color 12 : errorf(!"Error: %s\n",_text) : sResult="" : color 7
+      #define LinkerWarning( _text ) color 14 : errorf(!Warning: %s\n",_text): color 7
    #else
       #define ParserError( _text ) sOutput += "Error: " & SafeText(_text) & !"\r\nat line " & TokenLineNumber(iCurToken) & " '" & SafeText(sStatement) & !"'\r\n" : sResult="" : exit while
       #define ParserWarning( _text ) sOutput += "Warning: " & SafeText(_text) & !"\r\nat line " & TokenLineNumber(iCurToken) & " '" & SafeText(sStatement) & !"'\r\n"
@@ -246,16 +249,16 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
       for N as long = 0 to iTokCnt-1
          if iTokenLineNumber <> TokenLineNumber(N) then
             #ifdef __Standalone
-            puts("")
+            errorf(!"\n")
             #endif
             iTokenLineNumber = TokenLineNumber(N)
          end if
          #ifdef __Standalone
-         printf("%s","{"+SafeText(sToken(N))+"}")
+         errorf(!"{%s}",SafeText(sToken(N)))
          #endif
       next N
       #ifdef __Standalone
-      puts("")
+      errorf(!"\n")
       #endif      
                   
       'Parse Tokens
@@ -492,7 +495,8 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
                               end with
                               sResult += zTemp 
                               #ifdef __Standalone
-                              printf("(first) %s",zTemp)
+                              'errorf("(first) %s",zTemp)
+                              printf("%s",zTemp)
                               #endif                                
                            end with
                            'so there was a connection, but as first so it skips right to the next connection
@@ -642,7 +646,8 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
                      end with
                      sResult += zTemp 
                      #ifdef __Standalone
-                     printf("<%i>%s",__LINE__,zTemp)
+                     'printf("<%i>%s",__LINE__,zTemp)
+                     printf("%s",zTemp)
                      #endif
                   end with            
                   'puts("1 0 40 -24 -20 1 0 0 0 1 0 0 0 1 3001.dat")
@@ -675,18 +680,22 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
 end function
 
 #ifdef __Standalone
-
+var isTerm = _isatty( _fileno(stdout) )
 dim as string sText,sScript
 var sCmd = command(), iDump=0
 if len(sCmd) then
    var f = freefile() : iDump=1
    if open(sCmd for binary access read as #f) then
-      print "Failed to open '"+sCmd+"'"
+      Errorf(!"Failed to open '%s'\n",sCmd)
       GiveUp(2)
    end if
    sScript = space(lof(f))
    get #f,,sScript : close #f
 else   
+   if IsTerm=0 then
+      Errorf(!"SYNTAX: ls2dlr file.ls >output.ldr")
+      GiveUp(1)
+   end if
    print ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> in memory script <<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
    #if 0
    sScript = _
@@ -752,7 +761,7 @@ if len(sModel) andalso iDump then
    close #f
 end if
 
-if len(sModel) then   
+if len(sModel) andalso isTerm then   
    var sParms = """"+sModel+""""
    puts("-----------------")
    print sModel
@@ -761,8 +770,8 @@ if len(sModel) then
    puts("-----------------")
    end 0
 else
-   if iDump=0 then sleep
-   end 255
+   if iDump=0 andalso IsTerm then sleep
+   end 0
 end if
 
 #if 0

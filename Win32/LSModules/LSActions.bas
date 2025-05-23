@@ -48,6 +48,7 @@ function LoadFileIntoEditor( sFile as string ) as boolean
    SetWindowText( CTL(wcMain) , sAppName + " - " + sFile )
    'NotifySelChange( wcEdit )
    SetFocus( CTL(wcButton) )
+   Sendmessage( CTL(wcEdit) , EM_SETMODIFY , 0,0 )
    return true
 end function
 
@@ -71,22 +72,29 @@ sub UpdateTabCloseButton()
    dim as POINT tPt(1) = any
    dim as RECT tRc = any : GetClientRect( CTL(wcMain) , @tRc )
    TabCtrl_GetItemRect( CTL(wcTabs) , g_iCurTab , cptr(RECT ptr,@tPt(0)) )
+   var hFont = cast(HFONT,SendMessage( CTL(wcTabs) , WM_GETFONT , 0,0 ))
+   if hFont=0 then end
+   var hDC = GetDC(0) : SelectObject( hDC , hFont )      
+   dim as SIZE tSz = any : GetTextExtentPoint32( hDC , @"        " , cCloseLen , @tSz )
    tPt(1).x += g_tMainCtx.hCTL( wcTabs ).iX
-   with g_tMainCtx.hCTL( wcBtnClose )
-      .iX = tPt(1).x-.iW
-      var fPX = (.iX*100)\tRc.right
-      .tX = _pct(fPX)
-      SetWindowPos( CTL(wcBtnClose) , 0 , .iX,.iY , 0,0 , SWP_NOSIZE or SWP_NOZORDER )
+   with g_tMainCtx.hCTL( wcBtnClose )      
+      .iX = tPt(1).x-.iW : .iW = tSz.cx : .iH = tSz.cy
+      var fPX = (.iX*100)\tRc.right , fW = (.iW*100)\tRc.right , fH = (.iH*100)\tRc.bottom
+      .tX = _pct(fPX) : .tW = _pct(fW) : .tH = _pct(fH)
+      SetWindowPos( CTL(wcBtnClose) , 0 , .iX,.iY , .iW,.iH , SWP_NOZORDER or SWP_NOACTIVATE )
       InvalidateRect( CTL(wcBtnClose) , NULL , true )
    end with
+   ReleaseDC( NULL , hDC )
 end sub
 sub ChangeToTab( iNewTab as long , bForce as boolean = false )    
    if iNewTab < 0 orelse iNewTab >= g_iTabCount then puts("out of bounds tabs"): exit sub
    'var iCurTab = TabCtrl_GetCurSel( CTL(wcTabs) )   
    'if bForce=0 andalso iCurTab = iNewTab then exit sub
-   with g_tTabs(iNewTab)      
+   with g_tTabs(iNewTab)                  
       var hWndOld = CTL(wcEdit) , hParent = GetParent(.hEdit)
       if hWndOld = .hEdit then UpdateTabCloseButton() : exit sub
+      var iModifyOld = SendMessage( hWndOld , EM_GETMODIFY , 0 , 0 )
+      var iModifyNew = SendMessage( .hEdit , EM_GETMODIFY , 0 , 0 )
       var hFont = g_tMainCtx.hFnt(g_tMainCtx.hCtl(wcEdit).bFont).hFont
       CTL(wcEdit) = .hEdit : g_iCurTab = iNewTab
       'swap control IDs (so that only one control have the current tab ID)
@@ -94,8 +102,8 @@ sub ChangeToTab( iNewTab as long , bForce as boolean = false )
       dim as RECT tRC = any : GetWindowRect( hWndOld , @tRC )      
       ScreenToClient( hParent , cast(POINT ptr,@tRC)+0 )
       ScreenToClient( hParent , cast(POINT ptr,@tRC)+1 )
-      g_bChangingFont = true
-      SendMessage( .hEdit , WM_SETFONT , cast(WPARAM,hFont) , false ) 'this causes selection change O.o
+      g_bChangingFont = true      
+      SendMessage( .hEdit , WM_SETFONT , cast(WPARAM,hFont) , false ) 'this causes SelChange and SetModify O.o
       g_bChangingFont = false
       SetWindowPos( .hEdit , 0 , tRC.left , tRc.top , tRc.right-tRc.left , tRc.Bottom-tRc.top , SWP_NOZORDER or SWP_SHOWWINDOW )
       ShowWindow( hWndOld , SW_HIDE )
@@ -104,7 +112,9 @@ sub ChangeToTab( iNewTab as long , bForce as boolean = false )
       UpdateMainWindowCaption()
       'NotifySelChange( wcEdit )
       SetFocus( CTL(wcEdit) )
-      UpdateTabCloseButton() 
+      UpdateTabCloseButton()
+      SendMessage( hWndOld , EM_SETMODIFY , iModifyOld , 0 )
+      SendMessage( .hEdit , EM_SETMODIFY , iModifyNew , 0 )
    end with   
    'puts("new tab: " & iNewTab & " Tabs: " & g_iTabCount & " ? " & TabCtrl_GetItemCount( CTL(wcTabs) ) )
    if g_iTabCount <> TabCtrl_GetItemCount( CTL(wcTabs) ) then puts("{{Tab count mismatch!!!}}")
@@ -117,13 +127,15 @@ function CloneHwnd( hWnd as HWND , iIncStyles as integer = 0 ) as HWND
    var lStyleEx = GetWindowLong(hWnd,GWL_EXSTYLE)
    return CreateWindowEx( lStyleEx , wClass , NULL , lStyle or iIncStyles , 0,0,0,0 , hParent , 0 , hInst , NULL )
 end function
+   
 
 #define ResetTabCount() GetNewTabName(true)
+const sNoName = "Untitled"
 function GetNewTabName(bReset as boolean=false) as string
    static as long iNum : iNum += 1         
    if g_iTabCount=1 then iNum=1
    if bReset then iNum=0 : return ""
-   return iif( iNum=1 , "Untitled" , "Untitled" & iNum )
+   return iif( iNum=1 , sNoName , sNoName & iNum )
 end function   
 sub UpdateTabName( iTab as long )
    if cuint(iTab) >= g_iTabCount then exit sub   
@@ -150,7 +162,7 @@ function NewTab( sNewFile as string , iLinked as long = -1 , iReplaceTab as long
    'if the current tab is empty and it's not linked and ....
    'if we're not linking to tab then reuse same tab instead of creating a new one
    var bIsLinked = (g_tTabs(g_iCurTab).iLinked <> -1)
-   var bHasText  = GetWindowTextLength( CTL(wcEdit) )<>0
+   var bHasText  = SendMessage( CTL(wcEdit) , EM_GETMODIFY , 0,0 )<>0
    var bHaveName = len(g_tTabs(g_iCurTab).sFilename)
    if iReplaceTab=-1 andalso (iLinked<>-1 orelse bIsLinked orelse bHaveName orelse bHasText) then      
       'puts("New tab")
@@ -174,13 +186,12 @@ function NewTab( sNewFile as string , iLinked as long = -1 , iReplaceTab as long
       g_tTabs( iNewTab ).hEdit = hWnd
       SendMessage( hWnd , EM_EXLIMITTEXT , 0 , 16*1024*1024 ) '16mb text limit
       SendMessage( hWnd , EM_SETEVENTMASK , 0 , ENM_SELCHANGE or ENM_KEYEVENTS or ENM_SCROLL )
+      SendMessage( hWnd , EM_SETMODIFY , 0 , 0 )
       dim as TC_ITEM tItem = type( TCIF_TEXT , 0,0 , @"   " , 0,-1 , 0 ) 
       TabCtrl_InsertItem( CTL(wcTabs) , iNewTab , @tItem )         
    else
       'puts("Same tab")
    end if
-   
-   'UpdateTabName(
       
    with g_tTabs(iNewTab)
       .iLinked = iLinked
@@ -196,52 +207,77 @@ function NewTab( sNewFile as string , iLinked as long = -1 , iReplaceTab as long
          if iPos2 > iPos then iPos = iPos2         
          .sFilename = sFile
          sFile = mid(sFile,iPos+1)         
-      else         
-         sFile = GetNewTabName()
+      else                              
+         dim as zstring*64 zName = any : zName[0]=0
+         dim as TC_ITEM tItem = type( TCIF_TEXT )
+         tItem.pszText = @zName : tItem.cchTextMax = sizeof(zName)-1
+         TabCtrl_GetItem( CTL(wcTabs) , iNewTab , @tItem )         
+         #define WasNew (left(zName,len(sNoName))=sNoName andalso right(zName,cCloseLen) = space(cCloseLen))
+         sFile = iif(WasNew,"",GetNewTabName())
          'puts("new name: "+sFile & " (" & iNewTab & ")") 
          .sFilename = ""               
       end if
-      sFile += space(cCloseLen)
-      dim as TC_ITEM tItem = type( TCIF_TEXT , 0,0 , strptr(sFile) , 0,-1 , 0 ) 
-      TabCtrl_SetItem( CTL(wcTabs) , iNewTab , @tItem )      
+      if len(sFile) then
+         sFile += space(cCloseLen)
+         dim as TC_ITEM tItem = type( TCIF_TEXT , 0,0 , strptr(sFile) , 0,-1 , 0 ) 
+         TabCtrl_SetItem( CTL(wcTabs) , iNewTab , @tItem )
+      end if
    end with
    InvalidateRect( CTL(wcTabs) , NULL , true )   
    return iNewTab
 end function
+sub LoadScript( sFile as string )   
+   var sFileL = lcase(sFile)
+   for N as long = 0 to g_iTabCount-1
+      with g_tTabs(N)
+         'puts "'"+lcase(.sFileName)+"' = '"+sFileL
+         if lcase(.sFileName) = sFileL then
+            ChangeToTab(N): exit sub
+         end if
+      end with
+   next N      
+   ChangeToTab(NewTab( sFile ))                  
+   LoadFileIntoEditor( sFile )
+end sub
+
 sub File_New()
    ChangeToTab( NewTab( "" ) )
 end sub
 sub File_Open()
          
    dim as OPENFILENAME tOpen
-   dim as zstring*32768 zFile = any : zFile[0]=0
-   with tOpen
-      .lStructSize = sizeof(tOpen)
-      .hwndOwner = CTL(wcMain)
-      .lpstrFilter = @ _
-         !"LegoScript Files\0*.ls\0" _
-         !"LDraw Files\0*.ldr\0" _
-         !"All Files\0*.*\0\0"
-      .nFilterIndex = 0 '.ls
-      .lpstrFile = @zFile
-      .nMaxFile = 32767
-      .lpstrInitialDir = NULL
-      .lpstrTitle = NULL
-      .lpstrDefExt = @"ls"
-      .Flags = OFN_FILEMUSTEXIST or OFN_PATHMUSTEXIST or OFN_NOCHANGEDIR
-      if GetOpenFileName( @tOpen ) = 0 then exit sub      
-      print "["+*.lpstrFile+"]"
-      var sFile = *.lpstrFile, sFileL = lcase(sFile)
-      for N as long = 0 to g_iTabCount-1
-         with g_tTabs(N)
-            if lcase(.sFileName) = sFileL then
-               ChangeToTab(N): exit sub
-            end if
-         end with
-      next N      
-      ChangeToTab(NewTab( sFile ))                  
-      LoadFileIntoEditor( sFile )
-   end with
+   var pzFile = cptr(zstring ptr,malloc(65536)) : (*pzFile)[0] = 0   
+   do
+      with tOpen
+         .lStructSize = sizeof(tOpen)
+         .hwndOwner = CTL(wcMain)
+         .lpstrFilter = @ _
+            !"LegoScript Files\0*.ls\0" _
+            !"LDraw Files\0*.ldr\0" _
+            !"All Files\0*.*\0\0"
+         .nFilterIndex = 0 '.ls
+         .nFileExtension = 0
+         .lpstrFile = pzFile
+         .nMaxFile = 65536
+         .lpstrInitialDir = NULL
+         .lpstrTitle = NULL
+         .lpstrDefExt = @"ls"
+         .Flags = OFN_FILEMUSTEXIST or OFN_PATHMUSTEXIST or OFN_NOCHANGEDIR or OFN_ALLOWMULTISELECT or OFN_EXPLORER
+         if GetOpenFileName( @tOpen ) = 0 then exit do         
+         if .nFileExtension = 0 then 'loading multiples
+            var sPath = *.lpstrFile+"\", pzFile = .lpstrFile+.nFileOffset
+            do
+               var sFile = *pzFile : pzFile += len(sFile)+1
+               if len(sFile)=0 then exit do
+               LoadScript(sPath+sFile)
+            loop            
+         else
+            LoadScript(*.lpstrFile)
+         end if
+         exit do
+      end with
+   loop
+   free(pzFile)
 end sub
 sub File_Save()
    if GetFileAttributes(g_CurrentFilePath)=&hFFFFFFFF then
@@ -296,9 +332,9 @@ sub File_Exit()
 end sub
 sub File_Close()
       
-   if GetWindowTextLength( CTL(wcEdit) ) then
+   if Sendmessage( CTL(wcEdit) , EM_GETMODIFY , 0,0 ) then
       #define sMsg !"All unsaved data will be lost, continue?"
-      if MessageBox( CTL(wcMain) , sMsg , "File->Open" , MB_ICONQUESTION or MB_YESNO ) <> IDYES then exit sub
+      if MessageBox( CTL(wcMain) , sMsg , "File->Open" , MB_ICONQUESTION or MB_YESNO or MB_DEFBUTTON2 ) <> IDYES then exit sub
    end if   
    
    if g_iTabCount = 1 then 
@@ -335,6 +371,22 @@ sub File_Close()
    UpdateTabCloseButton() 
    
 end sub
+function File_Quit() as boolean   
+   for N as long = g_iTabCount-1 to 0 step -1
+      ChangeToTab( N )
+      if SendMessage( CTL(wcEdit) , EM_GETMODIFY , 0,0 ) then         
+         #define sMsg !"this file is modified, save it?"
+         select case MessageBox( CTL(wcMain) , sMsg , "File->Quit" , MB_ICONQUESTION or MB_YESNOCANCEL or MB_DEFBUTTON1 )
+         case IDYES    : File_Save()
+         case IDNO     : Sendmessage( CTL(wcEdit) , EM_SETMODIFY , 0,0 ) : File_Close()
+         case IDCANCEL : return FALSE
+         end select
+      else
+         File_Close()
+      end if
+   next N   
+   return true
+end function
 
 sub Do_Compile()   
    SetWindowText( CTL(wcStatus) , "Building..." )   

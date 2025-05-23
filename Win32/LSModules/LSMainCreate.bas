@@ -78,6 +78,4 @@ SetForegroundWindow( ctl(wcMain) )
 SetFocus( ctl(wcEdit) )
 ChangeToTab( 0 )
 
-'SetTimer( hwnd , 1 , 100 , NULL )      
-
-return 0
+'SetTimer( hwnd , 1 , 100 , NULL )

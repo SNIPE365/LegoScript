@@ -5,7 +5,7 @@
      __Entry( meFile_open     , "&Open"             , _Ctrl        , VK_O , @File_Open   )     
      __Entry( meFile_Save     , "&Save"             , _Ctrl        , VK_S , @File_Save   )     
      __Entry( meFile_SaveAs   , "Save &As"          , _Ctrl+_Shift , VK_S , @File_SaveAs )     
-     __Entry( meFile_Close    , "&Close"            , _Ctrl        , VK_F4, @File_Close  )
+     __Entry( meFile_Close    , "&Close"            , _Ctrl        , VK_W , @File_Close  )
      __Separator()
       __Entry( meFile_Import  , "&Import"           , _Ctrl        , VK_I , @File_Import )
       __Entry( meFile_Export  , "&Export"           , _Ctrl+_Shift , VK_I , @File_Export )

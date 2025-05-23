@@ -8,6 +8,7 @@
 #include once "win\ole2.bi"
 #include once "win\Richedit.bi"
 #include once "win\uxtheme.bi"
+#include once "win\shlwapi.bi"
 #include once "crt.bi"
 #include once "fbthread.bi"
 
@@ -19,15 +20,15 @@
 ' !!! because when using ldraw it does not matter the order, so they never enforced that     !!!
 
 
+'TODO (19/05/25): fix LS2LDR parsing bugs (prevent part that is connected from moving)
+'TODO (19/05/25): Add #include capability
 'TODO (17/05/25): investigate crash when building before opening graphics window
 'TODO (16/05/25): clutches [slide=true] are real clutches??
 'TODO (13/05/25): Add Menu entries for the Query window/buttons 
-'TODO (13/05/25): add multi-file selection for open dialog.
 'TODO (16/05/25): TAB structure must keep the selection position
 'TODO (13/05/25): load/save settings for Legoscript main window
 'TODO (25/03/25): re-organize the LS2LDR code, so that it looks better and explain better
 'TODO (20/03/25): process keys to toggle filters and to change the text/add type (plate/brick/etc...)
-'TODO (05/03/25): fix LS2LDR parsing bugs
 'TODO (06/03/25): check bug regarding wheel positioning and the line numbers
 'TODO (21/04/25): prevent buffer overflow when doing a FIND/RESEARCH when the selected text is bigger than 32k
 
@@ -365,8 +366,7 @@ sub ResizeMainWindow( bCenter as boolean = false )
          .right  -= .left : .bottom -= .top              'get window size
          .right -= RcCli.right : .bottom -= RcCli.bottom 'make it be difference from wnd/client
          .right += g_WndWid : .bottom += g_WndHei        'add back desired client area size
-         GetClientRect(GetDesktopWindow(),@RcDesk)
-         
+         GetClientRect(GetDesktopWindow(),@RcDesk)         
          dim as RECT RcGfx=any : GetWindowRect( g_GfxHwnd , @RcGfx )         
          var iAllWid = .right , iGfxHei = RcGfx.bottom-RcGfx.top
          if iGfxHei > .bottom then .bottom = iGfxHei
@@ -379,8 +379,11 @@ sub ResizeMainWindow( bCenter as boolean = false )
       
    'recalculate control sizes based on window size
    ShowWindow( g_hContainer , SW_HIDE )      
+   var iModify = SendMessage( CTL(wcEdit) , EM_GETMODIFY , 0 , 0 )   
    ResizeLayout( hWnd , g_tMainCtx.tForm , RcCli.right , RcCli.bottom )   
-   
+   UpdateTabCloseButton() 
+   SendMessage( CTL(wcEdit) , EM_SETMODIFY , iModify , 0 )
+      
    if g_hSearch then UpdateSearchWindowFont( g_tMainCtx.hFnt(wfStatus).HFONT )      
    MoveWindow( CTL(wcStatus) ,0,0 , 0,0 , TRUE )
    dim as long aWidths(2-1) = {RcCli.right*.85,-1}
@@ -575,7 +578,7 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
       var fActive = wParam
       'if GetForegroundWindow() <> g_hContainer then fActive = (GetFocus = CTL(wcEdit))
       if fActive then
-         ShowWindow( g_hContainer , g_SearchVis   )
+         ShowWindow( g_hContainer , g_SearchVis )
       else
          ShowWindow( g_hContainer , SW_HIDE )
       end if
@@ -584,11 +587,28 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
      ShowWindow( g_hContainer , SW_HIDE )
    case WM_CREATE  'Window was created
       #include "LSModules\LSMainCreate.bas"          
+      var N = 1 , sCurDir = curdir()+"\"
+      do
+         var sFile = command(N) : N += 1         
+         if len(sFile)=0 then exit do
+         for N as long = 0 to len(sFile)
+            if sFile[N] = asc("/") then sFile[N] = asc("\")
+         next N
+         if FileExists(sCurDir+sFile) then 
+            sFile = sCurDir + sFile
+         elseif FileExists(sFile)=0 then
+            MessageBox( CTL(wcMain) , "File not found: '"+sFile+"'" , NULL , MB_ICONERROR )
+            continue do
+         end if      
+         'puts(sFile)
+         var pzTemp = cptr(zstring ptr,malloc(65536))
+         PathCanonicalizeA( pzTemp , sFile )
+         LoadScript( *pzTemp )
+         free(pzTemp)
+      loop  
+      return 0
    case WM_CLOSE   'close button was clicked
-      if GetWindowTextLength( CTL(wcEdit) ) then
-         #define sMsg !"All unsaved data will be lost, quit anyway?"
-         if MessageBox( CTL(wcMain) , sMsg , "File->Quit" , MB_ICONQUESTION or MB_YESNO ) <> IDYES then return 0
-      end if
+      if File_Quit()=false then return 0      
       PostQuitMessage(0) ' to quit
    case WM_DESTROY 'Windows was closed/destroyed
     PostQuitMessage(0) ' to quit
