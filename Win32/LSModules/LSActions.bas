@@ -8,40 +8,14 @@ sub NotifySelChange( iID as long )
    end with
    SendMessage( hParent , WM_NOTIFY , iID , cast(LPARAM,@tSelChange) )   
 end sub
+   
 function LoadFileIntoEditor( sFile as string ) as boolean
-   var f = freefile(), iResu = open(sFile for binary access read as #f)
-   if iResu orelse (lof(f) > (64*1024*1024)) then
-      if iResu=0 then close(f)
+   
+   dim as string sScript
+   if LoadScriptFile( sFile , sScript )=false then
       MessageBox( CTL(wcMain) , !"Failed to open:\n\n'"+sFile+"'" , NULL , MB_ICONERROR )
       return false
    end if   
-   dim as string sData = space(lof(f)), sScript = space(lof(f)*3)   
-   get #f,,sData : close #f
-      
-   dim as long iOut=0, iLen = len(sData)
-   for iN as long = 0 to iLen-1
-      dim as ubyte iChar = sData[iN]
-      select case iChar
-      case asc(";") 'implicit EOL
-         sScript[iOut] = iChar : iOut += 1
-         do
-            iN += 1 : if iN >= iLen then exit for
-            iChar = sData[iN]
-            select case iChar
-            case 13,9,asc(" "),asc(";") 'ignore blanks
-               rem ignore blanks
-            case 10
-               sScript[iOut] = 13 : iChar = 10: iOut += 1 : exit do            
-            case else
-               sScript[iOut] = 13 : sScript[iOut+1] = 10: iOut += 2 : exit do
-            end select
-         loop
-      case 13 : continue for
-      case 10 : sScript[iOut] = 10 : iOut += 1
-      end select
-      sScript[iOut] = iChar : iOut += 1
-   next iN   
-   sScript = left(sScript,iOut)
       
    SetWindowText( CTL(wcEdit) , sScript ) : sScript=""
    g_CurrentFilePath = sFile
@@ -54,6 +28,19 @@ end function
 
 const cCloseLen = 4
 
+function GetTabName( iTab as long ) as string
+   with g_tTabs(iTab)
+      dim as zstring*64 zName = any : zName[0]=0
+      dim as TC_ITEM tItem = type( TCIF_TEXT )
+      tItem.pszText = @zName : tItem.cchTextMax = sizeof(zName)-1
+      TabCtrl_GetItem( CTL(wcTabs) , g_iCurTab , @tItem )
+      if iTab = g_iCurTab then
+         return left(zName,len(zName)-cCloseLen)
+      else
+         return zName
+      end if
+   end with
+end function
 sub UpdateMainWindowCaption()
    with g_tTabs(g_iCurTab)
       if len(.sFilename) then 
@@ -127,7 +114,6 @@ function CloneHwnd( hWnd as HWND , iIncStyles as integer = 0 ) as HWND
    var lStyleEx = GetWindowLong(hWnd,GWL_EXSTYLE)
    return CreateWindowEx( lStyleEx , wClass , NULL , lStyle or iIncStyles , 0,0,0,0 , hParent , 0 , hInst , NULL )
 end function
-   
 
 #define ResetTabCount() GetNewTabName(true)
 const sNoName = "Untitled"
@@ -142,9 +128,7 @@ sub UpdateTabName( iTab as long )
    with g_tTabs(iTab)
       dim as string sFile
       if len(.sFilename) then
-         var iPos = instrrev(.sFilename,"\") , iPos2 = instrrev(.sFilename,"/")
-         if iPos2 > iPos then iPos = iPos2          
-         sFile = mid(.sFilename,iPos+1)
+         sGetFilename( .sFilename , sFile )         
       else
          sFile = GetNewTabName()         
       end if
@@ -236,8 +220,36 @@ sub LoadScript( sFile as string )
          end if
       end with
    next N      
-   ChangeToTab(NewTab( sFile ))                  
+   ChangeToTab(NewTab( sFile ))
    LoadFileIntoEditor( sFile )
+end sub
+sub ChangeToTabByFile( sFullPath as string , iLine as long = -1 )
+   dim as long iTab = -1 'not found
+   if len(sFullPath)=0 then exit sub 
+   if sFullPath[0] = asc("*") then
+      iTab = g_iCurTab
+   else
+      var sPathL = lcase(sFullPath)
+      for N as long = 0 to g_iTabCount-1
+         if lcase(g_tTabs(N).sFilename)=sPathL then iTab = N : exit for         
+      next N
+   end if
+   if iTab = -1 then
+      if FileExists( sFullPath ) then
+         ChangeToTab(NewTab( sFullPath ))
+         LoadFileIntoEditor( sFullPath )
+         iTab = g_iCurTab
+      end if
+   else
+      ChangeToTab(iTab)
+   end if
+   if iLine >= 0 then
+      var iRow = SendMessage( CTL(wcEDIT) , EM_LINEINDEX , iLine , 0 )
+      dim as CHARRANGE tRange = (iRow,iRow)
+      SendMessage( CTL(wcEDIT) , EM_EXSETSEL , 0 , cast(LPARAM,@tRange) )
+      SendMessage( CTL(wcEDIT) , EM_SCROLLCARET , 0,0 )
+   end if
+   
 end sub
 
 sub File_New()
@@ -397,10 +409,11 @@ sub Do_Compile()
       SetWindowText( CTL(wcStatus) , "Build failed." )
       exit sub  
    end if
-   dim as string sOutput, sError
-   sOutput = LegoScriptToLDraw( sScript , sError )   
+   dim as string sOutput, sError, sFilePath = g_CurrentFilePath
+   if len(sFilePath)=0 then sFilePath = "*"+GetTabName( g_iCurTab )
+   sOutput = LegoScriptToLDraw( sScript , sError , sFilePath )   
    SetWindowText( CTL(wcOutput) , iif(len(sError)=0,sOutput,sError) )   
-   if len(sOutput) then
+   if len(sOutput) orelse len(sError)=0 then
       if lcase(right(g_CurrentFilePath,3)) = ".ls" then
          Viewer.LoadMemory( sOutput , left(g_CurrentFilePath,len(g_CurrentFilePath)-3)+".ldr" )
       else
@@ -408,7 +421,7 @@ sub Do_Compile()
       end if
    end if
    if len(sError) then SendMessage( CTL(wcRadOutput) , BM_CLICK , 0,0 )
-   SetWindowText( CTL(wcStatus) , iif(len(sOutput),"Ready.","Script error.") )
+   SetWindowText( CTL(wcStatus) , iif(len(sOutput),"Ready.",iif(len(sError),"Script error.","No output generated!")))
    
 end sub
 sub Button_Compile()

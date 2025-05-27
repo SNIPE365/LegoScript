@@ -570,6 +570,7 @@ function LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as 
 end function
 
 function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex as long = -1 , iLoadDependencies as byte = 1 ) as DATFile ptr   
+   if pFile = NULL then pFile = @" "
    #macro CheckError(_s , _separator... )
       #if len( #_separator )
         if iResu>0 andalso pFile[iResu] <> asc(_separator) then iResu = -1

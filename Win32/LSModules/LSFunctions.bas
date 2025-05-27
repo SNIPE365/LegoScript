@@ -201,4 +201,203 @@ function SafeText( sInput as string ) as string
       end select
    next N
    return sResult
-end function      
+end function   
+function GetFilePath( In_sFullPath as string ) as string
+   puts(In_sFullPath)
+   var iPosi = InstrRev( In_sFullPath , "\" ), iPosi2 = InstrRev( In_sFullPath , "/" )
+   if iPosi2 > iPosi then iPosi = iPosi2
+   return left( In_sFullPath , iPosi )
+end function
+sub sCanonicalizeFilePath( InOut_sFullPath as string , IN_sCurPath as string = "" )         
+   dim as string sCurPath
+   if len(IN_sCurPath)=0 then sCurPath=curdir() else sCurPath=IN_sCurPath
+   var iLen = len(sCurPath)
+   if sCurPath[iLen-1] <> asc("\") andalso sCurPath[iLen-1] <> asc("/") then sCurPath += "\"
+   InOut_sFullPath = trim(InOut_sFullPath) 
+   iLen = len(InOut_sFullPath) : if iLen=0 then exit sub
+   for N as long = 0 to iLen-1
+      if InOut_sFullPath[N] = asc("/") then InOut_sFullPath[N] = asc("\")
+   next N
+   if InOut_sFullPath[0] = asc("\") orelse (iLen>1) andalso InOut_sFullPath[1] = asc(":") then exit sub
+   InOut_sFullPath = sCurPath + InOut_sFullPath
+end sub
+sub sGetFilename( In_sFullPath as string , Out_sFilename as string )
+   var iPosi = InstrRev( In_sFullPath , "\" ), iPosi2 = InstrRev( In_sFullPath , "/" )
+   if iPosi2 > iPosi then iPosi = iPosi2
+   Out_sFilename = mid( In_sFullPath , iPosi+1 )
+end sub
+
+function LoadScriptFile( sFile as string , sOutString as string ) as boolean
+   var f = freefile(), iResu = open(sFile for binary access read as #f)
+   if iResu orelse (lof(f) > (64*1024*1024)) then
+      if iResu=0 then close(f) 
+      return false
+   end if   
+   dim as string sData = space(lof(f))
+   sOutString = space(lof(f)*3)   
+   get #f,,sData : close #f
+      
+   dim as long iOut=0, iLen = len(sData)
+   for iN as long = 0 to iLen-1
+      dim as ubyte iChar = sData[iN]
+      select case iChar
+      case asc(";") 'implicit EOL
+         'if there's comments or EOL in the line continuation then keep as is
+         var iT = iN         
+         do
+            iT += 1
+            select case sData[iT]
+            case asc(" "),9 : continue do
+            case 13,10      : iT = -1
+            case asc("/")   : if sData[iT+1] = asc("/") then iT = -1 
+            end select
+            exit do
+         loop  
+         'if there's another statement put it over next line
+         if iT <> -1 then            
+            sOutString[iOut] = iChar : iOut += 1            
+            do
+               iN += 1 : if iN >= iLen then exit for
+               iChar = sData[iN]
+               select case iChar
+               case 13,9,asc(" "),asc(";") 'ignore blanks
+                  rem ignore blanks
+               case 10
+                  sOutString[iOut] = 13 : iChar = 10: iOut += 1 : exit do            
+               case else
+                  sOutString[iOut] = 13 : sOutString[iOut+1] = 10: iOut += 2 : exit do
+               end select
+            loop
+         end if
+      case 13 : continue for
+      case 10 : sOutString[iOut] = 13 : iOut += 1
+      end select
+      sOutString[iOut] = iChar : iOut += 1
+   next iN   
+   sOutString = left(sOutString,iOut)
+   return true
+end function
+
+type lsString
+   pzData as ubyte ptr
+   uLen   as ulong
+   union
+      uSize as ulong
+      type
+         uLine:21 as ulong
+         uFile:11 as ulong
+      end type
+   end union
+end type
+
+'??? if there's a missing ; then the output statement is one char short ???
+function LS_GetNextStatement( sScript as string , iStStart as long , Out_sStatement as string , byref InOut_iLineNumber as long ) as long
+   if iStStart >= len(sScript) then Out_sStatement = "" : return 0
+   dim as long iStNext = instr(iStStart,sScript,";"), bNoEOS = 0
+   if iStNext=0 then iStNext = len(sScript) : bNoEOS = 1
+   var pzFb = cptr(fbStr ptr,@Out_sStatement)
+   dim as byte bPreSkipTillNextLine = 0
+   with *pzFb
+      .pzData = cptr(ubyte ptr,strptr(sScript))+iStStart-1
+      .iLen = iif(iStNext,iStNext,1+len(sScript))-(iStStart)         
+      while .iLen>0 andalso (bPreSkipTillNextLine orelse (g_bSeparators(.pzData[0]) and stToken))
+         select case .pzData[0] 'special chars
+         case 0 : exit while
+         case asc("/"): if .pzData[1] = asc("/") then bPreSkipTillNextLine = 1
+         case asc(!"\n"): InOut_iLineNumber += 1 : bPreSkipTillNextLine = 0
+         case asc(!"\r")
+            if .pzData[1]=asc(!"\n") then 
+               .pzData += 1 : .iLen -= 1 : iStStart += 1 
+               InOut_iLineNumber += 1 : bPreSkipTillNextLine = 0               
+            end if
+         end select
+         .pzData += 1 : .iLen -= 1 : iStStart += 1
+      wend      
+      
+      'preprocessor ends at line end not at ;
+      var bIsPreProcessor = .iLen>0 andalso .pzData[0] = asc("#")
+      if bIsPreProcessor then
+         iStNext = instr(iStStart,sScript,!"\n")
+         if iStNext=0 then iStNext = len(sScript)
+         if iStNext > 1 andalso sScript[iStNext-2]=asc(!"\r") then iStNext -= 1
+         .iLen = iStNext-iStStart : bNoEOS = 1
+      end if
+         
+      while .iLen>0 andalso (g_bSeparators(.pzData[.iLen-1]) and stToken)
+         select case .pzData[.iLen-1] 'special chars
+         case 0 : exit while
+         case asc("/") : exit while
+         case asc(!"\n") : InOut_iLineNumber += 1 
+         case asc(!"\r"): if .pzData[.iLen]=asc(!"\n") then .iLen -= 1 : InOut_iLineNumber += 1
+         end select
+         .iLen -= 1
+      wend
+      
+      .iLen += bNoEOS
+         
+      if .iLen=0 then 
+         if iStNext=len(sScript) then iStNext=0
+         Out_sStatement = ""
+      end if
+   end with
+   return iStNext
+end function
+function LS_SplitTokens( sStatement as string , Out_sToken() as string , iFileNumber as long ,  byref InOut_iLineNumber as long = 0 , byref Out_iErrToken as long = 0 ) as long
+   dim as long iTokStart=0,iTokCnt=0,iTokEnd=len(sStatement)
+   'split tokens
+   'print "["+sStatement+"]"
+   if len(sStatement)=0 then return 0 'no tokens
+   var pzStatement = cptr(ubyte ptr,strptr(sStatement))   
+   Out_iErrToken = 0
+   do      
+      #define iCurToken iTokCnt-1
+      if iTokCnt > ubound(Out_sToken) then Out_iErrToken = iCurToken : exit do
+      with *cptr(lsString ptr,@Out_sToken(iTokCnt))         
+         .uFile = iFileNumber
+         .pzData = pzStatement+iTokStart         
+         'skipping start of next token till a "non token separator" is found
+         while (g_bSeparators(.pzData[0]) and stToken)
+            if .pzData[0]=0 then exit do
+            .pzData += 1 : iTokStart += 1               
+            select case .pzData[-1] 'special characters
+            case asc(!"\n") 'new line (LF)
+               InOut_iLineNumber += 1
+            case asc(!"\r")   'new line (CRLF)
+               if .pzData[0]=asc(!"\n") then .pzData += 1 : iTokStart += 1 : InOut_iLineNumber += 1
+            case asc("/")    'escaping (commenting?)
+               if .pzData[0]=asc("/") then     'comment till EOL
+                  while iTokStart < iTokEnd andalso .pzData[0]<>asc(!"\r") andalso .pzData[0]<>asc(!"\n")
+                     .pzData += 1 : iTokStart += 1
+                  wend
+               elseif .pzData[0]=asc("*") then 'comment till *\
+                  .pzData += 1 : iTokStart += 1
+                  while iTokStart < iTokEnd andalso .pzData[0]
+                     .pzData += 1 : iTokStart += 1
+                     if .pzData[-1]=asc("*") andalso .pzData[0]=asc("/") then
+                        .pzData += 1 : iTokStart += 1 : exit while
+                     end if
+                  wend
+               end if
+            end select
+            if iTokStart >= iTokEnd then .uLine = InOut_iLineNumber : exit do
+         wend         
+         'locating end/size of current token
+         ''print .pzData[0],chr(.pzData[0])
+         if (g_bSeparators(.pzData[0]) and (not stToken)) then
+            .uLen = 1 : iTokStart += 1
+         else
+            .uLen = 0
+            var bQuotes = 0
+            while bQuotes orelse g_bSeparators(.pzData[.uLen])=0
+               if .pzData[.uLen]=asc("""") then bQuotes xor= 1
+               if iTokStart >= iTokEnd then exit while
+               .uLen += 1 : iTokStart += 1
+            wend
+         end if         
+         .uLine = InOut_iLineNumber
+         if .uLen <= 0 then exit do
+         iTokCnt += 1
+      end with      
+   loop   
+   return iTokCnt
+end function

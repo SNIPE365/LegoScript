@@ -108,114 +108,52 @@ static shared as SnapPV g_NullSnap
 
 'TODO: now check the remainder tokens, clutch/studs
 
-function LS_GetNextStatement( sScript as string , iStStart as long , Out_sStatement as string , InOut_iLineNumber as long ) as long
-   if iStStart >= len(sScript) then Out_sStatement = "" : return 0
-   dim as long iStNext = instr(iStStart,sScript,";")
-   if iStNext=0 then iStNext = len(sScript)
-   var pzFb = cptr(fbStr ptr,@Out_sStatement)
-   with *pzFb
-      .pzData = cptr(ubyte ptr,strptr(sScript))+iStStart-1
-      .iLen = iif(iStNext,iStNext,1+len(sScript))-(iStStart)         
-      while .iLen>0 andalso (g_bSeparators(.pzData[0]) and stToken)
-         select case .pzData[0] 'special chars
-         case asc("/"): exit while
-         case asc(!"\n"): InOut_iLineNumber += 1
-         case asc(!"\r"): if .pzData[1]=asc(!"\n") then .pzData += 1 : .iLen -= 1 : InOut_iLineNumber += 1
-         end select
-         .pzData += 1 : .iLen -= 1
-      wend
-      while .iLen>0 andalso (g_bSeparators(.pzData[.iLen-1]) and stToken)
-         select case .pzData[.iLen-1] 'special chars
-         case asc("/") : exit while
-         case asc(!"\n"): InOut_iLineNumber += 1
-         case asc(!"\r"): if .pzData[.iLen]=asc(!"\n") then .iLen -= 1 : InOut_iLineNumber += 1
-         end select
-         .iLen -= 1
-      wend
-      if .iLen=0 then 
-         if iStNext=len(sScript) then iStNext=0
-         Out_sStatement = ""
-      end if
-   end with
-   return iStNext
-end function
-function LS_SplitTokens( sStatement as string , Out_sToken() as string , byref InOut_iLineNumber as long = 0 , byref Out_iErrToken as long = 0 ) as long
-   dim as long iTokStart=0,iTokCnt=0,iTokEnd=len(sStatement)
-   'split tokens
-   'print "["+sStatement+"]"
-   if len(sStatement)=0 then return 0 'no tokens
-   var pzStatement = cptr(ubyte ptr,strptr(sStatement))   
-   Out_iErrToken = 0
-   do      
-      #define iCurToken iTokCnt-1
-      if iTokCnt > ubound(Out_sToken) then Out_iErrToken = iCurToken : exit do
-      with *cptr(fbStr ptr,@Out_sToken(iTokCnt))         
-         .pzData = pzStatement+iTokStart         
-         'skipping start of next token till a "non token separator" is found
-         while (g_bSeparators(.pzData[0]) and stToken)
-            if .pzData[0]=0 then exit do
-            .pzData += 1 : iTokStart += 1               
-            select case .pzData[-1] 'special characters
-            case asc(!"\n") 'new line (LF)
-               InOut_iLineNumber += 1
-            case asc(!"\r")   'new line (CRLF)
-               if .pzData[0]=asc(!"\n") then .pzData += 1 : iTokStart += 1 : InOut_iLineNumber += 1
-            case asc("/")    'escaping (commenting?)
-               if .pzData[0]=asc("/") then     'comment till EOL
-                  while iTokStart < iTokEnd andalso .pzData[0]<>asc(!"\r") andalso .pzData[0]<>asc(!"\n")
-                     .pzData += 1 : iTokStart += 1
-                  wend
-               elseif .pzData[0]=asc("*") then 'comment till *\
-                  .pzData += 1 : iTokStart += 1
-                  while iTokStart < iTokEnd andalso .pzData[0]
-                     .pzData += 1 : iTokStart += 1
-                     if .pzData[-1]=asc("*") andalso .pzData[0]=asc("/") then
-                        .pzData += 1 : iTokStart += 1 : exit while
-                     end if
-                  wend
-               end if
-            end select
-            if iTokStart >= iTokEnd then .iSize = InOut_iLineNumber : exit do
-         wend         
-         'locating end/size of current token
-         ''print .pzData[0],chr(.pzData[0])
-         if (g_bSeparators(.pzData[0]) and (not stToken)) then
-            .iLen = 1 : iTokStart += 1
-         else
-            .iLen = 0
-            while g_bSeparators(.pzData[.iLen])=0
-               if iTokStart >= iTokEnd then exit while
-               .iLen += 1 : iTokStart += 1
-            wend
-         end if         
-         .iSize = InOut_iLineNumber
-         if .iLen <= 0 then exit do
-         iTokCnt += 1
-      end with      
-   loop   
-   return iTokCnt
-end function
-
-function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as string
+function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainPath as string = "main.ldr" ) as string
    
+   type FileStruct
+      psFilename  as string ptr
+      psFilePath  as string ptr
+      psScript    as string ptr
+      uLineNumber as long
+      uStStart    as long
+   end type
    '<PartCode> <PartName> <PartPosition> =
    '<PartName> <PartPosition> =
-   
-   'split tokens
+      
    dim as string sStatement, sToken(15), sResult
-   dim as long iStStart=1,iLineNumber=1,iTokenLineNumber=1
+   dim as long iTokenLineNumber=1 , iCurFile = 1 , iStackPos = 0 , iFileCount = 1
    sOutput = "" : g_iPartCount = 1 : g_iConnCount = 0
+         
+   #define iStStart aFile(iCurFile).uStStart
+   #define iLineNumber aFile(iCurFile).uLineNumber
+   #define sScript (*aFile(iCurFile).psScript)
    
-   #define TokenLineNumber(_N) (cptr(fbStr ptr,@sToken(_N))->iSize)
+   redim aFile(1 to 8) as FileStruct   
+   redim iFileStack(15) as long
    
+   iFileStack(iStackPos) = iCurFile
+   dim as string sMainFile : sGetFilename( sMainPath , sMainFile )
+   with aFile(iCurFile)
+      .psFilename = @sMainFile
+      .psFilePath = @sMainPath
+      .psScript  = @_sScript
+      .uStStart=1 
+      .uLineNumber=1
+   end with   
+      
+   #define TokenLineNumber(_N) (cptr(lsString ptr,@sToken(_N))->uLine)
+   #define TokenFileNumber(_N) (cptr(lsString ptr,@sToken(_N))->uFile)
+   #define TokenFileName(_N) (*(aFile(TokenFileNumber(_N)).psFilename))
+   #define TokenFilePath(_N) (*(aFile(TokenFileNumber(_N)).psFilepath))
+      
    #ifdef __Standalone
-      #define ParserError( _text ) color 12:errorf(!"Error: %s\r\nat line %i '%s'\n",SafeText(_text),TokenLineNumber(iCurToken),SafeText(sStatement)) : sResult="" : color 7: exit while
-      #define ParserWarning( _text ) color 14:errorf(!"Warning: %s\r\nat line %i '%s'\n",SafeText(_text),TokenLineNumber(iCurToken),SafeText(sStatement)):color 7
+      #define ParserError( _text ) color 12:errorf(!"Error: %s\r\nat '%s':%i '%s'\n",SafeText(_text),TokenFilename(iCurToken), TokenLineNumber(iCurToken),SafeText(sStatement)) : sResult="" : color 7: exit while
+      #define ParserWarning( _text ) color 14:errorf(!"Warning: %s\r\nat '%s':%i '%s'\n",SafeText(_text),TokenFilename(iCurToken),TokenLineNumber(iCurToken),SafeText(sStatement)):color 7
       #define LinkerError( _text ) color 12 : errorf(!"Error: %s\n",_text) : sResult="" : color 7
       #define LinkerWarning( _text ) color 14 : errorf(!Warning: %s\n",_text): color 7
    #else
-      #define ParserError( _text ) sOutput += "Error: " & SafeText(_text) & !"\r\nat line " & TokenLineNumber(iCurToken) & " '" & SafeText(sStatement) & !"'\r\n" : sResult="" : exit while
-      #define ParserWarning( _text ) sOutput += "Warning: " & SafeText(_text) & !"\r\nat line " & TokenLineNumber(iCurToken) & " '" & SafeText(sStatement) & !"'\r\n"
+      #define ParserError( _text ) sOutput += "Error: " & SafeText(_text) & !"\r\nat '" & TokenFilename(iCurToken) & "':" & TokenLineNumber(iCurToken) & " '" & SafeText(sStatement) & !"'\r\n" : sResult="" : ChangeToTabByFile( TokenFilePath(iCurTokeN) , TokenLineNumber(iCurToken ) ) : exit while
+      #define ParserWarning( _text ) sOutput += "Warning: " & SafeText(_text) & !"\r\nat '" & TokenFilename(iCurToken) & "':" &  TokenLineNumber(iCurToken) & " '" & SafeText(sStatement) & !"'\r\n"
       #define LinkerError( _text ) sOutput += "Error: " & _text & !"\r\n" : sResult=""
       #define LinkerWarning( _text ) sOutput += "Warning: " & _text & !"\r\n" 
    #endif
@@ -227,23 +165,81 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
       
    
    'Parsing LS and generate connections
-   while 1
-            
+   
+   #define FileDone() if iStackPos then iStackPos -= 1 : iCurFile = iFileStack(iStackPos) : continue while else exit while
+      
+   while 1            
       
       'get next statement
       var iStNext = LS_GetNextStatement(sScript,iStStart,sStatement,iLineNumber)      
-      if iStNext=0 then exit while
+      if iStNext=0 then FileDone()               
       if len(sStatement)=0 then iStStart = iStNext+1 : continue while
+      
+      'puts(iLineNumber & "'"+sStatement+"'")
                   
+      'split tokens
       dim as long iErrToken = 0
-      var iTokCnt = LS_SplitTokens( sStatement , sToken() , iLineNumber , iErrToken )
+      var iTokCnt = LS_SplitTokens( sStatement , sToken() , iCurFile , iLineNumber , iErrToken )
       if iTokCnt > ubound(sToken) then 
          #define iCurToken iErrToken
          ParserError("Too many tokens")            
       end if            
       
       iStStart = iStNext+1
-      if iTokCnt=0 then if iStNext=0 then exit while else continue while
+      if iTokCnt=0 then if iStNext=0 then FileDone() else continue while
+      
+      'preprocessor / pragama checker
+      if sStatement[0] = asc("#") then
+         var iCurToken = 0
+         select case lcase(sToken(0))
+         case "#include"
+            if iTokCnt<2 then ParserError( "Expected filename, got end of line" )
+            if iTokCnt>2 then ParserError( "Expected end of line got '" & sToken(2) & "'" )            
+            var iEnd = len(sToken(1)) : iCurToken = 1
+            if sToken(1)[0]<>asc("""") andalso sToken(1)[0]<>asc("'") then
+               ParserError( "Expected string, got end of line" )
+            end if
+            if iEnd < 2 orelse sToken(1)[iEnd-1] <> sToken(1)[0] then
+               ParserError( "Mismatched string quotes" )
+            end if
+            var sFile = mid(sToken(1),2,iEnd-2) : sCanonicalizeFilePath( sFile , GetFilePath((*aFile(iCurFile).psFilepath))  )
+            var sFileL = lcase(sFile), iLoadedFile=0
+            for N as long = 1 to iFileCount
+               if aFile(N).psFilepath = null then exit for
+               if *aFile(N).psFilepath = sFileL then iLoadedFile = N
+               for I as long = 0 to iStackPos
+                  if (*aFile(iFileStack(I)).psFilepath) = sFileL then
+                     ParserError( "Recursive #include" )
+                  end if
+               next I               
+            next N
+            if iLoadedFile = 0 then
+               var psScript = new string
+               if LoadScriptFile( sFile , *psScript )=false then
+                  puts("file not found?? '" & sFile & "'")
+                  delete psScript : ParserError( "File not found" )                  
+               end if
+               iFileCount += 1
+               with aFile(iFileCount)
+                  .psFilename = new string (sFile)
+                  .psFilepath = new string (sFileL)
+                  .psScript   = psScript
+               end with
+               iLoadedFile = iFileCount
+            end if
+            with aFile(iLoadedFile)
+               .uStStart=1 
+               .uLineNumber=1
+            end with
+            iStackPos += 1 : iCurFile = iLoadedFile
+            iFileStack(iStackPos)=iLoadedFile            
+         case "#pragma"
+            rem
+         case else            
+            ParserError( "Unknown pre-processor directive" )            
+         end select
+         continue while
+      end if
       
       'Display Tokens
       for N as long = 0 to iTokCnt-1
@@ -367,7 +363,7 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
                   end if
                   continue do,do
                case asc("x"): 'X angle or position for this piece
-                  if bExisting then ParserError("Can't define attributes for existing parts (redefined X offset or rotation)")
+                  if .bConnected then ParserError("Can't define attributes for existing parts (redefined X offset or rotation)")
                   select case sThisToken[1]
                   case asc("o") 
                      if bDefinedXOff then ParserError("Defined X offset twice")
@@ -377,7 +373,7 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
                      .tLocation.fAX  = ReadTokenNumber( sThisToken , 1-(sThisToken[1]=asc("r")) , true )*(PI/180) : bDefinedXrot = 1
                   end select
                case asc("y"): 'Y angle or position for this piece
-                  if bExisting then ParserError("Can't define attributes for existing parts (redefined Y offset or rotation)")
+                  if .bConnected then ParserError("Can't define attributes for existing parts (redefined Y offset or rotation)")
                   select case sThisToken[1]
                   case asc("o") 
                      if bDefinedYOff then ParserError("Defined Y offset twice")
@@ -387,7 +383,7 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
                      .tLocation.fAY  = ReadTokenNumber( sThisToken , 1-(sThisToken[1]=asc("r")) , true )*(PI/180) : bDefinedYrot = 1
                   end select
                case asc("z"): 'Z angle or position for this piece
-                  if bExisting then ParserError("Can't define attributes for existing parts (redefined Z offset or rotation)")
+                  if .bConnected then ParserError("Can't define attributes for existing parts (redefined Z offset or rotation)")
                   select case sThisToken[1]
                   case asc("o") 
                      if bDefinedZOff then ParserError("Defined Z offset twice")
@@ -397,7 +393,7 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
                      .tLocation.fAZ  = ReadTokenNumber( sThisToken , 1-(sThisToken[1]=asc("r")) , true )*(PI/180) : bDefinedZrot = 1
                   end select
                case asc("#"): 'color token #nn #RGB #RRGGBB
-                  if bExisting then 
+                  if .bConnected then 
                      ParserError("Can't define attributes for existing parts")
                   end if
                   if .iColor >= 0 then ParserError("color attribute was already set for part '"+.sName+"'")
@@ -671,6 +667,15 @@ function LegoScriptToLDraw( sScript as string , sOutput as string = "" ) as stri
          
    clear sToken(0),0,16*sizeof(fbStr) ': erase sToken
    clear sStatement,0,sizeof(fbStr)   ': sStatement = ""
+   
+   'cleanup dynamically allocated scripts (1=main = not dynamically created)
+   for N as long = 2 to iFileCount
+      with aFile(N)
+         if .psScript   then delete .psScript   : .psScript   = 0
+         if .psFilename then delete .psFilename : .psFilename = 0
+         if .psFilepath then delete .psFilepath : .psFilepath = 0
+      end with
+   next N
    
    redim as PartStructLS g_tPart(_cPartMin)
    redim as PartConnLS g_tConn(_cConnMin)

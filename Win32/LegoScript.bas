@@ -20,8 +20,9 @@
 ' !!! because when using ldraw it does not matter the order, so they never enforced that     !!!
 
 
+'TODO (27/05/25): file's not ending with LN are crashing when compiling - [FIX ON 28/5/2025]
+'TODO (26/05/25): prevent fallback connectors from crashing parser      - [FIX ON 28/5/2025]
 'TODO (19/05/25): fix LS2LDR parsing bugs (prevent part that is connected from moving)
-'TODO (19/05/25): Add #include capability
 'TODO (17/05/25): investigate crash when building before opening graphics window
 'TODO (16/05/25): clutches [slide=true] are real clutches??
 'TODO (13/05/25): Add Menu entries for the Query window/buttons 
@@ -109,6 +110,8 @@ declare sub File_SaveAs()
 declare sub RichEdit_Replace( hCtl as HWND , iStart as long , iEnd as long , sText as string , bKeepSel as long = true )
 
 #define GiveUp(_N) return false
+
+declare sub ChangeToTabByFile( sFullPath as string , iLine as long = -1 )
 
 #include "Loader\LoadLDR.bas"
 #include "Loader\Include\Colours.bas"

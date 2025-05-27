@@ -191,8 +191,8 @@ namespace Viewer
                      if iBorders >=0 then glDeleteLists( iBorders , 2 ) : iBorders = -1
                   end if 
                   g_TotalLines = 0 : g_TotalOptis = 0 : g_TotalTrigs = 0 : g_TotalQuads = 0
-                  static as string sPrevFilename
-                  pModel = LoadModel( strptr(g_sGfxFile) , g_sFileName )
+                  static as string sPrevFilename                  
+                  pModel = LoadModel( strptr(g_sGfxFile) , g_sFileName )                  
                   g_sGfxFile = "" : if pModel = NULL then exit do 'failed to load
                   iModel   = glGenLists( 1 )
                   glNewList( iModel ,  GL_COMPILE ) 'GL_COMPILE_AND_EXECUTE
