@@ -292,7 +292,15 @@ end type
 
 '??? if there's a missing ; then the output statement is one char short ???
 function LS_GetNextStatement( sScript as string , iStStart as long , Out_sStatement as string , byref InOut_iLineNumber as long ) as long
-   if iStStart >= len(sScript) then Out_sStatement = "" : return 0
+   
+   'printf( !"%i of %i '%s'\n",iStStart,len(sScript),iif(iStStart<len(sScript),strptr(sScript)+iStStart-1,NULL) )
+   
+   if iStStart >= len(sScript) then 
+      with *cptr(fbStr ptr,@Out_sStatement)
+         .pzData = NULL : .iLen = 0 : .iSize = 0
+      end with
+      return 0
+   end if
    dim as long iStNext = instr(iStStart,sScript,";"), bNoEOS = 0
    if iStNext=0 then iStNext = len(sScript) : bNoEOS = 1
    var pzFb = cptr(fbStr ptr,@Out_sStatement)
@@ -302,7 +310,7 @@ function LS_GetNextStatement( sScript as string , iStStart as long , Out_sStatem
       .iLen = iif(iStNext,iStNext,1+len(sScript))-(iStStart)         
       while .iLen>0 andalso (bPreSkipTillNextLine orelse (g_bSeparators(.pzData[0]) and stToken))
          select case .pzData[0] 'special chars
-         case 0 : exit while
+         'case 0 : exit while
          case asc("/"): if .pzData[1] = asc("/") then bPreSkipTillNextLine = 1
          case asc(!"\n"): InOut_iLineNumber += 1 : bPreSkipTillNextLine = 0
          case asc(!"\r")
@@ -325,7 +333,7 @@ function LS_GetNextStatement( sScript as string , iStStart as long , Out_sStatem
          
       while .iLen>0 andalso (g_bSeparators(.pzData[.iLen-1]) and stToken)
          select case .pzData[.iLen-1] 'special chars
-         case 0 : exit while
+         'case 0 : exit while
          case asc("/") : exit while
          case asc(!"\n") : InOut_iLineNumber += 1 
          case asc(!"\r"): if .pzData[.iLen]=asc(!"\n") then .iLen -= 1 : InOut_iLineNumber += 1
@@ -337,7 +345,10 @@ function LS_GetNextStatement( sScript as string , iStStart as long , Out_sStatem
          
       if .iLen=0 then 
          if iStNext=len(sScript) then iStNext=0
-         Out_sStatement = ""
+         'Out_sStatement = ""
+         with *cptr(fbStr ptr,@Out_sStatement)
+            .pzData = NULL : .iLen = 0 : .iSize = 0
+         end with
       end if
    end with
    return iStNext

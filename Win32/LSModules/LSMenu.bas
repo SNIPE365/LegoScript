@@ -25,7 +25,7 @@
       __Entry( meEdit_Copy    , "&Copy"  !"\tCtrl+C" ,              ,      , @Edit_Copy )      
       __Entry( meEdit_Paste   , "&Paste" !"\tCtrl+V" ,              ,      , @Edit_Paste)
       __Separator()
-      __Entry( meCode_Build   , "&Build"             , _Ctrl        , VK_B , @Button_Compile )
+      __Entry( meCode_Build   , "&Build"             , 0            , VK_F6 , @Button_Compile )
       __Entry( meCode_Clear   , "Cl&ear output"      , _Ctrl+_Shift , VK_B , @Code_ClearOutput )
    __EndSubMenu()
    __SubMenu( "&Completion" )

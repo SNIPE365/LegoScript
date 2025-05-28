@@ -279,39 +279,53 @@ end sub
 #define CTL(_I) pCtx->hCTL(_I).hwnd
 #endif
 
+
+#if 0
+   '#define v_first(_last) va_first()
+   '#define v_arg(_p , _t) va_arg(_p,_t)
+   '#define v_next(_p) va_next(_p,_t)
+#else
+   #define v_first(_last) cast(any ptr,@_last+1)
+   #define v_arg(_p , _t) *cptr( _t ptr , (_p) )
+   #define v_next(_p , _t) cast(any ptr,_p)+sizeof(_t)
+#endif
+
 'set fonts to multiple controls
-sub _SetControlsFont cdecl ( pCtl as ControlStruct ptr , bFont as byte , ... ) 
-  var p = va_first()
-  do
-    var iID = va_arg(p,long)
-    if iID < 0 then exit do
-    pCtl[iID].bFont = bFont
-    p = va_next(p,long)
-  loop
+sub _SetControlsFont cdecl ( pCtl as ControlStruct ptr , bFont as long , iCount as long , ... )   
+  
+   dim args as Cva_List
+   Cva_Start( args, iCount )
+   For i as long = 1 To iCount
+     var iID = Cva_Arg(args, long)
+     pCtl[iID].bFont = bFont
+   Next
+   Cva_End( args )
+   
 end sub
-#define SetControlsFont( _Font , _IDs... ) _SetControlsFont( @(pCtx->hCtl(0)) , _Font , _IDs , -1 )
+#define SetControlsFont( _Font , _IDs... ) _SetControlsFont( @(pCtx->hCtl(0)) , _Font , __FB_ARG_COUNT__( _IDs) , _IDs )
 'set color callback to multiple controls (WM_CTLCOLOR*)
 sub _SetControlsEventCallback cdecl ( pCtl as ControlStruct ptr , pCb as ControlEventCallback , ... ) 
-  var p = va_first()
+  var p = v_first(pCb)
   do
-    var iID = va_arg(p,long)
+    var iID = v_arg(p,long)
     if iID < 0 then exit do
     pCtl[iID].cbEvent = pCb
-    p = va_next(p,long)
+    p = v_next(p,long)
   loop
 end sub
 #define SetControlsEventCallback( _Callback , _IDs... ) _SetControlsEventCallback( @(pCtx->hCtl(0)) , _Callback , _IDs , -1 )
 
 'set after size callback to multiple controls (for special resize?)
-sub _SetControlsAfterSize cdecl ( pCtl as ControlStruct ptr , pCb as ControlAfterSizeCallback , ... ) 
-  var p = va_first()
+sub _SetControlsAfterSize cdecl ( pCtl as ControlStruct ptr , pCb as ControlAfterSizeCallback , ... )   
+  var p = v_first(pCb)
   do
-    var iID = va_arg(p,long)
+    var iID = v_arg(p,long)
     if iID < 0 then exit do
     pCtl[iID].cbAfterSize = pCb
-    p = va_next(p,long)
+    p = v_next(p,long)
   loop
 end sub
+
 #define SetControlsAfterSize( _Callback , _IDs... ) _SetControlsAfterSize( @(pCtx->hCtl(0)) , _Callback , _IDs , -1 )
 
 sub _ShowHideControlRange( pCtl as ControlStruct ptr , iShow as long , iBegin as long , iEnd as long )

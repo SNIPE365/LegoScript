@@ -1,4 +1,4 @@
-#cmdline "-g"
+'#cmdline "-gen gcc -O 3"
 #define __Main "LegoScript"
 
 #include once "windows.bi"
@@ -20,8 +20,6 @@
 ' !!! because when using ldraw it does not matter the order, so they never enforced that     !!!
 
 
-'TODO (27/05/25): file's not ending with LN are crashing when compiling - [FIX ON 28/5/2025]
-'TODO (26/05/25): prevent fallback connectors from crashing parser      - [FIX ON 28/5/2025]
 'TODO (19/05/25): fix LS2LDR parsing bugs (prevent part that is connected from moving)
 'TODO (17/05/25): investigate crash when building before opening graphics window
 'TODO (16/05/25): clutches [slide=true] are real clutches??
@@ -31,7 +29,7 @@
 'TODO (25/03/25): re-organize the LS2LDR code, so that it looks better and explain better
 'TODO (20/03/25): process keys to toggle filters and to change the text/add type (plate/brick/etc...)
 'TODO (06/03/25): check bug regarding wheel positioning and the line numbers
-'TODO (21/04/25): prevent buffer overflow when doing a FIND/RESEARCH when the selected text is bigger than 32k
+'TODO (21/04/25): prevent buffer overflow when doing a FIND/REPLACE when the selected text is bigger than 32k
 
 '*************** Enumerating our control id's ***********
 enum StatusParts

@@ -26,12 +26,15 @@ static shared as long g_CurrentMatrix
 
 #define tCurrentMatrix() tMatrixStack( g_CurrentMatrix )
 
-dim shared as Matrix4x4 g_tIdentityMatrix = ( _
-   { 1, 0, 0, 0,  _
-     0, 1, 0, 0,  _
-     0, 0, 1, 0,  _
-     0, 0, 0, 1 } _
-)
+static shared as Matrix4x4 g_tIdentityMatrix '= ( _
+'   { 1, 0, 0, 0,  _
+'     0, 1, 0, 0,  _
+'     0, 0, 1, 0,  _
+'     0, 0, 0, 1 } _
+')
+g_tIdentityMatrix.m(0)=1  : g_tIdentityMatrix.m(5)=1
+g_tIdentityMatrix.m(10)=1 : g_tIdentityMatrix.m(15)=1
+
 dim shared as Matrix4x4 g_tBlankMatrix
 tMatrixStack( 0 ) = g_tIdentityMatrix
 function PushAndMultMatrix( pIn as const single ptr ) as boolean

@@ -27,7 +27,6 @@
 87081 BR9 #0;  //black 4x4 round brick with pinhole
 87081 BR10 #0; //black 4x4 round brick with pinhole
 
-B1 c1 = B2 #10 y90 s1;
+B1 c1 = B2 y90 s1;
 
 B3 c1 = B4 s1;
-
