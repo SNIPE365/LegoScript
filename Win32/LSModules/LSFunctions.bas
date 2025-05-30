@@ -33,9 +33,21 @@ function IsTokenNumeric( sToken as string , iStart as long = 0 ) as long
 end function
 function IsPrimative( sToken as string ) as long
    if len(sToken)=0 then return false
-   for N as long = 0 to len(sToken)-1
-      select case sToken[0]
-      case asc("a") to asc("z"),asc("0") to asc("9"),asc("_")
+   
+   select case sToken[0]
+   '!!! To allow letters in the begin of part ID/Primative we will need to be able to do a slower or cached CHECK
+   'case asc("a") to asc("z") 
+   case asc("0") to asc("9"),asc("_")
+      rem valid first char for primatives
+   case asc("$") 'force assumption of primative
+      sToken = mid(sToken,2)
+   case else
+      return false
+   end select
+   
+   for N as long = 1 to len(sToken)-1
+      select case sToken[N]
+      case asc("A") to asc("Z"),asc("a") to asc("z"),asc("0") to asc("9"),asc("_")
          rem valid chars for primatives
       case else
          return false
@@ -45,7 +57,7 @@ function IsPrimative( sToken as string ) as long
 end function
 function IsValidPartName( sToken as string ) as long   
    if len(sToken)=0 then return false
-   select case sToken[0]
+   select case sToken[0]   
    case asc("A") to asc("Z")
       rem valid initial chars for part names
    case else
@@ -203,7 +215,7 @@ function SafeText( sInput as string ) as string
    return sResult
 end function   
 function GetFilePath( In_sFullPath as string ) as string
-   puts(In_sFullPath)
+   'puts(In_sFullPath)
    var iPosi = InstrRev( In_sFullPath , "\" ), iPosi2 = InstrRev( In_sFullPath , "/" )
    if iPosi2 > iPosi then iPosi = iPosi2
    return left( In_sFullPath , iPosi )
@@ -295,19 +307,19 @@ function LS_GetNextStatement( sScript as string , iStStart as long , Out_sStatem
    
    'printf( !"%i of %i '%s'\n",iStStart,len(sScript),iif(iStStart<len(sScript),strptr(sScript)+iStStart-1,NULL) )
    
-   if iStStart >= len(sScript) then 
+   if iStStart > len(sScript) then 
       with *cptr(fbStr ptr,@Out_sStatement)
          .pzData = NULL : .iLen = 0 : .iSize = 0
       end with
       return 0
    end if
    dim as long iStNext = instr(iStStart,sScript,";"), bNoEOS = 0
-   if iStNext=0 then iStNext = len(sScript) : bNoEOS = 1
+   if iStNext=0 then iStNext = len(sScript)+1 : bNoEOS = 1
    var pzFb = cptr(fbStr ptr,@Out_sStatement)
    dim as byte bPreSkipTillNextLine = 0
    with *pzFb
       .pzData = cptr(ubyte ptr,strptr(sScript))+iStStart-1
-      .iLen = iif(iStNext,iStNext,1+len(sScript))-(iStStart)         
+      .iLen = iStNext-iStStart
       while .iLen>0 andalso (bPreSkipTillNextLine orelse (g_bSeparators(.pzData[0]) and stToken))
          select case .pzData[0] 'special chars
          'case 0 : exit while
@@ -326,7 +338,7 @@ function LS_GetNextStatement( sScript as string , iStStart as long , Out_sStatem
       var bIsPreProcessor = .iLen>0 andalso .pzData[0] = asc("#")
       if bIsPreProcessor then
          iStNext = instr(iStStart,sScript,!"\n")
-         if iStNext=0 then iStNext = len(sScript)
+         if iStNext=0 then iStNext = len(sScript)+1
          if iStNext > 1 andalso sScript[iStNext-2]=asc(!"\r") then iStNext -= 1
          .iLen = iStNext-iStStart : bNoEOS = 1
       end if
@@ -341,10 +353,10 @@ function LS_GetNextStatement( sScript as string , iStStart as long , Out_sStatem
          .iLen -= 1
       wend
       
-      .iLen += bNoEOS
+      '.iLen += bNoEOS
          
       if .iLen=0 then 
-         if iStNext=len(sScript) then iStNext=0
+         if iStNext>len(sScript) then iStNext=0
          'Out_sStatement = ""
          with *cptr(fbStr ptr,@Out_sStatement)
             .pzData = NULL : .iLen = 0 : .iSize = 0

@@ -46,7 +46,7 @@ SetControlsFont( wfStatus, wcTabs )
 
 InitSearchWindow()
 Menu.Trigger( meCompletion_Enable )
-Menu.Trigger( meView_ToggleGWDock )
+'Menu.Trigger( meView_ToggleGWDock )
 'Menu.Trigger( meCompletion_Variations )
 
 ColoredControl.Colorize( CTL(wcRadOutput) , &HFF8844 )

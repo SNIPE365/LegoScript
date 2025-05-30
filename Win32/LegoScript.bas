@@ -20,6 +20,7 @@
 ' !!! because when using ldraw it does not matter the order, so they never enforced that     !!!
 
 
+'TODO (30/05/25): fix crash when not finding a valid part name
 'TODO (19/05/25): fix LS2LDR parsing bugs (prevent part that is connected from moving)
 'TODO (17/05/25): investigate crash when building before opening graphics window
 'TODO (16/05/25): clutches [slide=true] are real clutches??
@@ -103,7 +104,7 @@ dim shared as hwnd g_GfxHwnd
 dim shared as byte g_DoQuit , g_Show3D , g_Dock3D
 dim shared as string g_CurrentFilePath
 
-declare sub DockGfxWindow()
+declare sub DockGfxWindow( bForce as boolean = false )
 declare sub File_SaveAs()
 declare sub RichEdit_Replace( hCtl as HWND , iStart as long , iEnd as long , sText as string , bKeepSel as long = true )
 
@@ -145,7 +146,7 @@ function CreateMainMenu() as HMENU
    #define _EndSubMenu() end scope   
    #define _Separator() Menu.MenuAddEntry( hMenu )
    #macro _Entry( _idName , _Text , _Modifiers , _Accelerator , _Callback... )      
-      #if len(#_Accelerator)         
+      #if len(#_Accelerator)
          #if (_Modifiers and _Shift)
             #define _sShift "Shift+"
          #else
@@ -178,8 +179,8 @@ function CreateMainMenu() as HMENU
       #endif      
       Menu.MenuAddEntry( hMenu , _idName , _sText2 , _Callback )
       #undef _sText2      
-   #endmacro     
-     
+   #endmacro
+
    var hMenu = CreateMenu() : g_WndMenu = hMenu      
       
    ForEachMenuEntry( _Entry ,  _SubMenu , _EndSubMenu , _Separator )
@@ -326,9 +327,9 @@ function CreateMainAccelerators() as HACCEL
    return CreateAcceleratorTable( @AccelList(0) , ubound(AccelList)+1 )
 end function
 
-sub DockGfxWindow()
-   static as integer iOnce=0
-   if g_GfxHwnd=0 then exit sub
+sub DockGfxWindow( bForce as boolean = false )   
+   static as boolean iOnce=false 
+   if g_GfxHwnd=0 orelse IsIconic(g_GfxHwnd) orelse (bForce=false andalso IsWindowVisible(g_GfxHwnd)=0) then exit sub
    ''if IsWindowVisible(g_GfxHwnd)=0 then ShowWindow( g_GfxHwnd , SW_SHOW )
    dim as RECT RcWnd=any,RcGfx=any,RcCli=any,RcDesk
    GetWindowRect( GetDesktopWindow() , @RcDesk )
@@ -348,18 +349,18 @@ sub DockGfxWindow()
       hPlace = HWND_TOPMOST : tPtRight.x = RcDesk.right-GfxWid
    end if
    'gfx.tOldPt.x = -65537
-   SetWindowPos( g_GfxHwnd , hPlace , tPtRight.x-4 ,iYPos , 0,0 , SWP_NOSIZE or SWP_NOACTIVATE or ((g_Dock3D=0 orelse iOnce<>0) and SWP_NOMOVE) )
+   SetWindowPos( g_GfxHwnd , hPlace , tPtRight.x-4 ,iYPos , 0,0 , SWP_NOSIZE or SWP_NOACTIVATE or ((g_Dock3D=0 andalso iOnce) and SWP_NOMOVE) )
    'NotifySelChange( wcEdit ) ??Why this was here??
-   iOnce = 1
+   iOnce = true
 end sub   
-sub ResizeMainWindow( bCenter as boolean = false )         
+sub ResizeMainWindow( bCenter as boolean = false )            
    static as boolean bResize
-   if bResize then exit sub
-   bResize = true
+   if bResize then exit sub   
    'Calculate Client Area Size
    dim as RECT RcWnd=any,RcCli=any,RcDesk=any
    var hWnd = CTL(wcMain)
-   GetClientRect(hWnd,@RcCli)      
+   if hWnd=0 orelse IsIconic(hWnd) orelse IsWindowVisible(hWnd)=0 then exit sub
+   bResize = true : GetClientRect(hWnd,@RcCli)      
    if bCenter then 'initial position
       GetWindowRect(hWnd,@RcWnd)
       'Window Rect is in SCREEN coordinate.... make right/bottom become WID/HEI
@@ -544,9 +545,12 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
       return 0
     
    case WM_SIZE       'window is sizing/was sized
-      ResizeMainWindow()
-      UpdateTabCloseButton() 
-      return 0
+      'puts("Main Size")
+      if wParam <> SIZE_MINIMIZED andalso wParam <> SIZE_MAXHIDE then 
+         ResizeMainWindow()
+         UpdateTabCloseButton() 
+         return 0
+      end if
    case WM_MOVE       'window is moving/was moved
       DockGfxWindow()
    case WM_USER+1 'gfx resized
@@ -559,18 +563,23 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
       SetControl( wcLines , cMarginL , _BtP(wcButton,0.5) , _pct(((.18+2*g_RowDigits))) , _pct(53) , CTL(wcLines) )
       ResizeMainWindow()      
    case WM_ACTIVATE  'Activated/Deactivated
-      if g_GfxHwnd andalso g_Show3D then
+      static as boolean b_IgnoreActivation
+      if b_IgnoreActivation=0 andalso g_GfxHwnd andalso g_Show3D then
          var fActive = LOWORD(wParam) , fMinimized = HIWORD(wParam) , hwndPrevious = cast(HWND,lParam)
          if fActive then            
+            'puts("Main Activate")
             DockGfxWindow()            
             SetWindowPos( g_GfxHwnd , HWND_TOPMOST , 0,0,0,0 , SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE)
-            SetWindowPos( g_GfxHwnd , HWND_NOTOPMOST , 0,0,0,0 , SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE)
+            SetWindowPos( g_GfxHwnd , HWND_NOTOPMOST , 0,0,0,0 , SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE or SWP_SHOWWINDOW)
             'SetFocus( CTL(wcMain) )
          else
-            if fMinimized then                              
-               ShowWindow( g_GfxHwnd , SW_HIDE )
-            else
-               SetWindowPos( g_GfxHwnd , HWND_NOTOPMOST , 0,0 , 0,0 , SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE )
+            'puts("main deactivate")
+            if isIconic(g_GfxHwnd) = 0 then            
+               if fMinimized then                              
+                  ShowWindow( g_GfxHwnd , SW_HIDE )
+               else
+                  SetWindowPos( g_GfxHwnd , HWND_NOTOPMOST , 0,0 , 0,0 , SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE )
+               end if
             end if
          end if
       end if

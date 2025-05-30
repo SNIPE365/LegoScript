@@ -692,10 +692,11 @@ sub View_ToggleGW()
    var iToggledState = g_CurItemState xor MFS_CHECKED
    g_Show3D = (iToggledState and MFS_CHECKED)<>0
    if g_GfxHwnd then      
-      ShowWindow( g_GfxHwnd , iif( g_Show3D , SW_SHOWNA , SW_HIDE ) )
-      if g_Show3D then
+      ShowWindowAsync( g_GfxHwnd , iif( g_Show3D , SW_SHOWNA , SW_HIDE ) )
+      DockGfxWindow( true )
+      if g_Show3D then         
          SetWindowPos( g_GfxHwnd , HWND_TOPMOST , 0,0,0,0 , SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE)
-         SetWindowPos( g_GfxHwnd , HWND_NOTOPMOST , 0,0,0,0 , SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE)
+         SetWindowPos( g_GfxHwnd , HWND_NOTOPMOST , 0,0,0,0 , SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE)         
       end if
    end if   
    Menu.MenuState( g_hCurMenu,g_CurItemID, iToggledState )

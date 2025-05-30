@@ -122,6 +122,7 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
       
    dim as string sStatement, sToken(15), sResult
    dim as long iTokenLineNumber=1 , iCurFile = 1 , iStackPos = 0 , iFileCount = 1
+   dim as byte bNullSkip = 1
    sOutput = "" : g_iPartCount = 1 : g_iConnCount = 0
          
    #define iStStart aFile(iCurFile).uStStart
@@ -166,23 +167,28 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
    
    'Parsing LS and generate connections
    
-   #define FileDone() if iStackPos > 0 then iStackPos -= 1 : iCurFile = iFileStack(iStackPos) : continue while else exit while
+   #define FileDone() if iStackPos > 0 then iStackPos -= 1 : iCurFile = iFileStack(iStackPos) : DbgBuild("!! resuming at '" & *aFile(iCurFile).psFilepath & "':" & aFile(iCurFile).uLineNumber ) : aFile(iCurFile).uLineNumber -= 1 : continue while else DbgBuild("!! All files parsed"): exit while
    
    '#define DbgCrash() puts("" & __LINE__)
    #define DbgCrash()
-      
+   
+   #define DbgBuild(_s) puts("" & __LINE__ & ": " & _s)
+   '#define DbgBuild(_s)
+   
+   DbgBuild(!"\r"+string(60,"-"))
+   DbgBuild( "!! building '"+sMainFile+"'" )
    while 1            
       
       DbgCrash()
             
       'get next statement
       var iStNext = LS_GetNextStatement(sScript,iStStart,sStatement,iLineNumber)
-      
+            
       DbgCrash()
       
       if iStNext=0 then FileDone()               
-      if len(sStatement)=0 then iStStart = iStNext+1 : continue while      
-      'puts(iLineNumber & "'"+sStatement+"'")
+      if len(sStatement)=0 then iStStart = iStNext : continue while      
+      DbgBuild("<" & iLineNumber & ">'"+sStatement+"'")
       
       DbgCrash()
       
@@ -203,6 +209,7 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
       
       'preprocessor / pragama checker
       if sStatement[0] = asc("#") then
+         DbgBuild(">> Is meta statement so takes whole line")
          var iCurToken = 0
          select case lcase(sToken(0))
          case "#include"
@@ -215,7 +222,8 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
             if iEnd < 2 orelse sToken(1)[iEnd-1] <> sToken(1)[0] then
                ParserError( "Mismatched string quotes" )
             end if
-            var sFile = mid(sToken(1),2,iEnd-2) : sCanonicalizeFilePath( sFile , GetFilePath((*aFile(iCurFile).psFilepath))  )
+            var sFile = mid(sToken(1),2,iEnd-2) 
+            sCanonicalizeFilePath( sFile , GetFilePath((*aFile(iCurFile).psFilepath))  )
             var sFileL = lcase(sFile), iLoadedFile=0
             for N as long = 1 to iFileCount
                if aFile(N).psFilepath = null then exit for
@@ -227,11 +235,11 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                next I               
             next N
             if iLoadedFile = 0 then
-               var psScript = new string
+               var psScript = new string               
                if LoadScriptFile( sFile , *psScript )=false then
                   puts("file not found?? '" & sFile & "'")
                   delete psScript : ParserError( "File not found" )                  
-               end if
+               end if               
                iFileCount += 1
                with aFile(iFileCount)
                   .psFilename = new string (sFile)
@@ -245,7 +253,8 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                .uLineNumber=1
             end with
             iStackPos += 1 : iCurFile = iLoadedFile
-            iFileStack(iStackPos)=iLoadedFile            
+            iFileStack(iStackPos)=iLoadedFile
+            DbgBuild(">> now processing '" & sFile & "'")
          case "#pragma"
             rem
          case else            
@@ -289,11 +298,15 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
       do 
          #define sRelToken(_N) sToken(iCurToken+(_N))
          #define sCurToken sToken(iCurToken)
+         DbgBuild("{{" & sCurToken & "}}")         
          var iName=ecNotFound, bExisting = false         
          'if the first token is a primative (DAT) name then it's a declaration
          if IsPrimative( sCurToken ) then            
             #define sPart sCurToken
             #define sName sRelToken(1)
+            DbgBuild(">> Token is a primative ")
+            DbgBuild("{{" + sName + "}}")
+            sName = ucase(sName)            
             if len(sName)=0 orelse iCurToken >= iTokCnt then ParserError( "Expected part name, got end of statement" )
             if IsValidPartName( sName )=false then ParserError("'"+sName+"' is not a valid part name")
             iName = FindPartName( sName )
@@ -305,17 +318,20 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                exit do
             end if            
             iCurToken += 2            
-         else 'otherwise it must be an existing part name
+            DbgBuild(">> Part name created, ID:" & iName)
+         else 'otherwise it must be an existing part name            
             #define sName sCurToken            
+            sName = ucase(sName)
             if sName = "NULL" then               
-               iName = _NULLPARTNAME               
+               iName = _NULLPARTNAME : bNullSkip = 0
             else
                if IsValidPartName( sName )=false then ParserError("'"+sName+"' is not a valid primative or part name")
                iName = FindPartName( sName )               
                if iName < 0 then ParserError( "part name not declared" )
             end if
             iCurToken += 1 : bExisting = true
-         end if         
+            DbgBuild(">> Token is an existing part name, ID:" & iName)
+         end if
          'if there's no more parameters than it's just a part declaration
          ''puts( tLeft(Part) & " , " & tRight(Part) & " , " & iCurToken & ":" & iTokCnt )
          
@@ -349,6 +365,9 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                   if bAttIgnored=0 then bAttIgnored=1 : ParserWarning("NULL part attribute ignored")
                   continue do
                end if                     
+               if sThisToken[0] >= asc("A") andalso sThisToken[0] <= asc("Z") then
+                  sThisToken[0] += 32 'lowercase
+               end if
                select case sThisToken[0]
                case asc("s"),asc("c"): 'stud/clutch (connector)   (last token from the side)
                   #define curPart g_tPart(iName)
@@ -438,293 +457,308 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
             if tRight(Part)<>_NULLPARTNAME andalso tRight(Type)=spUnknown then ParserError("right part is missing connector")
             if tLeft(Part)=_NULLPARTNAME andalso tRight(Part) = _NULLPARTNAME then ParserError("meaningless connection with both parts being NULL")
             AddConnection( tConn ) 'lsfunctions.bas
+            DbgBuild(">> Added connection between parts " & tLeft(Part) & " and " & tRight(Part))
          end if
       end with
       DbgCrash()
       if iStNext=0 then exit while      
    wend   
    DbgCrash()
+   
    #macro DebugParts()
-      puts("sNam sPrimative  Colr Idx Ct Ok LocX LocY LocZ AngX AngY AngZ SX    1    2    4   SY    6    8    9   SZ")
-      for N as long = 0 to g_iPartCount-1      
+      puts("ID   sNam sPrimative  Colr Idx Ct Ok LocX LocY LocZ AngX AngY AngZ SX    1    2    4   SY    6    8    9   SZ")
+      for N as long = bNullSkip to g_iPartCount-1      
          with g_tPart(N)
             var sPrim = .sPrimative , iPos = instrrev(sPrim,"\") 
             if iPos then sPrim = mid(sPrim,iPos+1)
             printf( _
-               !"%-4s %-11s %-4i %-3i %-2i %-2i " _
+               !"%-4i %-4s %-11s %4i %-3i %-2i %-2i " _
                !"%4i %4i %4i %4i %4i %4i " _
                !"%1.1f  %1.1f  %1.1f  " _
                !"%1.1f  %1.1f  %1.1f  " _
                !"%1.1f  %1.1f  %1.1f\n", _            
-               .sName,sPrim,.iColor,.iModelIndex,.bPartCat,.bFoundPart, _
+               N,iif(len(.sName),.sName,"NULL"), _
+               iif(len(sPrim),sPrim,"None"), _
+               .iColor,.iModelIndex,.bPartCat,.bFoundPart, _
                cint(.tLocation.fPX),cint(.tLocation.fPY),cint(.tLocation.fPZ), _
-               cint(.tLocation.fAX),cint(.tLocation.fAY),cint(.tLocation.fAZ), _
+               cint(.tLocation.fAX*(180/PI)),cint(.tLocation.fAY*(180/PI)),cint(.tLocation.fAZ*(180/PI)), _
                (.tMatrix.fScaleX) , (.tMatrix.f_1)     , (.tMatrix.f_2)     , _
                (.tMatrix.f_4)     , (.tMatrix.fScaleY) , (.tMatrix.f_6)     , _
                (.tMatrix.f_8)     , (.tMatrix.f_9)     , (.tMatrix.fScaleZ) , _            
             )
          end with
       next N
-   #endmacro
-         
-   'DebugParts()   
-   #if 1
-      'generate LDRAW and check collisions
-      if g_iPartCount>0 then 'iStNext=0 andalso 
-         dim as zstring*256 zTemp=any
-         dim as SnapPV ptr pLeft,pRight
-         dim as single tVec3(2) = any
-         #define _fPX tVec3(0)
-         #define _fPY tVec3(1)
-         #define _fPZ tVec3(2)         
-         '------------------------------------------------------------------------
-         '--------------- later parts are relative to some other part ------------
-         '---------- so process all connections to get the relative parts --------
-         '------------------------------------------------------------------------
-         dim as byte bFirstConnect = true
-         
-         DbgCrash()
-         
-         do
-            dim as byte bDidConnect , bHaveStrayConnections 
-            ''print "#","left","used","right","used"
-                                    
-            for I as long = 0 to g_iConnCount-1
+   #endmacro      
+   #if len(__FB_QUOTE__(DbgBuild))
+     DebugParts()   
+   #endif
+   
+   'generate LDRAW and check collisions
+   if g_iPartCount>0 then 'iStNext=0 andalso 
+      dim as zstring*256 zTemp=any
+      dim as SnapPV ptr pLeft,pRight
+      dim as single tVec3(2) = any
+      #define _fPX tVec3(0)
+      #define _fPY tVec3(1)
+      #define _fPZ tVec3(2)         
+      '------------------------------------------------------------------------
+      '--------------- later parts are relative to some other part ------------
+      '---------- so process all connections to get the relative parts --------
+      '------------------------------------------------------------------------
+      dim as byte bFirstConnect = true 
+      dim as long iPass = 0
+      
+      DbgCrash()
+      
+      do
+         iPass += 1
+         DbgBuild("---- Handling connections Pass #" & iPass & " ----")
+         dim as byte bDidConnect , bHaveStrayConnections 
+         ''print "#","left","used","right","used"
+                                 
+         for I as long = 0 to g_iConnCount-1
+            
+            DbgCrash()
+            
+            with g_tConn(I)
+               'decide what to do based on which sides are connected
+               if g_tPart(.iLeftPart).bConnected=0 orelse g_tPart(.iRightPart).bConnected=0 then
+                  DbgBuild(">> Conn: " & I & " Left: " & .iLeftPart & iif(g_tPart(.iLeftPart).bConnected,"|Locked","") & "  Right: " &  .iRightPart & iif(g_tPart(.iRightPart).bConnected,"|Locked","") )
+               end if
+               
+               if g_tPart(.iLeftPart).bConnected=false then 'if left side isnt connected
+                  if g_tPart(.iRightPart).bConnected then     'and right side is connected then SWAP and connect
+                     DbgBuild(">> Right part is already connected, so must swap sides")
+                     swap .iLeftPart , .iRightPart : swap .iLeftType , .iRightType
+                     swap .iLeftNum  , .iRightNum : I -= 1 : continue for
+                  else                                        'and right side is also disconnected then check for stray                        
+                     if bFirstConnect then
+                        '------------------------------------------------------------------------
+                        '------------------------ first part positioning ------------------------
+                        '------------------------------------------------------------------------
+                        with g_tPart( g_tConn(I).iLeftPart )
+                           'print .sName , .sPrimative , .iColor
+                           var iColor = iif( .iColor<0 , 16 , .iColor ) , psPrimative = @.sPrimative
+                           .bConnected = true 'this part now have a position
+                           _fPX = .tLocation.fPX : _fPY = .tLocation.fPY : _fPZ = .tLocation.fPZ         
+                           .tMatrix = g_tIdentityMatrix
+                           if .tLocation.fAX then MatrixRotateX( .tMatrix , .tMatrix , .tLocation.fAX )
+                           if .tLocation.fAY then MatrixRotateY( .tMatrix , .tMatrix , .tLocation.fAY )
+                           if .tLocation.fAZ then MatrixRotateZ( .tMatrix , .tMatrix , .tLocation.fAZ )         
+                           with .tMatrix
+                              sprintf(zTemp,!"1 %i %f %f %f %g %g %g %g %g %g %g %g %g %s\r\n",iColor,_fPX,_fPY,_fPZ, _
+                                 .m(0),.m(1),.m(2),.m(4),.m(5),.m(6),.m(8),.m(9),.m(10) , *psPrimative )
+                           end with
+                           sResult += zTemp 
+                           #ifdef __Standalone
+                           'errorf("(first) %s",zTemp)
+                           printf("%s",zTemp)
+                           #endif                                
+                        end with
+                        DbgBuild(">> This left part is a key-part")
+                        'so there was a connection, but as first so it skips right to the next connection
+                        bFirstConnect = false : bDidConnect = true : continue for
+                     else
+                        'print "[" &  I & "]"
+                        bHaveStrayConnections = 1 : continue for
+                     end if
+                  end if
+               else                                         'if left side is connected
+                  if g_tPart(.iRightPart).bConnected then     'and right side is also connected then skips
+                     continue for
+                  else                                        'and right is not connected then do nothing
+                     rem
+                  end if
+               end if
                
                DbgCrash()
                
-               with g_tConn(I)
-                  'decide what to do based on which sides are connected
-                  ''puts( I & " , " & .iLeftPart & ":" & g_tPart(.iLeftPart).bConnected  & " , " &  .iRightPart  & ":" &  g_tPart(.iRightPart).bConnected)
-                  if g_tPart(.iLeftPart).bConnected=false then 'if left side isnt connected
-                     if g_tPart(.iRightPart).bConnected then     'and right side is connected then SWAP and connect
-                        swap .iLeftPart , .iRightPart : swap .iLeftType , .iRightType
-                        swap .iLeftNum  , .iRightNum : I -= 1 : continue for
-                     else                                        'and right side is also disconnected then check for stray                        
-                        if bFirstConnect then
-                           '------------------------------------------------------------------------
-                           '------------------------ first part positioning ------------------------
-                           '------------------------------------------------------------------------
-                           with g_tPart( g_tConn(I).iLeftPart )
-                              'print .sName , .sPrimative , .iColor
-                              var iColor = iif( .iColor<0 , 16 , .iColor ) , psPrimative = @.sPrimative
-                              .bConnected = true 'this part now have a position
-                              _fPX = .tLocation.fPX : _fPY = .tLocation.fPY : _fPZ = .tLocation.fPZ         
-                              .tMatrix = g_tIdentityMatrix
-                              if .tLocation.fAX then MatrixRotateX( .tMatrix , .tMatrix , .tLocation.fAX )
-                              if .tLocation.fAY then MatrixRotateY( .tMatrix , .tMatrix , .tLocation.fAY )
-                              if .tLocation.fAZ then MatrixRotateZ( .tMatrix , .tMatrix , .tLocation.fAZ )         
-                              with .tMatrix
-                                 sprintf(zTemp,!"1 %i %f %f %f %g %g %g %g %g %g %g %g %g %s\r\n",iColor,_fPX,_fPY,_fPZ, _
-                                    .m(0),.m(1),.m(2),.m(4),.m(5),.m(6),.m(8),.m(9),.m(10) , *psPrimative )
-                              end with
-                              sResult += zTemp 
-                              #ifdef __Standalone
-                              'errorf("(first) %s",zTemp)
-                              printf("%s",zTemp)
-                              #endif                                
-                           end with
-                           'so there was a connection, but as first so it skips right to the next connection
-                           bFirstConnect = false : bDidConnect = true : continue for
-                        else
-                           'print "[" &  I & "]"
-                           bHaveStrayConnections = 1 : continue for
-                        end if
-                     end if
-                  else                                         'if left side is connected
-                     if g_tPart(.iRightPart).bConnected then     'and right side is also connected then skips
-                        continue for
-                     else                                        'and right is not connected then do nothing
-                        rem
-                     end if
-                  end if
-                  
-                  DbgCrash()
-                  
-                  'print _
-                  '   .iLeftPart  & "{" & .iLeftType  & ":" & .iLeftNum  & "} = " & _
-                  '   .iRightPart & "{" & .iRightType & ":" & .iRightNum & "}"
-                  'dim as single FromX,FromY,FromZ , ToX,ToY,ToZ
-                  dim pSnap as PartSnap ptr  = NULL , pModel as DATFile ptr = NULL 
-                  if .iLeftPart = _NULLPARTNAME then
+               'print _
+               '   .iLeftPart  & "{" & .iLeftType  & ":" & .iLeftNum  & "} = " & _
+               '   .iRightPart & "{" & .iRightType & ":" & .iRightNum & "}"
+               'dim as single FromX,FromY,FromZ , ToX,ToY,ToZ
+               dim pSnap as PartSnap ptr  = NULL , pModel as DATFile ptr = NULL 
+               if .iLeftPart = _NULLPARTNAME then
+                  pLeft = @g_NullSnap
+               else
+                  pModel = g_tModels(g_tPart(.iLeftPart).iModelIndex).pModel 
+                  pSnap = cptr(PartSnap ptr,pModel->pData)            
+                  if .iLeftNum<1 then
                      pLeft = @g_NullSnap
-                  else
-                     pModel = g_tModels(g_tPart(.iLeftPart).iModelIndex).pModel 
-                     pSnap = cptr(PartSnap ptr,pModel->pData)            
-                     if .iLeftNum<1 then
-                        pLeft = @g_NullSnap
-                     else                     
-                        select case .iLeftType
-                        case spStud   : pLeft = pSnap->pStud  +.iLeftNum-1
-                        case spClutch : pLeft = pSnap->pClutch+.iLeftNum-1
-                        case else     : puts("Error")
-                        end select
-                     end if
+                  else                     
+                     select case .iLeftType
+                     case spStud   : pLeft = pSnap->pStud  +.iLeftNum-1
+                     case spClutch : pLeft = pSnap->pClutch+.iLeftNum-1
+                     case else     : puts("Error")
+                     end select
                   end if
-                  if .iRightPart = _NULLPARTNAME then
-                     pRight = @g_NullSnap
-                  else                  
-                     pModel = g_tModels(g_tPart(.iRightPart).iModelIndex).pModel 
-                     pSnap = cptr(PartSnap ptr,pModel->pData)
-                     if .iRightNum<1 then
-                        pRight = @g_NullSnap
-                     else
-                        select case .iRightType
-                        case spStud   : pRight = pSnap->pStud  +.iRightNum-1
-                        case spClutch : pRight = pSnap->pClutch+.iRightNum-1
-                        case else     : puts("Error")
-                        end select
-                     end if
-                  end if  
-                  
-                  DbgCrash()
-                  
-                  'print pLeft->fPX , pLeft->fPY , pLeft->fPZ
-                  'print pRight->fPX , pRight->fPY , pRight->fPZ
-                  'type SnapPV
-                  '   as single fPX,fPY,fPZ 'position
-                  '   as single fVX,fVy,fVZ 'direction vector
-                  'end type
-                  var ptLocation = @g_tPart(.iLeftPart).tLocation
-                  var pLeftPart = @g_tPart(.iLeftPart) , iRightPart_ = .iRightPart
-                  g_tPart(.iRightPart).bConnected = true : bDidConnect = true
-                  
-                  DbgCrash()
-                  
-                  'pLeft/pRight are the snap matrix for the piece stud/clutch
-                  with g_tPart(iRightPart_)                              
-                     'if memcmp( @pLeftPart->tMatrix , @g_tBlankMatrix , sizeof(Matrix4x4) ) = 0 then                        
-                     '   'if memcmp( @pRightPart->tMatrix , @g_tBlankMatrix , sizeof(Matrix4x4) ) = 0 then                  
-                     '      .tMatrix = g_tIdentityMatrix
-                     '   'else
-                     '   '   .tMatrix =pRightPart->tMatrix
-                     '   'end if
-                     'else
-                     .tMatrix = pLeftPart->tMatrix
-                     'end if
-                     
-                     #if 0
-                        with *(pLeft->pMatOrg)
-                           '.fPosX = 0
-                           '.fPosY = 100
-                           '.fPosZ = 0
-                        end with
-                     #endif
-                     
-                     DbgCrash()
-                     
-                     ''puts("pLeft:" & pLeft & " // pRight:" & pRight)
-                     if pLeft->pMatOrg then 
-                        puts("Prev rotation")
-                        MultMatrix4x4( .tMatrix , .tMatrix , pLeft->pMatOrg )
-                     end if
-                     if pRight->pMatOrg then 
-                        puts("Auto Rotating")
-                        MultMatrix4x4( .tMatrix , .tMatrix , pRight->pMatOrg )
-                     end if    
-                     
-                     DbgCrash()
-                     
-                     if .tLocation.fAX then MatrixRotateX( .tMatrix , .tMatrix , .tLocation.fAX )
-                     if .tLocation.fAY then MatrixRotateY( .tMatrix , .tMatrix , .tLocation.fAY )
-                     if .tLocation.fAZ then MatrixRotateZ( .tMatrix , .tMatrix , .tLocation.fAZ )
-                                                            
-                     DbgCrash()
-                                                            
-                     _fPX = pLeft->fPX : _fPY = pLeft->fPY : _fPZ = pLeft->fPZ               
-                     'if pLeft->pMatOrg then MultiplyMatrixVector( @tVec3(0) , pLeft->pMatOrg )
-                     'MultiplyMatrixVector( @tVec3(0) , @pLeftPart->tMatrix )
-                     tVec3(0) += pLeftPart->tMatrix.fPosX
-                     tVec3(1) += pLeftPart->tMatrix.fPosY
-                     tVec3(2) += pLeftPart->tMatrix.fPosZ
-                     
-                     DbgCrash()
-                     
-                     dim as single tVec3R(2) = { pRight->fPX , pRight->fPY , pRight->fPZ }
-                     'if pRight->pMatOrg then MultiplyMatrixVector( @tVec3R(0) , pRight->pMatOrg )
-                     'MultiplyMatrixVector( @tVec3R(0) , @.tMatrix )
-                                                               
-                     _fPX = ptLocation->fPX - (_fPX + tVec3R(0)) + .tLocation.fPX '.fPX
-                     _fPY = ptLocation->fPY + (_fPY - tVec3R(1)) + .tLocation.fPY '.fPY
-                     _fPZ = ptLocation->fPZ + (_fpZ + tVec3R(2)) + .tLocation.fPZ '.fPZ
-                     
-                     'if .tLocation.fPX = 0 andalso .tLocation.fPY=0 andalso .tLocation.fPZ=0 then
-                        .tLocation.fPX = _fPX : .tLocation.fPY = _fPY : .tLocation.fPZ = _fPZ
-                     'elseif abs(.tLocation.fPX-_fPX)>.001 orelse abs(.tLocation.fPY-_fPY)>.001 orelse abs(.tLocation.fPZ-_fPZ)>.001 then
-                     '   'LinkerError( "Impossible Connection detected!" )
-                     'end if
-                     
-                     DbgCrash()
-                     
-                     dim as PartSize tPart = any  : tPart = pModel->tSize
-                     var iIdx = .iModelIndex
-                     'with tPart
-                     '   printf(!"Part: %i = x:%f>%f y:%f>%f z:%f>%f\n", _
-                     '     iIdx , .xMin,.xMax , .yMin,.yMax , .zMin,.zMax )
-                     'end with
-                     if (tPart.yMin-(-4)) < .0001 then tPart.yMin = 0
-                     tPart.xMin = tPart.xMin+.1+.tLocation.fPX : tPart.xMax = tPart.xMax-.1+.tLocation.fPX
-                     tPart.yMin = tPart.yMin+.1+.tLocation.fPY : tPart.yMax = tPart.yMax-.1+.tLocation.fPY
-                     tPart.zMin = tPart.zMin+.1+.tLocation.fPZ : tPart.zMax = tPart.zMax-.1+.tLocation.fPZ               
-                                                               
-                     #if 0
-                        for N as long = 0 to g_iPartCount-1
-                           if N = iRightPart_ then continue for
-                           if .tLocation.fPX = 0 andalso .tLocation.fPY=0 andalso .tLocation.fPZ=0 then
-                              continue for
-                           end if
-                           with g_tPart(N)                     
-                              dim as PartSize tChk = any
-                              tChk = g_tModels(g_tPart(N).iModelIndex).pModel->tSize                     
-                              if (tChk.yMin-(-4)) < .0001 then tChk.yMin = 0                     
-                              tChk.xMin = tChk.xMin+.1+.tLocation.fPX : tChk.xMax = tChk.xMax-.1+.tLocation.fPX
-                              tChk.yMin = tChk.yMin+.1+.tLocation.fPY : tChk.yMax = tChk.yMax-.1+.tLocation.fPY
-                              tChk.zMin = tChk.zMin+.1+.tLocation.fPZ : tChk.zMax = tChk.zMax-.1+.tLocation.fPZ
-                              if CheckCollision( tPart , tChk ) then
-                                 dim as zstring*128 zMessage = any
-                                 sprintf(zMessage,!"Collision! between part %s and %s",g_tPart(iRightPart_).sName,.sName)
-                                 LinkerWarning( zMessage )
-                              end if
-                           end with
-                        next N
-                     #endif
-                     
-                     DbgCrash()
-                                                   
-                     var iColor = iif(.iColor<0,16,.iColor), psPrimative = @.sPrimative
-                     'nearest = roundf(val * 100) / 100
-                     with .tMatrix
-                        #define r(_i) (roundf(.m(_i)*100000)/100000)
-                        sprintf(zTemp,!"1 %i %f %f %f %g %g %g %g %g %g %g %g %g %s\r\n",iColor,_fPX,_fPY,_fPZ, _
-                           r(0),r(1),r(2),r(4),r(5),r(6),r(8),r(9),r(10) , *psPrimative )
-                     end with
-                     sResult += zTemp 
-                     #ifdef __Standalone
-                     'printf("<%i>%s",__LINE__,zTemp)
-                     printf("%s",zTemp)
-                     #endif
-                  end with  
-                  
-                  DbgCrash()
-                  'puts("1 0 40 -24 -20 1 0 0 0 1 0 0 0 1 3001.dat")
-                  'puts("1 0 0 0 0 1 0 0 0 1 0 0 0 1 3001.dat")
-               end with
-            next I   
-                      
-            DbgCrash()
-            
-            ''print "First? ";bFirstConnect , "New? ";bDidConnect , "More? ";bHaveStrayConnections : sleep 
-            ''print "-----------------------------------------------------------------------"
-            if bDidConnect=false then 'there was no connections made?
-               if bFirstConnect=false andalso bHaveStrayConnections then 'and there was no stray connections? then we're done!                  
-                  bFirstConnect=true : continue do 'there's stray connections, so we restart
                end if
-               exit do 'no more possible connections, so we're done
-            end if            
-         loop         
-         ''sleep
-      end if
-   #endif   
+               if .iRightPart = _NULLPARTNAME then
+                  pRight = @g_NullSnap
+               else                  
+                  pModel = g_tModels(g_tPart(.iRightPart).iModelIndex).pModel 
+                  pSnap = cptr(PartSnap ptr,pModel->pData)
+                  if .iRightNum<1 then
+                     pRight = @g_NullSnap
+                  else
+                     select case .iRightType
+                     case spStud   : pRight = pSnap->pStud  +.iRightNum-1
+                     case spClutch : pRight = pSnap->pClutch+.iRightNum-1
+                     case else     : puts("Error")
+                     end select
+                  end if
+               end if  
+               
+               DbgCrash()
+               
+               'print pLeft->fPX , pLeft->fPY , pLeft->fPZ
+               'print pRight->fPX , pRight->fPY , pRight->fPZ
+               'type SnapPV
+               '   as single fPX,fPY,fPZ 'position
+               '   as single fVX,fVy,fVZ 'direction vector
+               'end type
+               var ptLocation = @g_tPart(.iLeftPart).tLocation
+               var pLeftPart = @g_tPart(.iLeftPart) , iRightPart_ = .iRightPart
+               g_tPart(.iRightPart).bConnected = true : bDidConnect = true
+               
+               DbgCrash()
+               
+               'pLeft/pRight are the snap matrix for the piece stud/clutch
+               with g_tPart(iRightPart_)                              
+                  'if memcmp( @pLeftPart->tMatrix , @g_tBlankMatrix , sizeof(Matrix4x4) ) = 0 then                        
+                  '   'if memcmp( @pRightPart->tMatrix , @g_tBlankMatrix , sizeof(Matrix4x4) ) = 0 then                  
+                  '      .tMatrix = g_tIdentityMatrix
+                  '   'else
+                  '   '   .tMatrix =pRightPart->tMatrix
+                  '   'end if
+                  'else
+                  .tMatrix = pLeftPart->tMatrix
+                  'end if
+                  
+                  #if 0
+                     with *(pLeft->pMatOrg)
+                        '.fPosX = 0
+                        '.fPosY = 100
+                        '.fPosZ = 0
+                     end with
+                  #endif
+                  
+                  DbgCrash()
+                  
+                  ''puts("pLeft:" & pLeft & " // pRight:" & pRight)
+                  if pLeft->pMatOrg then 
+                     puts("Prev rotation")
+                     MultMatrix4x4( .tMatrix , .tMatrix , pLeft->pMatOrg )
+                  end if
+                  if pRight->pMatOrg then 
+                     puts("Auto Rotating")
+                     MultMatrix4x4( .tMatrix , .tMatrix , pRight->pMatOrg )
+                  end if    
+                  
+                  DbgCrash()
+                  
+                  if .tLocation.fAX then MatrixRotateX( .tMatrix , .tMatrix , .tLocation.fAX )
+                  if .tLocation.fAY then MatrixRotateY( .tMatrix , .tMatrix , .tLocation.fAY )
+                  if .tLocation.fAZ then MatrixRotateZ( .tMatrix , .tMatrix , .tLocation.fAZ )
+                                                         
+                  DbgCrash()
+                                                         
+                  _fPX = pLeft->fPX : _fPY = pLeft->fPY : _fPZ = pLeft->fPZ               
+                  'if pLeft->pMatOrg then MultiplyMatrixVector( @tVec3(0) , pLeft->pMatOrg )
+                  'MultiplyMatrixVector( @tVec3(0) , @pLeftPart->tMatrix )
+                  tVec3(0) += pLeftPart->tMatrix.fPosX
+                  tVec3(1) += pLeftPart->tMatrix.fPosY
+                  tVec3(2) += pLeftPart->tMatrix.fPosZ
+                  
+                  DbgCrash()
+                  
+                  dim as single tVec3R(2) = { pRight->fPX , pRight->fPY , pRight->fPZ }
+                  'if pRight->pMatOrg then MultiplyMatrixVector( @tVec3R(0) , pRight->pMatOrg )
+                  'MultiplyMatrixVector( @tVec3R(0) , @.tMatrix )
+                                                            
+                  _fPX = ptLocation->fPX - (_fPX + tVec3R(0)) + .tLocation.fPX '.fPX
+                  _fPY = ptLocation->fPY + (_fPY - tVec3R(1)) + .tLocation.fPY '.fPY
+                  _fPZ = ptLocation->fPZ + (_fpZ + tVec3R(2)) + .tLocation.fPZ '.fPZ
+                  
+                  'if .tLocation.fPX = 0 andalso .tLocation.fPY=0 andalso .tLocation.fPZ=0 then
+                     .tLocation.fPX = _fPX : .tLocation.fPY = _fPY : .tLocation.fPZ = _fPZ
+                  'elseif abs(.tLocation.fPX-_fPX)>.001 orelse abs(.tLocation.fPY-_fPY)>.001 orelse abs(.tLocation.fPZ-_fPZ)>.001 then
+                  '   'LinkerError( "Impossible Connection detected!" )
+                  'end if
+                  
+                  DbgCrash()
+                  
+                  dim as PartSize tPart = any  : tPart = pModel->tSize
+                  var iIdx = .iModelIndex
+                  'with tPart
+                  '   printf(!"Part: %i = x:%f>%f y:%f>%f z:%f>%f\n", _
+                  '     iIdx , .xMin,.xMax , .yMin,.yMax , .zMin,.zMax )
+                  'end with
+                  if (tPart.yMin-(-4)) < .0001 then tPart.yMin = 0
+                  tPart.xMin = tPart.xMin+.1+.tLocation.fPX : tPart.xMax = tPart.xMax-.1+.tLocation.fPX
+                  tPart.yMin = tPart.yMin+.1+.tLocation.fPY : tPart.yMax = tPart.yMax-.1+.tLocation.fPY
+                  tPart.zMin = tPart.zMin+.1+.tLocation.fPZ : tPart.zMax = tPart.zMax-.1+.tLocation.fPZ               
+                                                            
+                  #if 0
+                     for N as long = 0 to g_iPartCount-1
+                        if N = iRightPart_ then continue for
+                        if .tLocation.fPX = 0 andalso .tLocation.fPY=0 andalso .tLocation.fPZ=0 then
+                           continue for
+                        end if
+                        with g_tPart(N)                     
+                           dim as PartSize tChk = any
+                           tChk = g_tModels(g_tPart(N).iModelIndex).pModel->tSize                     
+                           if (tChk.yMin-(-4)) < .0001 then tChk.yMin = 0                     
+                           tChk.xMin = tChk.xMin+.1+.tLocation.fPX : tChk.xMax = tChk.xMax-.1+.tLocation.fPX
+                           tChk.yMin = tChk.yMin+.1+.tLocation.fPY : tChk.yMax = tChk.yMax-.1+.tLocation.fPY
+                           tChk.zMin = tChk.zMin+.1+.tLocation.fPZ : tChk.zMax = tChk.zMax-.1+.tLocation.fPZ
+                           if CheckCollision( tPart , tChk ) then
+                              dim as zstring*128 zMessage = any
+                              sprintf(zMessage,!"Collision! between part %s and %s",g_tPart(iRightPart_).sName,.sName)
+                              LinkerWarning( zMessage )
+                           end if
+                        end with
+                     next N
+                  #endif
+                  
+                  DbgCrash()
+                                                
+                  var iColor = iif(.iColor<0,16,.iColor), psPrimative = @.sPrimative
+                  'nearest = roundf(val * 100) / 100
+                  with .tMatrix
+                     #define r(_i) (roundf(.m(_i)*100000)/100000)
+                     sprintf(zTemp,!"1 %i %f %f %f %g %g %g %g %g %g %g %g %g %s\r\n",iColor,_fPX,_fPY,_fPZ, _
+                        r(0),r(1),r(2),r(4),r(5),r(6),r(8),r(9),r(10) , *psPrimative )
+                  end with
+                  sResult += zTemp 
+                  #ifdef __Standalone
+                  'printf("<%i>%s",__LINE__,zTemp)
+                  printf("%s",zTemp)
+                  #endif
+               end with  
+               
+               DbgCrash()
+               'puts("1 0 40 -24 -20 1 0 0 0 1 0 0 0 1 3001.dat")
+               'puts("1 0 0 0 0 1 0 0 0 1 0 0 0 1 3001.dat")
+            end with
+         next I   
+                   
+         DbgCrash()
+         
+         ''print "First? ";bFirstConnect , "New? ";bDidConnect , "More? ";bHaveStrayConnections : sleep 
+         ''print "-----------------------------------------------------------------------"
+         if bDidConnect=false then 'there was no connections made?
+            if bFirstConnect=false andalso bHaveStrayConnections then 'and there was no stray connections? then we're done!                  
+               DbgBuild(">> There's still unconnected parts, so do extra pass")
+               bFirstConnect=true : continue do 'there's stray connections, so we restart
+            end if
+            exit do 'no more possible connections, so we're done
+         end if            
+      loop         
+      ''sleep
+   end if
+   
+   DbgBuild("--- Build Complete ---")
    
    'DebugParts()
    DbgCrash()
