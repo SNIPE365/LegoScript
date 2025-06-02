@@ -200,6 +200,8 @@ function AddConnection( byref tConn as PartConnLS ) as long
       redim preserve g_tConn( ubound(g_tConn)+_cConnMin+1 )
    end if
    g_tConn( g_iConnCount ) = tConn : g_iConnCount += 1
+   g_tPart( tConn.iLeftPart ).bConnected = 1
+   g_tPart( tConn.iRightPart ).bConnected = 1
    return g_iConnCount-1
 end function
 
@@ -238,7 +240,11 @@ sub sGetFilename( In_sFullPath as string , Out_sFilename as string )
    if iPosi2 > iPosi then iPosi = iPosi2
    Out_sFilename = mid( In_sFullPath , iPosi+1 )
 end sub
-
+sub sToUpper( sText as string )
+   for N as long = 0 to len(sText)-1
+      sText[N] = toupper(sText[N])
+   next N
+end sub
 function LoadScriptFile( sFile as string , sOutString as string ) as boolean
    var f = freefile(), iResu = open(sFile for binary access read as #f)
    if iResu orelse (lof(f) > (64*1024*1024)) then
@@ -319,7 +325,7 @@ function LS_GetNextStatement( sScript as string , iStStart as long , Out_sStatem
    dim as byte bPreSkipTillNextLine = 0
    with *pzFb
       .pzData = cptr(ubyte ptr,strptr(sScript))+iStStart-1
-      .iLen = iStNext-iStStart
+      .iLen = iStNext-iStStart : iStNext += 1-bNoEOS
       while .iLen>0 andalso (bPreSkipTillNextLine orelse (g_bSeparators(.pzData[0]) and stToken))
          select case .pzData[0] 'special chars
          'case 0 : exit while

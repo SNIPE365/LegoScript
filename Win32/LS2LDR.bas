@@ -180,8 +180,10 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
    while 1            
       
       DbgCrash()
-            
-      'get next statement
+      
+      '=======================================================================
+      '======================== get next statement ===========================
+      '=======================================================================
       var iStNext = LS_GetNextStatement(sScript,iStStart,sStatement,iLineNumber)
             
       DbgCrash()
@@ -192,7 +194,9 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
       
       DbgCrash()
       
-      'split tokens
+      '=======================================================================
+      '========================== split tokens ===============================
+      '=======================================================================
       dim as long iErrToken = 0
       var iTokCnt = LS_SplitTokens( sStatement , sToken() , iCurFile , iLineNumber , iErrToken )
       if iTokCnt > ubound(sToken) then 
@@ -207,7 +211,9 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
       
       DbgCrash()
       
-      'preprocessor / pragama checker
+      '=======================================================================
+      '=================== preprocessor / pragama checker ====================
+      '=======================================================================
       if sStatement[0] = asc("#") then
          DbgBuild(">> Is meta statement so takes whole line")
          var iCurToken = 0
@@ -265,7 +271,7 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
       
       DbgCrash()
       
-      'Display Tokens
+      'Display Tokens (debug?)
       for N as long = 0 to iTokCnt-1
          if iTokenLineNumber <> TokenLineNumber(N) then
             #ifdef __Standalone
@@ -287,7 +293,9 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
          'puts("")
       #endif
       
-      'Parse Tokens
+      '=======================================================================
+      '============================= Parse Tokens ============================
+      '=======================================================================
       dim as long iCurToken=0
       dim as PartConnLS tConn 'expects 0's
       tConn.iLeftPart = ecNotFound : tConn.iRightPart = ecNotFound      
@@ -306,12 +314,12 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
             #define sName sRelToken(1)
             DbgBuild(">> Token is a primative ")
             DbgBuild("{{" + sName + "}}")
-            sName = ucase(sName)            
-            if len(sName)=0 orelse iCurToken >= iTokCnt then ParserError( "Expected part name, got end of statement" )
+            sToUpper(sName)            
+            if len(sName)=0 orelse iCurToken >= iTokCnt then ParserError( "Expected part name, got end of statement" )            
             if IsValidPartName( sName )=false then ParserError("'"+sName+"' is not a valid part name")
-            iName = FindPartName( sName )
-            if iName >= 0 then ParserError( "Name already exists" )            
-            iName = AddPartName( sName , sPart  )                        
+            iName = FindPartName( sName )            
+            if iName >= 0 then ParserError( "Name already exists" )                        
+            iName = AddPartName( sName , sPart  )
             if iName >=0 andalso g_tPart(iName).bFoundPart = 0 then 
                ParserError("'"+sPart+"' primative not found")
                'puts("bad primative?")
@@ -493,14 +501,21 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
      DebugParts()   
    #endif
    
-   'generate LDRAW and check collisions
+   'remove connection flags for all parts...
+   for N as long = 1 to g_iPartCount-1
+      g_tPart(N).bConnected = 0
+   next N
+   
+   '=======================================================================
+   '=================== generate LDRAW and check collisions ===============
+   '=======================================================================
    if g_iPartCount>0 then 'iStNext=0 andalso 
       dim as zstring*256 zTemp=any
       dim as SnapPV ptr pLeft,pRight
       dim as single tVec3(2) = any
-      #define _fPX tVec3(0)
-      #define _fPY tVec3(1)
-      #define _fPZ tVec3(2)         
+      #define _fPX .tMatrix.fPosX 'tVec3(0)
+      #define _fPY .tMatrix.fPosY 'tVec3(1)
+      #define _fPZ .tMatrix.fPosZ 'tVec3(2)         
       '------------------------------------------------------------------------
       '--------------- later parts are relative to some other part ------------
       '---------- so process all connections to get the relative parts --------
@@ -521,11 +536,10 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
             DbgCrash()
             
             with g_tConn(I)
-               'decide what to do based on which sides are connected
+               '----- decide what to do based on which sides are connected -----
                if g_tPart(.iLeftPart).bConnected=0 orelse g_tPart(.iRightPart).bConnected=0 then
                   DbgBuild(">> Conn: " & I & " Left: " & .iLeftPart & iif(g_tPart(.iLeftPart).bConnected,"|Locked","") & "  Right: " &  .iRightPart & iif(g_tPart(.iRightPart).bConnected,"|Locked","") )
-               end if
-               
+               end if               
                if g_tPart(.iLeftPart).bConnected=false then 'if left side isnt connected
                   if g_tPart(.iRightPart).bConnected then     'and right side is connected then SWAP and connect
                      DbgBuild(">> Right part is already connected, so must swap sides")
@@ -544,9 +558,9 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                            .tMatrix = g_tIdentityMatrix
                            if .tLocation.fAX then MatrixRotateX( .tMatrix , .tMatrix , .tLocation.fAX )
                            if .tLocation.fAY then MatrixRotateY( .tMatrix , .tMatrix , .tLocation.fAY )
-                           if .tLocation.fAZ then MatrixRotateZ( .tMatrix , .tMatrix , .tLocation.fAZ )         
+                           if .tLocation.fAZ then MatrixRotateZ( .tMatrix , .tMatrix , .tLocation.fAZ )                                    
                            with .tMatrix
-                              sprintf(zTemp,!"1 %i %f %f %f %g %g %g %g %g %g %g %g %g %s\r\n",iColor,_fPX,_fPY,_fPZ, _
+                              sprintf(zTemp,!"1 %i %f %f %f %g %g %g %g %g %g %g %g %g %s\r\n",iColor,.fPosX,.fPosY,.fPosZ, _
                                  .m(0),.m(1),.m(2),.m(4),.m(5),.m(6),.m(8),.m(9),.m(10) , *psPrimative )
                            end with
                            sResult += zTemp 
@@ -571,12 +585,13 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                   end if
                end if
                
-               DbgCrash()
-               
+               DbgCrash()               
                'print _
                '   .iLeftPart  & "{" & .iLeftType  & ":" & .iLeftNum  & "} = " & _
                '   .iRightPart & "{" & .iRightType & ":" & .iRightNum & "}"
                'dim as single FromX,FromY,FromZ , ToX,ToY,ToZ
+               
+               '---- grab snap points of both parts ----
                dim pSnap as PartSnap ptr  = NULL , pModel as DATFile ptr = NULL 
                if .iLeftPart = _NULLPARTNAME then
                   pLeft = @g_NullSnap
@@ -634,54 +649,52 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                   'else
                   .tMatrix = pLeftPart->tMatrix
                   'end if
+                                    
+                  
+                  DbgCrash()
+                  
+                  MatrixTranslate( .tMatrix , pLeft->fPX , pLeft->fPY , pLeft->fpZ )
                   
                   #if 0
-                     with *(pLeft->pMatOrg)
-                        '.fPosX = 0
-                        '.fPosY = 100
-                        '.fPosZ = 0
-                     end with
+                     ''puts("pLeft:" & pLeft & " // pRight:" & pRight)
+                     if pLeft->pMatOrg then 
+                        puts("Prev rotation")
+                        MultMatrix4x4( .tMatrix , .tMatrix , pLeft->pMatOrg )
+                     end if
+                     if pRight->pMatOrg then 
+                        puts("Auto Rotating")
+                        MultMatrix4x4( .tMatrix , .tMatrix , pRight->pMatOrg )
+                     end if    
                   #endif
                   
                   DbgCrash()
-                  
-                  ''puts("pLeft:" & pLeft & " // pRight:" & pRight)
-                  if pLeft->pMatOrg then 
-                     puts("Prev rotation")
-                     MultMatrix4x4( .tMatrix , .tMatrix , pLeft->pMatOrg )
-                  end if
-                  if pRight->pMatOrg then 
-                     puts("Auto Rotating")
-                     MultMatrix4x4( .tMatrix , .tMatrix , pRight->pMatOrg )
-                  end if    
-                  
-                  DbgCrash()
-                  
+                                                      
                   if .tLocation.fAX then MatrixRotateX( .tMatrix , .tMatrix , .tLocation.fAX )
                   if .tLocation.fAY then MatrixRotateY( .tMatrix , .tMatrix , .tLocation.fAY )
-                  if .tLocation.fAZ then MatrixRotateZ( .tMatrix , .tMatrix , .tLocation.fAZ )
+                  if .tLocation.fAZ then MatrixRotateZ( .tMatrix , .tMatrix , .tLocation.fAZ )                  
                                                          
                   DbgCrash()
                                                          
-                  _fPX = pLeft->fPX : _fPY = pLeft->fPY : _fPZ = pLeft->fPZ               
-                  'if pLeft->pMatOrg then MultiplyMatrixVector( @tVec3(0) , pLeft->pMatOrg )
-                  'MultiplyMatrixVector( @tVec3(0) , @pLeftPart->tMatrix )
-                  tVec3(0) += pLeftPart->tMatrix.fPosX
-                  tVec3(1) += pLeftPart->tMatrix.fPosY
-                  tVec3(2) += pLeftPart->tMatrix.fPosZ
+                  ''_fPX = pLeft->fPX : _fPY = pLeft->fPY : _fPZ = pLeft->fPZ
+                  ''if pLeft->pMatOrg then MultiplyMatrixVector( @tVec3(0) , pLeft->pMatOrg )
+                  ''MultiplyMatrixVector( @tVec3(0) , @pLeftPart->tMatrix )
+                  ''tVec3(0) += pLeftPart->tMatrix.fPosX
+                  ''tVec3(1) += pLeftPart->tMatrix.fPosY
+                  ''tVec3(2) += pLeftPart->tMatrix.fPosZ
                   
                   DbgCrash()
                   
-                  dim as single tVec3R(2) = { pRight->fPX , pRight->fPY , pRight->fPZ }
-                  'if pRight->pMatOrg then MultiplyMatrixVector( @tVec3R(0) , pRight->pMatOrg )
-                  'MultiplyMatrixVector( @tVec3R(0) , @.tMatrix )
+                  ''dim as single tVec3R(2) = { pRight->fPX , pRight->fPY , pRight->fPZ }
+                  '''if pRight->pMatOrg then MultiplyMatrixVector( @tVec3R(0) , pRight->pMatOrg )
+                  '''MultiplyMatrixVector( @tVec3R(0) , @.tMatrix )
+                  MatrixTranslate( .tMatrix , pRight->fPX , pRight->fPY , pRight->fpZ )
                                                             
-                  _fPX = ptLocation->fPX - (_fPX + tVec3R(0)) + .tLocation.fPX '.fPX
-                  _fPY = ptLocation->fPY + (_fPY - tVec3R(1)) + .tLocation.fPY '.fPY
-                  _fPZ = ptLocation->fPZ + (_fpZ + tVec3R(2)) + .tLocation.fPZ '.fPZ
+                  ''_fPX = ptLocation->fPX - (_fPX + tVec3R(0)) + .tLocation.fPX '.fPX
+                  ''_fPY = ptLocation->fPY + (_fPY - tVec3R(1)) + .tLocation.fPY '.fPY
+                  ''_fPZ = ptLocation->fPZ + (_fpZ + tVec3R(2)) + .tLocation.fPZ '.fPZ
                   
                   'if .tLocation.fPX = 0 andalso .tLocation.fPY=0 andalso .tLocation.fPZ=0 then
-                     .tLocation.fPX = _fPX : .tLocation.fPY = _fPY : .tLocation.fPZ = _fPZ
+                  .tLocation.fPX = _fPX : .tLocation.fPY = _fPY : .tLocation.fPZ = _fPZ
                   'elseif abs(.tLocation.fPX-_fPX)>.001 orelse abs(.tLocation.fPY-_fPY)>.001 orelse abs(.tLocation.fPZ-_fPZ)>.001 then
                   '   'LinkerError( "Impossible Connection detected!" )
                   'end if
@@ -727,7 +740,7 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                   'nearest = roundf(val * 100) / 100
                   with .tMatrix
                      #define r(_i) (roundf(.m(_i)*100000)/100000)
-                     sprintf(zTemp,!"1 %i %f %f %f %g %g %g %g %g %g %g %g %g %s\r\n",iColor,_fPX,_fPY,_fPZ, _
+                     sprintf(zTemp,!"1 %i %f %f %f %g %g %g %g %g %g %g %g %g %s\r\n",iColor,.fPosX,.fPosY,.fPosZ, _
                         r(0),r(1),r(2),r(4),r(5),r(6),r(8),r(9),r(10) , *psPrimative )
                   end with
                   sResult += zTemp 

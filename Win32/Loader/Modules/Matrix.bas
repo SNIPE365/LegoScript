@@ -158,6 +158,11 @@ sub MatrixRotateZ( tmOut as Matrix4x4 , tmIn as Matrix4x4 , fAngle as single )
    }   
    MultMatrix4x4WithVector3x3( tmOut , tmIn , @sMat(0) )
 end sub
+sub MatrixTranslate( tmInOut as Matrix4x4 , fDX as single , fDY as single , fDZ as single )
+   var tMat = g_tIdentityMatrix
+   tMat.fPosX = fDX : tMat.fPosY = fDY : tMat.fPosZ = fDZ
+   MultMatrix4x4( tmInOut , tmInOut , @tMat )
+end sub   
 
 sub PrintCurrentMatrix()
    with tMatrixStack( g_CurrentMatrix )
