@@ -135,7 +135,11 @@ sub UpdateTabName( iTab as long )
       sFile += space(cCloseLen)
       dim as TC_ITEM tItem = type( TCIF_TEXT , 0,0 , strptr(sFile) , 0,-1 , 0 ) 
       TabCtrl_SetItem( CTL(wcTabs) , iTab , @tItem )   
-      if iTab = g_iCurTab then UpdateMainWindowCaption()
+      if iTab = g_iCurTab then 
+         UpdateTabCloseButton()
+         UpdateMainWindowCaption()
+      end if
+      InvalidateRect( CTL(wcTabs) , null , true )
    end with   
 end sub
 function NewTab( sNewFile as string , iLinked as long = -1 , iReplaceTab as long = -1 ) as long   
@@ -312,6 +316,7 @@ sub File_Save()
    close #f
    g_tTabs(g_iCurTab).sFilename = g_CurrentFilePath
    UpdateTabName( g_iCurTab )
+   UpdateMainWindowCaption()
 end sub
 sub File_SaveAs()
    dim as OPENFILENAME tOpen
@@ -354,7 +359,8 @@ sub File_Close()
       ResetTabCount() : g_iCurTab=0
       var iNewTab = NewTab( "" ,, g_iCurTab ) : SetWindowText( CTL(wcEdit) , "" )
       'puts("iNewTab here: " & iNewTab)
-      if g_iTabCount = 1 then ChangeToTab(iNewTab)
+      if g_iTabCount = 1 then ChangeToTab(iNewTab) 
+      UpdateMainWindowCaption()
       exit sub
    end if
    
@@ -380,7 +386,8 @@ sub File_Close()
    g_iTabCount -= 1 : Redim preserve g_tTabs(g_iTabCount)
    'and set current tab to the actual correct number
    iCurTab = iNewTab
-   UpdateTabCloseButton() 
+   UpdateTabCloseButton()
+   UpdateMainWindowCaption()
    
 end sub
 function File_Quit() as boolean   

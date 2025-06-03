@@ -31,16 +31,17 @@ function IsTokenNumeric( sToken as string , iStart as long = 0 ) as long
    next N
    return true
 end function
-function IsPrimative( sToken as string ) as long
+function IsPrimative( sToken as string ) as long   
    if len(sToken)=0 then return false
-   
    select case sToken[0]
    '!!! To allow letters in the begin of part ID/Primative we will need to be able to do a slower or cached CHECK
    'case asc("a") to asc("z") 
    case asc("0") to asc("9"),asc("_")
       rem valid first char for primatives
    case asc("$") 'force assumption of primative
-      sToken = mid(sToken,2)
+      with *cptr(fbstr ptr,@sToken)
+         .pzData += 1 : .iLen -= 1
+      end with      
    case else
       return false
    end select

@@ -314,7 +314,7 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
             #define sName sRelToken(1)
             DbgBuild(">> Token is a primative ")
             DbgBuild("{{" + sName + "}}")
-            sToUpper(sName)            
+            sToUpper(sName)
             if len(sName)=0 orelse iCurToken >= iTokCnt then ParserError( "Expected part name, got end of statement" )            
             if IsValidPartName( sName )=false then ParserError("'"+sName+"' is not a valid part name")
             iName = FindPartName( sName )            
@@ -328,8 +328,9 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
             iCurToken += 2            
             DbgBuild(">> Part name created, ID:" & iName)
          else 'otherwise it must be an existing part name            
+            DbgBuild(">> Token must be an existing part name")
             #define sName sCurToken            
-            sName = ucase(sName)
+            sToUpper(sName)
             if sName = "NULL" then               
                iName = _NULLPARTNAME : bNullSkip = 0
             else

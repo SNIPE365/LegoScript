@@ -11,7 +11,7 @@ InitFont( wfEdit    , g_sFixedFont  , 16 ) 'edit controls font
 InitFont( wfArrows  , g_sArrowFont  , 12 )
 
 AddButtonAT(wcBtnClose  , _pct(10)  , _pct(2) , _pct(3)  , _pct(4) , "X" )
-AddTabsA  ( wcTabs      , cMarginL  , cMarginT  , _pct(85) , cRow(1.25) , cRow(1.25) )
+AddTabsA  ( wcTabs      , cMarginL  , cMarginT  , _pct(85) , cRow(1.25) , cRow(1.25) , WS_CLIPCHILDREN )
 AddButtonA( wcButton    , _NextCol  , _SameRow  , cMarginR , cRow(1.25) , "Build" )
 AddTextA  ( wcLines     , cMarginL  , _NextRow0 , _pct(2*1.66*2) , _pct(53) ,  "" , SS_OWNERDRAW )
 AddRichA  ( wcEdit      , _NextCol0 , _SameRow  , cMarginR , _pct(53) , "" , WS_HSCROLL or WS_VSCROLL or ES_AUTOHSCROLL or ES_DISABLENOSCROLL or ES_NOHIDESEL )            

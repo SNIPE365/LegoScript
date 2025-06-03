@@ -448,6 +448,19 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
    #include "LSModules\ControlsMacros.bas"
    
    select case( message )       
+   #if 0
+   case WM_CTLCOLORBTN  
+      var hCtl = cast(HWND,lParam) : printf(!"btn=%X\n",hCtl)
+      if hCtl = CTL(wcTabs) then puts("Tabs changed? (button)")
+   case WM_CTLCOLORSCROLLBAR  
+      var hCtl = cast(HWND,lParam) : printf(!"scroll=%X\n",hCtl)
+      if hCtl = CTL(wcTabs) then puts("Tabs changed? (scroll)")
+   case WM_CTLCOLORSTATIC  
+      var hCtl = cast(HWND,lParam) : printf(!"static=%X\n",hCtl)
+      if hCtl = CTL(wcTabs) then puts("Tabs changed? (static)")      
+      'TabCtrl_GetItemRect(
+   #endif
+
    case WM_DRAWITEM   'item in a control is being drawn (owner draw)
       var wID = clng(wParam) , ptDrw = cast(LPDRAWITEMSTRUCT,lparam)
       select case wId
@@ -668,11 +681,13 @@ sub WinMain ()
    var hMenu = CreateMainMenu()
    var hAcceleratos = CreateMainAccelerators()
          
-   hWnd = CreateWindowEx(WS_EX_COMPOSITED,sAppName,sAppName, WS_TILEDWINDOW or WS_CLIPCHILDREN, _
+   'WS_EX_COMPOSITED
+   'or WS_CLIPCHILDREN
+   hWnd = CreateWindowEx(WS_EX_LAYERED,sAppName,sAppName, WS_TILEDWINDOW, _
    200,200,g_WndWid,g_WndHei,null,hMenu,g_AppInstance,0)
    
    'SetClassLong( hwnd , GCL_HBRBACKGROUND , CLNG(GetSysColorBrush(COLOR_INFOBK)) )
-   'SetLayeredWindowAttributes( hwnd , GetSysColor(COLOR_INFOBK) , 192 , LWA_COLORKEY )
+   SetLayeredWindowAttributes( hwnd , GetSysColor(COLOR_INFOBK) , 192 , LWA_COLORKEY )
     
    '' Process windows messages
    ' *** all messages(events) will be read converted/dispatched here ***
