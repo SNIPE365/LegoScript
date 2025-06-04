@@ -20,6 +20,7 @@
 ' !!! because when using ldraw it does not matter the order, so they never enforced that     !!!
 
 
+'TODO (04/06/25): show debug of connectors when viewing a single part
 'TODO (30/05/25): fix crash when not finding a valid part name
 'TODO (19/05/25): fix LS2LDR parsing bugs (prevent part that is connected from moving)
 'TODO (17/05/25): investigate crash when building before opening graphics window

@@ -653,8 +653,15 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                                     
                   
                   DbgCrash()
+                                                      
+                  if .tLocation.fAX then MatrixRotateX( .tMatrix , .tMatrix , .tLocation.fAX )
+                  if .tLocation.fAY then MatrixRotateY( .tMatrix , .tMatrix , .tLocation.fAY )
+                  if .tLocation.fAZ then MatrixRotateZ( .tMatrix , .tMatrix , .tLocation.fAZ )
                   
-                  MatrixTranslate( .tMatrix , pLeft->fPX , pLeft->fPY , pLeft->fpZ )
+                  DbgCrash()
+                  
+                  printf(!"Left <%g %g %g>\n",pLeft->fPX,pLeft->fPY,pLeft->fPZ)
+                  MatrixTranslate( .tMatrix , -pLeft->fPX , --pLeft->fPY , -pLeft->fpZ )
                   
                   #if 0
                      ''puts("pLeft:" & pLeft & " // pRight:" & pRight)
@@ -667,12 +674,7 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                         MultMatrix4x4( .tMatrix , .tMatrix , pRight->pMatOrg )
                      end if    
                   #endif
-                  
-                  DbgCrash()
-                                                      
-                  if .tLocation.fAX then MatrixRotateX( .tMatrix , .tMatrix , .tLocation.fAX )
-                  if .tLocation.fAY then MatrixRotateY( .tMatrix , .tMatrix , .tLocation.fAY )
-                  if .tLocation.fAZ then MatrixRotateZ( .tMatrix , .tMatrix , .tLocation.fAZ )                  
+                                                     
                                                          
                   DbgCrash()
                                                          
@@ -688,7 +690,14 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                   ''dim as single tVec3R(2) = { pRight->fPX , pRight->fPY , pRight->fPZ }
                   '''if pRight->pMatOrg then MultiplyMatrixVector( @tVec3R(0) , pRight->pMatOrg )
                   '''MultiplyMatrixVector( @tVec3R(0) , @.tMatrix )
-                  MatrixTranslate( .tMatrix , pRight->fPX , pRight->fPY , pRight->fpZ )
+                  printf(!"Right <%g %g %g>\n",pRight->fPX,pRight->fPY,pRight->fPZ)
+                  'MatrixTranslate( .tMatrix , pRight->fPX , -pRight->fPY , pRight->fpZ )
+                  'MatrixTranslate( .tMatrix , .tLocation.fPX , -.tLocation.fPY , .tLocation.fpZ )
+                  
+                  MatrixTranslate( .tMatrix , _ 
+                    pRight->fPX+.tLocation.fPX , _ 
+                    -(pRight->fPY+.tLocation.fPY) , _
+                    pRight->fpZ+.tLocation.fPZ )
                                                             
                   ''_fPX = ptLocation->fPX - (_fPX + tVec3R(0)) + .tLocation.fPX '.fPX
                   ''_fPY = ptLocation->fPY + (_fPY - tVec3R(1)) + .tLocation.fPY '.fPY
