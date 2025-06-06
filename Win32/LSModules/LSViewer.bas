@@ -290,7 +290,9 @@ namespace Viewer
             if g_CurDraw < 0 then
                glCallList(	iModel )   
             else
-               RenderModel( pModel , false , , g_CurDraw )      
+               RenderModel( pModel , false , , g_CurDraw )
+               dim as PartSnap tSnap = any
+               SnapModel( pModel , tSnap , g_CurDraw )      
             end if
             glCallList(	iBorders-(g_CurDraw>=0) )
             Catch()

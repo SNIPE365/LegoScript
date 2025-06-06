@@ -1062,7 +1062,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
             end with
          next N
       end if
-      for N as long = 0 to .iPartCount-1         
+      for N as long = 0 to .iPartCount-1                           
          with .tParts(N)            
             if .bType = 1 then 'we only care for includes
                'continue for
@@ -1093,9 +1093,11 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
    end with   
 end sub
 #else
-sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false , pRoot as DATFile ptr = NULL )
+
+'sub RenderModel( pPart as DATFile ptr , iBorders as long , uCurrentColor as ulong = &h70605040 , lDrawPart as long = -1 , uCurrentEdge as ulong = 0 DebugPrimParm )
+sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , lDrawPart as long = -2 , pRoot as DATFile ptr = NULL )   
    #ifdef __NoRender
-   bDraw=false
+   lDrawPart=-2
    #endif
    if pRoot = NULL then pRoot = pPart        
    with *pPart
@@ -1109,7 +1111,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
       if .iShadowCount then
          #ifndef __Tester
             #ifdef DebugShadow
-               if bDraw=0 then printf(!"Shadow Entries=%i (%s)\n",.iShadowCount,GetPartName(pPart))
+               if lDrawPart=-2 then printf(!"Shadow Entries=%i (%s)\n",.iShadowCount,GetPartName(pPart))
             #endif
          #endif
          
@@ -1131,7 +1133,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                select case .bType
                case sit_Include
                   #ifndef __Tester
-                  if bDraw=0 then puts("sit_Include")
+                  if lDrawPart>-2 then puts("sit_Include")
                   #endif
                   iIdent += 2
                case sit_Cylinder
@@ -1151,7 +1153,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                   
                   #ifndef __Tester                   
                   #ifndef __NoRender
-                  if bDraw then                     
+                  if lDrawPart>-2 then                     
                      if .bFlagOriMat then
                         dim as single fMatrix(15) = { _                           
                           .fOri(0) , .fOri(3) , .fOri(6) , 0 , _ 'X scale ,    0?   ,   0?    , 0 
@@ -1210,10 +1212,13 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                                     '   printf(!"  %g %g %g %g ]\n",.m(12),.m(13),.m(14),.m(15))
                                     'end with
                                  'end if                                 
-                                 DrawMaleShape( __Position__ , p->wFixRadius/100 , p->bLength , bRound ) 
-                                 
+                                 'if lDrawPart <> -2 then 
+                                    DrawMaleShape( __Position__ , p->wFixRadius/100 , p->bLength , bRound )                                 
+                                 'end if
                               else
-                                 DrawFemaleShape( __Position__ , p->wFixRadius/100 , p->bLength , bRound ) '*(pMat->fScaleY)
+                                 'if lDrawPart <> -2 then 
+                                    DrawFemaleShape( __Position__ , p->wFixRadius/100 , p->bLength , bRound ) '*(pMat->fScaleY)
+                                 'end if
                               end if
                               
                            next I
@@ -1242,14 +1247,14 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                         #ifndef __Tester                            
                            #ifdef DebugShadow
                               var pMat = @tMatrixStack(g_CurrentMatrix)
-                              if bDraw=0 then printf(" %s(%g %g)",pzSecs(.bShape),.wFixRadius/100,.bLength*(pMat->fScaleY))
+                              if lDrawPart=-2 then printf(" %s(%g %g)",pzSecs(.bShape),.wFixRadius/100,.bLength*(pMat->fScaleY))
                            #endif
                         #endif
                      end with
                   next I      
                   #ifndef __Tester
                      #ifdef DebugShadow
-                        if bDraw=0 then puts("")
+                        if lDrawPart=-2 then puts("")
                      #endif
                   #endif                  
                   
@@ -1260,7 +1265,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                      case sc_None : bSides = 2
                      case sc_One  : bSides = 1
                      #ifndef __Tester
-                     case sc_Two  : if bDraw=0 then puts("!!!!! CHECK TWO CAPS!!!!!")
+                     case sc_Two  : if lDrawPart=-2 then puts("!!!!! CHECK TWO CAPS!!!!!")
                      #endif
                      end select
                      
@@ -1270,7 +1275,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                         var pMat = @tMatrixStack(g_CurrentMatrix)
                         var iIgnore = 0
                         #ifndef __Tester
-                        if iConCnt > 1 andalso bDraw=0 then puts("!!!!!! MALE GRID FOUND !!!!!")
+                        if iConCnt > 1 andalso lDrawPart=-2 then puts("!!!!!! MALE GRID FOUND !!!!!")
                         #endif
                         bConType = spStud
                         for I as long = 0 to .bSecCnt-1
@@ -1282,7 +1287,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                            if .tSecs(I).bLength = 1 then bSecs -= 1 : continue for 'ignore length=1 sections
                            select case .tSecs(I).bShape
                            case sss_Axle
-                              if bDraw=0 then 
+                              if lDrawPart=-2 then 
                                  DbgConnect(!"Axle += %i\n",iConCnt)
                               end if
                               tSnap.lAxleCnt += iConCnt : bSecs -= 1 'AXLEHOLE //bConType = spAxleHole: exit for 
@@ -1291,7 +1296,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                               bSecs -= 1 'other side of pin?
                               'puts("Pin Mirror " & bSecs)
                            case sss_FlexPrev
-                              if bDraw=0 then 
+                              if lDrawPart=-2 then 
                                  DbgConnect(!"Pin += %i\n",iConCnt)
                               end if
                               ''tSnap.lPinCnt += iConCnt 
@@ -1303,14 +1308,14 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                                  bSecs -= 1 'STOPPER? Ignoring it for now
                                  'puts("Stopper" & bSecs)
                               elseif .tSecs(I).wFixRadius = 400 then
-                                 if bDraw=0 then 
+                                 if lDrawPart=-2 then 
                                     DbgConnect(!"Bar += %i\n",iConCnt)
                                  end if
                                  ''tSnap.lBarCnt += iConCnt 
                                  bSecs -= 1 'BARHOLE
                                  'puts("Bar" & bSecs)
                               elseif .tSecs(I).wFixRadius = 600 then 'stud
-                                 if bDraw=0 then
+                                 if lDrawPart=-2 then
                                     DbgConnect(!"Stud += %i\n",iConCnt)
                                     'var p = pPart
                                     with *pMat
@@ -1327,12 +1332,12 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                                     '#endif
                                  else
                                     #ifndef __Tester
-                                    if bDraw=0 then puts("Unknown male round cylinder?")
+                                    if lDrawPart=-2 then puts("Unknown male round cylinder?")
                                     #endif
                                  end if
                               end if
                            case else
-                              if bDraw=0 then puts("Unknown male?")
+                              if lDrawPart=-2 then puts("Unknown male?")
                            end select
                         next I
                      else 'females can be BARHOLE / PINHOLE / CLUTCHES / ALIAS
@@ -1345,13 +1350,13 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                            for I as long = 0 to .bSecCnt-1                              
                               if .tSecs(I).bLength*((pMat->fScaleY)) = 1 then
                                  #ifndef __Tester
-                                 if bDraw=0 then puts("Length 1 section ignored")
+                                 if lDrawPart=-2 then puts("Length 1 section ignored")
                                  #endif
                                  bSecs -= 1 : continue for 'ignore length=1 sections
                               end if
                               select case .tSecs(I).bShape 
                               case sss_Axle                                 
-                                 if bDraw=0 then 
+                                 if lDrawPart=-2 then 
                                     DbgConnect(!"AxleHole += %i (Axle slide)\n",iConCnt*bSides)
                                  end if
                                  if bDidAxleHole=0 then bDidAxleHole=1 '': tSnap.lAxleHoleCnt += iConCnt*bSides 
@@ -1359,7 +1364,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                                  'if there's an axlehole then it can't be a pinhole, and it can't have dual clutches
                                  bSecs -= 1 : iMaybePins=-999 : bSides = 1
                               case sss_Square   
-                                 if bDraw=0 then
+                                 if lDrawPart=-2 then
                                     if bDidClutch=0 then
                                        bDidClutch=1
                                        with *pMat
@@ -1377,7 +1382,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                                  case 800: bSecs -= 1 '???? (anti-stopper??)
                                  case 600: iMaybePins += 1 
                                  case 400
-                                    if bDraw=0 then 
+                                    if lDrawPart-2 then 
                                        DbgConnect(!"BarHole += %i (Round slide)\n",iConCnt*bSides)
                                     end if
                                     if bDidBarHole=0 then bDidBarHole=1 '': tSnap.lBarHoleCnt += iConCnt*bSides 
@@ -1386,7 +1391,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                               end select
                            next I
                            if iMaybePins>0 then 
-                              if bDraw=0 then
+                              if lDrawPart=-2 then
                                  DbgConnect(!"Clutch += %i (round slide from pin?)\n",iConCnt*iMaybePins*bSides )
                                  DbgConnect(!"PinHole += %i (round slide )\n", iConCnt*iMaybePins)
                                  #ifndef __Tester
@@ -1404,23 +1409,23 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                               select case .tSecs(I).bShape
                               case sss_Axle
                                  #ifndef __Tester
-                                 if bDraw=0 then puts("Axle hole without slide??????")
+                                 if lDrawPart=-2 then puts("Axle hole without slide??????")
                                  #endif
                               case sss_FlexPrev
-                                 if bDraw=0 then 
+                                 if lDrawPart=-2 then 
                                     DbgConnect(!"PinHole += %i (FlexPrev)\n",iConCnt)
                                  end if
                                  if bDidPinHole=0 then bDidPinHole=1 '': tSnap.lPinHoleCnt += iConCnt 
                                  bSecs -= 1: 'bConType = spPinHole
                               case sss_Round 'barholes have radius of 4.0
                                  if .tSecs(I).wFixRadius = 400 then 
-                                    if bDraw=0 then 
+                                    if lDrawPart=-2 then 
                                        DbgConnect(!"BarHole += %i (Round)\n",iConCnt*bSides)
                                     end if
                                     if bDidBarHole=0 then bDidBarHole = 1 '': tSnap.lBarHoleCnt += iConCnt*bSides 
                                     bSecs -= 1 'bConType = spBarhole : exit for 'BARHOLE
                                  elseif .tSecs(I).wFixRadius = 600 then 'clutch?
-                                    if bDraw=0 then 
+                                    if lDrawPart=-2 then 
                                        DbgConnect(!"Clutch += %i (Round)\n",iConCnt)
                                        with *pMat                                       
                                           for iGX as long = 0 to xCnt
@@ -1437,14 +1442,14 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                            ''if bConType = spBarHole andalso .bCaps = sc_None then iConCnt *= 2 'dual for hollow
                         end if
                      end if
-                     if bDraw=0 then 
+                     if lDrawPart=-2 then 
                         if bSecs < 0 then puts("ERROR: remaining section counter is negative")
                         if bSecs > 1 then puts("ERROR: Too many unhandled sections!")
                      end if
                      if bSecs > 0 then 'remaining sects (fallback)
                         select case bConType                           
                         case spStud    
-                           if bDraw=0 then 
+                           if lDrawPart=-2 then 
                               'DbgConnect(!"Stud += %i (Fallback)\n",iConCnt)
                               #ifndef __Tester
                               printf(!"Stud += %i (Fallback {ignored})\n",iConCnt)
@@ -1456,7 +1461,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                            '#endif
                         case spClutch  
                            'printf(!"Sides=%i\n",bSides)
-                           if bDraw=0 then
+                           if lDrawPart=-2 then
                               with *pMat
                                  SnapAddClutch( tSnap , iConCnt , type(fPX+.fPosX , fPY+.fPosY , fPZ+.fPosZ) )                                       
                               end with
@@ -1473,25 +1478,25 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                            'puts("!!! FALLBACK CLUTCH !!!")
                            '#endif
                         case spAlias   
-                           if bDraw=0 then 
+                           if lDrawPart=-2 then 
                               DbgConnect(!"Alias += %i (Fallback {ignored})\n",iConCnt)
                            end if
                            ''tSnap.lAliasCnt    += iConCnt
                         case spBar     
-                           if bDraw=0 then 
+                           if lDrawPart=-2 then 
                               DbgConnect(!"Bar += %i (Fallback {ignored})\n",iConCnt)
                            end if
                            ''tSnap.lBarCnt      += iConCnt
                         case spBarHole : tSnap.lBarHoleCnt  += iConCnt*bSides
-                           if bDraw=0 then 
+                           if lDrawPart=-2 then 
                               DbgConnect(!"BarHole += %i (Fallback {ignored})\n",iConCnt)
                            end if
                         case spPin     '': tSnap.lPinCnt      += iConCnt 
-                           if bDraw=0 then 
+                           if lDrawPart=-2 then 
                               DbgConnect(!"Pin += %i (Fallback {ignored})\n",iConCnt)
                            end if
                         case spPinHole 
-                           if bDraw=0 then 
+                           if lDrawPart=-2 then 
                               DbgConnect(!"PinHole += %i (Fallback {ignored})\n",iConCnt)
                            end if
                            ''tSnap.lPinHoleCnt  += iConCnt
@@ -1499,12 +1504,12 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                            'puts("!!! FALLBACK PINHOLE !!!")
                            '#endif
                         case spAxle
-                           if bDraw=0 then 
+                           if lDrawPart=-2 then 
                               DbgConnect(!"Axle += %i (Fallback {ignored})\n",iConCnt)
                            end if
                            ''tSnap.lAxleCnt     += iConCnt
                         case spAxleHole
-                           if bDraw=0 then 
+                           if lDrawPart=-2 then 
                               DbgConnect(!"AxleHole += %i (Fallback {ignored})\n",iConCnt)
                            end if
                            ''tSnap.lAxleHoleCnt += iConCnt
@@ -1518,6 +1523,9 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
          next N
       end if
       for N as long = 0 to .iPartCount-1         
+         dim as byte bDoDraw
+         if (lDrawPart=-1 orelse lDrawPart=N) then bDoDraw = -1 else bDoDraw = -3
+         if lDrawPart=-2 then bDoDraw = -2
          with .tParts(N)            
             if .bType = 1 then 'we only care for includes
                'continue for
@@ -1539,7 +1547,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
                   'next N
                   
                   PushAndMultMatrix( @fMatrix(0) )                  
-                  SnapModel( pSubPart , tSnap , bDraw , pRoot )
+                  SnapModel( pSubPart , tSnap , bDoDraw , pRoot )
                   PopMatrix()
                end with               
             end if
