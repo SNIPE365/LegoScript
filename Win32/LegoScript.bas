@@ -1,3 +1,4 @@
+#cmdline "res\ls.rc"
 '#cmdline "-gen gcc -O 3"
 #define __Main "LegoScript"
 

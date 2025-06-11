@@ -105,6 +105,7 @@ static shared as SnapPV g_NullSnap
 'g_NullSnap.pMatOrg = @g_tIdentityMatrix
 
 #include "LSModules\LSFunctions.bas"
+#include "LSModules\DictionaryTree.bas"
 
 'TODO: now check the remainder tokens, clutch/studs
 
