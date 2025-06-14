@@ -1,0 +1,182 @@
+######################## key syntax ######################
+# //          -- impelemtation comment                   #
+# # #         -- comment                                 #
+# --          -- separator for shortcut -- action        #
+# ( )...      -- repeat step(s)                          #
+# LClick      -- click left mouse button                 #
+# {LClick}    -- click and hold left mouse button        #
+# RClick      -- click right mouse button                #
+# {Rclick}    -- click and hold right mouse button       #
+# MClick      -- click the mouse wheel                   #
+# {MClick}    -- click and hold mouse wheel              #
+# WClick      -- same as MClick                          #
+# {WClick}    -- same as {MClick}                        #
+# LSHIFT      -- press down left SHIFT                   # 
+# {LSHIFT}    -- hold left shift down                    #
+# ^LSHIFT^    -- release left SHIFT                      #
+# _LSHIFT_    -- press down left SHIFT (same as LSHIFT)  #
+# RSHIFT      -- press down right SHIFT                  #
+# {RSHIFT}    -- hold right SHIFT down                   #
+# ^RSHIFT^    -- release right SHIFT                     #
+# _RSHIFT_    -- press down right SHIFT (same as RSHIFT) #
+# LCTRL       -- press right CTRL                        #
+# {LCTRL}     -- hold left CTRL down                     #
+# ^LCTRL^     -- release right CTRL                      #
+# _LCTRL_     -- press down right CTRL (same as LCTRL)   #
+# RCTRL       -- press down right CTRL                   #
+# {RCTRL}     -- hold right CTRL down                    # 
+# ^RCTRL^     -- release right CTRL                      #
+# _RCTRL_     -- press down right CTRL (same as RCTRL)   #
+##########################################################
+
+##################################
+# on a part in the build window: #              
+##################################
+                                                  
+(LClick)...                                       -- select or de-select a single part
+{LCTRL} + (LClick)...                             -- select or de-select multiple parts
+RClick                                            -- opens part context menu
+LClick then RClick                                -- same as RClick
+                                                  
+MClick                                            -- reset zoom at where the selected part is
+LClick then MClick                                -- same as MClick
+LClick then scroll wheel up                       -- zoom in at where the selected part is
+LClick then scroll wheel up                       -- zoom out at where the selected part is
+                                                  
+{LClick} then move mouse                          -- moves a part around.
+                                                  
+LClick then up                                    -- rotates a part in the up axis 
+LClick then left                                  -- rotates a part in the left axis
+LClick then down                                  -- rotates a part in the down axis
+LClick then right                                 -- rotates a part in the right axis
+                                                  
+LClick then {LCTRL} + up                          -- rotates a part in the forward axis
+LClick then {LCTRL} + left                        -- rotates a part in the up axis
+LClick then {LCTRL} + down                        -- rotates a part in the backward axis 
+LClick then {LCTRL} + right                       -- rotates a part in the down axis
+                                                  
+LClick then up + left                             -- rotates a part in the up left axis
+LClick then up + right                            -- rotates a part in the up right axis
+LClick then down + left                           -- rotates a part in the down left axis
+LClick then down + right                          -- rotates a part in the down right axis
+                                                  
+LClick then {LCTRL} then up + left                -- rotates a part in the forward left axis
+LClick then {LCTRL} then up + right               -- rotates a part in the forward right axis
+LClick then {LCTRL} then down + left              -- rotates a part in the backward left axis
+LClick then {LCTRL} then down + right             -- rotates a part in the backward right axis 
+                                                  
+// you cannot currently move a part both in the up + forward, up + backward, down + foward or down  +backward axis in one go
+                                                  
+LClick then del                                   -- delete the part
+{LCTRL} then LClick                               -- delete the selection
+                                                  
+LClick then CTRL + c                              -- copy the part
+LClick then CTRL + v                              -- paste the part
+LClick then CTRL + x                              -- cut the part
+                                                  
+LClick then CTRL + z                              -- undo (same as just CTRL + z)
+LClick then CTRL + y                              -- redo (same as just CTRL + y)
+                                                  
+LClick then CTRL + a                              -- selects all parts (same as CTRL + a)
+                                                  
+LClick then CTRL + s                              -- save file (same as CTRL + s)
+LClick then CTRL + LSHIFT + s                     -- save as (same as CTRL + SHIFT + s)
+                                                  
+LClick then LCTRL + w                             -- close current file LegoScript (same as CTRL + w)
+LClick then LCTRL + LSHIFT + w		        -- exits LegoScript (same as CTRL + SHIFT + w)
+                                                  
+LClick then LCTRL + r                             -- open part rotation dialog
+                                                  
+LClick then w                                     -- rotates a part in the pitch axis 
+LClick then a                                     -- rotates a part in the roll axis
+LClick then s                                     -- rotates a part in the pitch axis in the opposite direction
+LClick then d                                     -- rotates a part in the roll axis in the opposite direction
+                                                  
+LClick then {LCTRL} + w                           -- rotates a part in the yaw axis
+LClick then {LCTRL} + a                           -- rotates a part in the pitch axis 
+LClick then {LCTRL} + s                           -- rotates a part in the yaw axis in the opposite direction
+LClick then {LCTRL} + d                           -- rotates a part in the pitch axis in the opposite direction
+                                                  
+LClick then w + a                                 -- rotates a part in the yaw pitch axis
+LClick then w + d                                 -- rotates a part in the pitch yaw axis
+LClick then s + a                                 -- rotates a part in the yaw roll axis
+LClick then s + d                                 -- rotates a part in the roll yaw
+                                                  
+LClick then {LCTRL} then w + a                    -- rotates a part in the yaw pitch axis in the opposite direction
+LClick then {LCTRL} then w + d                    -- rotates a part in the pitch yaw axis in the opposite direction
+LClick then {LCTRL} then s + a                    -- rotates a part in the yaw roll axis in the opposite direction
+LClick then {LCTRL} then s + d                    -- rotates a part in the roll yaw in the opposite direction
+                                                  
+LClick then p                                     -- selects/de-selects all instances of the same part
+LClick then c                                     -- selects/de-selects all instances of the same color
+LClick then j                                     -- selects/de-selects all instances of parts that are connected
+                                                  
+LClick then l                                     -- selecets/de-selecets all instancs of parts that are the same dimensions as the selected part
+LClick then {LSHIFT} then l                       -- selecets/de-selects all instances of parts that are the same size as the selected part, in the current submodel
+                                                 
+LClick then p + c                                 -- selects/de-selects all instances of the same part and color
+LClick then p + j                                 -- selects/de-selects all instances of the same part that are connected
+LClick then c + j                                 -- selects/de-selects all instances of the same color that are connected
+LClick then p + c + j                             -- selects/de-selects all instances of the same part and color that are connected
+                                                  
+LClick then i                                     -- invert selection
+LClick then {LCTRL} + i                           -- invert selection in current submodel
+                                                  
+(LClick)... then {LCTRL} then p                   -- selects all instances of the same part in the current submodel
+(LClick)... then {LCTRL} then c                   -- selects all instances of the same color  in the current submodel
+(LClick)... then {LCTRL} then j                   -- selects all instanes of parts that are connected in the current submodel
+(LClick)... then {LCTRL} then p + c               -- selects all instances of the same part part and color in the current submodel
+(LClick)... then {LCTRL} then p + j               -- selects all instances of the same part that is conneted in the current submodel
+(LClick)... then {LCTRL} then c + j               -- selects all instances of the same color that is connected in the current submodel
+(LClick)... then {LCTRL} then p + c + j           -- selects all instances of the same part and color that is connected in the current submodel
+                                                  
+{LCTRL} then (LClick)... then then p              -- 
+{LCTRL} then (LClick)... then then c              --
+{LCTRL} then (LClick)... then then j              --
+{LCTRL} then (LClick)... then then p + c          --
+{LCTRL} then (LClick)... then then p + j          --
+{LCTRL} then (LClick)... then then c + j          --
+{LCTRL} then (LClick)... then then p + c + j      --
+                                                  
+##################################################################
+# on a parts primative(s) in sequence mode (in the buld window): #
+##################################################################
+                                                  
+LClick                                            -- selects/de-selecets a single primative
+{LCTRL} then LClick                               -- selects multiple primatives
+LClick then p                                     -- selects primatives of the same type
+LClick then i                                     -- invert selection
+                                                  
+{LCTRL} then p                                    -- selects primatives of the same type in current submodel
+{LCTRL} then i                                    -- inverts selection in current submodel
+                                                  
+({LCTRL}) then LClick then LCTRL_UP then p)...    
+                                                  
+#########################################                                                  
+# on a blank space in the build window: #         
+#########################################         
+                                                  
+{LClick} then mouse move                          -- rotate camera
+MClick                                            -- reset zoom at where the cursor is positioned
+Scroll wheel up                                   -- zooms in to where cursor is positioned
+Scroll wheel down                                 -- zooms out to where the cursor is positioned
+{LCTRL} + {RClick} then mouse move                -- pan camera
+{LCTRL} + {RClick} then mouse move                -- draw selecetion box
+{LCTRL} + {RClick} then mouse move
+                                                  
+1                                                 -- set grid stepping to tiniest
+2                                                 -- set grid stepping to tinier
+3                                                 -- set grid stepping to tiny
+4                                                 -- set grid stepping to smallest
+5                                                 -- set grid stepping to smaller
+6                                                 -- set grid stepping to small
+7                                                 -- set grid stepping to largest
+8                                                 -- set grid stepping to larger
+9                                                 -- set grid stepping to large
+                                                  
+0                                                 -- 
+-                                                 -- 
++                                                 -- 
+                                                  
+{LCTRL}+{LALT}+S                                  -- enter/exit sequence mode.
+                                                  

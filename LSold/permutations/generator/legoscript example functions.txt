@@ -1,0 +1,25 @@
+// All of the below functions are just ideas for possible functions
+// and do not exist withint the LEGOSCRIPT (LS) language, they can however
+// be implemented by using the following operators:
+// ! " £ $ % ^ & * ( ) _ + { } : @ ~ < > ? | - = [ ] ; ' # , . / \ ¬ 
+// == ++ += =+ -= =- *= =* /= =/ %= =% != =! ~= #~ |= =| &= =& ^= =^ <= =< >= 
+// => && || etc, note some of these operators might not exist in the first 
+// version of LEGOSCRIPT (LS), they are again just ideas until implemented.
+// and finally, if course you would combine these operators with operands such
+// primatives.
+
+
+IsRealPrimative(pr,...)    // returns 1 if its a real primative and not a primative that is "like" another primative, for example if you searched a part that conains a clip and asked "does it contain a barhole, it would return 0 because a clip is like a barhole but is not a barhole.
+IsRealPart(p,...)          // returns 1 if its a real part else it returns 0 basically is asking "does a part with these primatives exist?"
+IsrealPart(p,...)          // returns 1 if the partID exists in LDRAW else it returns 0
+IsColor(p,...)             // returns 1 if color matches, else returns 0
+IsHeight(x)                // returns a part or primative that matches the unit, otherwise it returns -1
+IsWidth(x)                 // returns a part, or a primative that matches the unit, otherwise it returns -1
+Islength(x)                // returns a part, or a primative that matches the unit, otherwise it returns -1
+IsSize(x,y,z)              // returns a part, or a primative that matches all 3 of the units only, otherwise it returns -1
+IsCubic(p||pr,...)         // returns 1 if part is cubic and 0 if part is not cubic
+isCubicx(p||pr,,...)       // returns 1 if part is cubic and 0 if part is not cubic
+IsSquare(p,...)            // returns 1 if part is square and 0 if part is not square
+Has4Sides()                // returns 1 if part has 4 sides and 0 if part does not have 4 sides.
+ContainsPart()             // returns -1 if a model or subassembly contains a given part otherwise it returns -1
+containsPrimative()        // returns -1 if a part, model or subassembly contains a given primative otherwise it returns -1
