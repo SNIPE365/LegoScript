@@ -76,6 +76,27 @@ function IsValidPartName( sToken as string ) as long
    next N
    return true 
 end function
+function IsValidIdentifierName( sToken as string ) as long   
+   if len(sToken)=0 then return false
+   select case sToken[0]   
+   case asc("A") to asc("Z"),asc("a") to asc("z"),asc("_")
+      rem valid initial chars for identifier names
+   case else
+      return false
+   end select
+   for N as long = 1 to len(sToken)-1
+      select case sToken[N]
+      case asc("A") to asc("Z"),asc("a") to asc("z")
+         rem valid chars for identifier names
+      case asc("0") to asc("9"),asc("_")
+         rem valid chars for identifier names
+      case else
+         return false
+      end select
+   next N
+   return true 
+end function
+
 
 function ParseColor( sToken as string ) as long
    var iLen = len(sToken), bHasHex = false, iTokenStart = 1
@@ -372,15 +393,19 @@ function LS_GetNextStatement( sScript as string , iStStart as long , Out_sStatem
    end with
    return iStNext
 end function
-function LS_SplitTokens( sStatement as string , Out_sToken() as string , iFileNumber as long ,  byref InOut_iLineNumber as long = 0 , byref Out_iErrToken as long = 0 ) as long
-   dim as long iTokStart=0,iTokCnt=0,iTokEnd=len(sStatement)
+function LS_SplitTokens( sStatement as string , Out_sToken() as string , iFileNumber as long , pDefDictionary as TreeNode ptr = 0 ,  byref InOut_iLineNumber as long = 0 , byref Out_iErrToken as long = 0 ) as long
+   dim as long iTokStart=0,iTokCnt=0,iTokEnd=len(sStatement),iRecursion=0
    'split tokens
    'print "["+sStatement+"]"
    if len(sStatement)=0 then return 0 'no tokens
-   var pzStatement = cptr(ubyte ptr,strptr(sStatement))   
-   Out_iErrToken = 0
+   static as zstring*1024 zModifiedStatement
+   var pzStatement = cptr(ubyte ptr,strptr(sStatement)), bModified = false   
+   Out_iErrToken = 0   
+   var iOrgLine = InOut_iLineNumber
    do      
+      iRecursion += 1
       #define iCurToken iTokCnt-1
+      if iRecursion > 1000 then Out_iErrToken = not iTokCnt : exit do
       if iTokCnt > ubound(Out_sToken) then Out_iErrToken = iCurToken : exit do
       with *cptr(lsString ptr,@Out_sToken(iTokCnt))         
          .uFile = iFileNumber
@@ -424,9 +449,30 @@ function LS_SplitTokens( sStatement as string , Out_sToken() as string , iFileNu
                .uLen += 1 : iTokStart += 1
             wend
          end if         
+                           
          .uLine = InOut_iLineNumber
          if .uLen <= 0 then exit do
-         iTokCnt += 1
+         
+         'locate defines and replace if needed
+         if pDefDictionary andalso (iTokCnt=0 orelse Out_SToken(0)[0]<>asc("#")) then            
+            var pzResu = FindEntry( pDefDictionary , Out_sToken(iTokCnt) )
+            if pzResu then 
+               'printf("*")
+               if bModified = false then 
+                  bModified = true : zModifiedStatement = _
+                  left(sStatement,iTokStart-.uLen)+*pzResu+mid(sStatement,iTokStart+1)
+               else
+                  zModifiedStatement = _
+                  left(zModifiedStatement,iTokStart-.uLen)+*pzResu+mid(zModifiedStatement,iTokStart+1)
+               end if
+               pzStatement = cptr(ubyte ptr,strptr(zModifiedStatement))
+               iTokEnd = len(zModifiedStatement)
+               iTokStart -= .uLen : InOut_iLineNumber = iOrgLine: continue do
+            end if
+         end if
+         'puts( "'" & Out_sToken(iTokCnt) & "'" )
+         iOrgLine = InOut_iLineNumber
+         iTokCnt += 1 : iRecursion = 0
       end with      
    loop   
    return iTokCnt

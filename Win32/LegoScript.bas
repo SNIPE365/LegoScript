@@ -21,6 +21,7 @@
 ' !!! because when using ldraw it does not matter the order, so they never enforced that     !!!
 
 
+'TODO (13/06/25): fix LS2LDR showing wrong error line numbers with #defines
 'TODO (04/06/25): show debug of connectors when viewing a single part
 'TODO (30/05/25): fix crash when not finding a valid part name
 'TODO (19/05/25): fix LS2LDR parsing bugs (prevent part that is connected from moving)
@@ -51,6 +52,8 @@ enum WindowControls
   wcBtnExec
   wcBtnLoad
   wcBtnSave
+  wcBtnInc
+  wcBtnDec
   wcBtnMinOut
   wcOutput
   wcQuery
@@ -306,6 +309,34 @@ function RichEdit_KeyPress( hCtl as HWND , iKey as long , iMod as long ) as long
    
    return 0
 end function
+sub RichEdit_IncDec( hCtl as HWND , bIsInc as boolean )
+   'puts(hCtl & " " & bIsInc)
+   dim as TEXTRANGE tRg = any
+   SendMessageW( hCtl , EM_EXGETSEL , 0 , cast(LPARAM,@tRg.chrg) )
+   var iSelLen = cint(tRg.chrg.cpmax-tRg.chrg.cpMin)   
+   if cuint(iSelLen-1) >= 20 then exit sub   
+   dim as wstring*32 wSel = any   
+   tRg.lpstrText = cast(any ptr,@wSel)   
+   SendMessageW( hCtl , EM_GETTEXTRANGE , 0 , cast(LPARAM,@tRg) )
+   'puts("Sel: " & iSelLen & " '"+wSel+"'")
+   for N as long = 0 to iSelLen-1      
+      select case wSel[N]      
+      case asc("0") to asc("9"): continue for
+      case asc("-")            : if N then exit sub
+      case else                : exit sub
+      end select
+   next N   
+   var sSel = str(ValLng(wSel)+iif(bIsInc,1,-1))   
+   var iMask = SendMessage( hCtl , EM_GETEVENTMASK   , 0 , 0 )                     
+   SendMessage( hCtl , EM_SETEVENTMASK , 0 , iMask and (not ENM_SELCHANGE))
+   SendMessage( hCTL , EM_EXSETSEL  , 0 , cast(LPARAM,@tRg.chrg) )   
+   tRg.chrg.cpMax = tRg.chrg.cpMin+len(sSel)
+   SendMessage( hCtl , EM_REPLACESEL , false , cast(LPARAM,strptr(sSel)) )
+   SendMessage( hCtl , EM_EXSETSEL , 0 , cast(LPARAM,@tRg.chrg) )
+   SendMessage( hCtl , EM_SETEVENTMASK , 0 , iMask)   
+   SetFocus( hCtl )
+end sub
+
 
 sub ProcessAccelerator( iID as long )
    select case iID
@@ -505,6 +536,13 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
                dim as zstring*64 zPart = any : sprintf(zPart,"%i : %i",iRow+1,iCol+1)
                'printf(!"(%s) > %i to %i    \r",,,.chrg.cpMin,.chrg.cpMax)
                SendMessage( CTL(wcStatus) , SB_SETTEXT , spCursor , cast(LPARAM,@zPart) ) 
+               if cuint((.chrg.cpmax-.chrg.cpMin)-1) < 20 then
+                  EnableWindow( CTL(wcBtnInc) , true )
+                  EnableWindow( CTL(wcBtnDec) , true )
+               else
+                  EnableWindow( CTL(wcBtnInc) , false )
+                  EnableWindow( CTL(wcBtnDec) , false )
+               end if
                RichEdit_TopRowChange( CTL(wID) )
                RichEdit_SelChange( CTL(wID) , iRow , iCol )
             end with
@@ -532,6 +570,8 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
          select case wID
          case wcBtnClose  : File_Close()
          case wcButton    : Button_Compile()
+         case wcBtnDec    : RichEdit_IncDec( CTL(wcEdit) , false )
+         case wcBtnInc    : RichEdit_IncDec( CTL(wcEdit) , true )
          case wcRadOutput : Output_SetMode()
          case wcRadQuery  : Output_SetMode()
          case wcBtnExec   : Output_QueryExecute()

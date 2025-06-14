@@ -104,8 +104,8 @@ static shared as long g_iPartCount=1 , g_iConnCount = 0
 static shared as SnapPV g_NullSnap
 'g_NullSnap.pMatOrg = @g_tIdentityMatrix
 
-#include "LSModules\LSFunctions.bas"
 #include "LSModules\DictionaryTree.bas"
+#include "LSModules\LSFunctions.bas"
 
 'TODO: now check the remainder tokens, clutch/studs
 
@@ -120,12 +120,20 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
    end type
    '<PartCode> <PartName> <PartPosition> =
    '<PartName> <PartPosition> =
-      
+     
+   
    dim as string sStatement, sToken(15), sResult
    dim as long iTokenLineNumber=1 , iCurFile = 1 , iStackPos = 0 , iFileCount = 1
    dim as byte bNullSkip = 1
    sOutput = "" : g_iPartCount = 1 : g_iConnCount = 0
-         
+   
+   static as TreeNode g_tDefineList
+   var pDefineList = @g_tDefineList
+   if g_tDefineList.iCount = 0 then
+      #define AddColorDefine( _Name , _Code , Unused... ) AddEntry( pDefineList , "#" #_Name , "#" #_Code , true )
+      ForEachColor( AddColorDefine )  
+   end if
+               
    #define iStStart aFile(iCurFile).uStStart
    #define iLineNumber aFile(iCurFile).uLineNumber
    #define sScript (*aFile(iCurFile).psScript)
@@ -199,12 +207,18 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
       '========================== split tokens ===============================
       '=======================================================================
       dim as long iErrToken = 0
-      var iTokCnt = LS_SplitTokens( sStatement , sToken() , iCurFile , iLineNumber , iErrToken )
+      var iTokCnt = LS_SplitTokens( sStatement , sToken() , iCurFile , pDefineList , iLineNumber , iErrToken )
+      puts("err: " & iErrToken)
+      if iErrToken < 0 then
+         iErrToken = not iErrToken
+         #define iCurToken iErrToken
+         ParserError("Recursive define limit reached.")
+      end if
       if iTokCnt > ubound(sToken) then 
          #define iCurToken iErrToken
          ParserError("Too many tokens")            
-      end if            
-      
+      end if
+            
       DbgCrash()
       
       iStStart = iStNext+1
@@ -262,6 +276,22 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
             iStackPos += 1 : iCurFile = iLoadedFile
             iFileStack(iStackPos)=iLoadedFile
             DbgBuild(">> now processing '" & sFile & "'")
+         case "#define","#redef"
+            if iTokCnt=1 then ParserError( "expected #define identifier, got end of line" )
+            if IsValidIdentifierName( sToken(1) )=0 then
+               ParserError( "invalid characters #define identifier" )
+            end if
+            dim as string sDefineValue
+            for N as long = 2 to iTokCnt-1
+               if N=2 then sDefineValue=sToken(N) else sDefineValue += " "+sToken(N)
+            next N
+            var bCanOverwrite = (sToken(0)[1]=asc("r"))
+            'puts( "'"+sToken(1)+"' '"+sDefineValue+"'" )
+            var pzNew = AddEntry( pDefineList , "" & sToken(1) , sDefineValue , , bCanOverwrite )
+            'puts("new: " & pzNew & " ovr: " & bCanOverwrite)
+            if pzNew = NULL then
+               ParserError( "'"+sToken(1)+"' is already defined" )
+            end if
          case "#pragma"
             rem
          case else            
@@ -502,6 +532,9 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
    #if len(__FB_QUOTE__(DbgBuild))
      DebugParts()   
    #endif
+   
+   'remove preprocessor entries now as they are unecessary (unless we use them for debug later)
+   RemoveAllEntries( pDefineList )
    
    'remove connection flags for all parts...
    for N as long = 1 to g_iPartCount-1
