@@ -127,6 +127,7 @@ declare sub ChangeToTabByFile( sFullPath as string , iLine as long = -1 )
 #include "Loader\Modules\Model.bas"
 #include "LS2LDR.bas"
 #include "ComboBox.bas"
+#include once "LSModules\CommandLine.bas"
 
 sub LogError( sError as string )   
    var f = freefile()
@@ -336,7 +337,6 @@ sub RichEdit_IncDec( hCtl as HWND , bIsInc as boolean )
    SendMessage( hCtl , EM_SETEVENTMASK , 0 , iMask)   
    SetFocus( hCtl )
 end sub
-
 
 sub ProcessAccelerator( iID as long )
    select case iID
@@ -652,10 +652,10 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
      ShowWindow( g_hContainer , SW_HIDE )
    case WM_CREATE  'Window was created
       #include "LSModules\LSMainCreate.bas"          
-      var N = 1 , sCurDir = curdir()+"\"
-      do
-         var sFile = command(N) : N += 1         
-         if len(sFile)=0 then exit do
+      var sCurDir = curdir()+"\"
+      for N as long = 1 to ubound(sOpenFiles)
+         var sFile = sOpenFiles(N)
+         if len(sFile)=0 then exit for
          for N as long = 0 to len(sFile)
             if sFile[N] = asc("/") then sFile[N] = asc("\")
          next N
@@ -663,14 +663,14 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
             sFile = sCurDir + sFile
          elseif FileExists(sFile)=0 then
             MessageBox( CTL(wcMain) , "File not found: '"+sFile+"'" , NULL , MB_ICONERROR )
-            continue do
+            continue for
          end if      
          'puts(sFile)
          var pzTemp = cptr(zstring ptr,malloc(65536))
          PathCanonicalizeA( pzTemp , sFile )
          LoadScript( *pzTemp )
          free(pzTemp)
-      loop  
+      next N
       return 0
    case WM_CLOSE   'close button was clicked
       if File_Quit()=false then return 0      
@@ -756,21 +756,22 @@ sub WinMain ()
 
 end sub
 
-sAppName = "LegoScript"
-InitCommonControls()
-if LoadLibrary("Riched20.dll")=0 then
-  MessageBox(null,"Failed To Load richedit component",null,MB_ICONERROR)
-  end
-end if
-g_FindRepMsg = RegisterWindowMessage(FINDMSGSTRING)
-
 function BeforeExit( dwCtrlType as DWORD ) as WINBOOL   
    GetClipboard() : system() : return 0 'never? :P
 end function
 SetConsoleCtrlHandler( @BeforeExit , TRUE )
 
-g_AppInstance = GetModuleHandle(null)
-WinMain() '<- main function
+if ParseCmdLine()=0 then 
+   sAppName = "LegoScript"
+   InitCommonControls()
+   if LoadLibrary("Riched20.dll")=0 then
+     MessageBox(null,"Failed To Load richedit component",null,MB_ICONERROR)
+     end
+   end if
+   g_FindRepMsg = RegisterWindowMessage(FINDMSGSTRING)
+   g_AppInstance = GetModuleHandle(null)
+   WinMain() '<- main function
+end if
 g_DoQuit = 1
 
 #if 0

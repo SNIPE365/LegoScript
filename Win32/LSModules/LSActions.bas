@@ -407,6 +407,29 @@ function File_Quit() as boolean
    return true
 end function
 
+sub SetColoredOutput( sColoredText as string )
+   dim as long iTag = instr( sColoredText , chr(2) )
+   if iTag = 0 then iTag = len(sColoredText)+1
+   SetWindowText( CTL(wcOutput) , left(sColoredText,iTag-1) )
+   dim as CHARFORMAT tFmt = (sizeof(CHARFORMAT))
+   while iTag < len(sColoredtext)
+      var iC = sColoredText[iTag] : iTag += 2
+      SendMessage( CTL(wcOutput) , EM_SETSEL , -1 , -1 )
+      tFmt.dwMask = CFM_COLOR : tFmt.dwEffects = 0
+      select case iC
+      case 12:   tFmt.crTextColor = &h000080
+      case 14:   tFmt.crTextColor = &h008080
+      case else: tFmt.crTextColor = &hFF0000 : tFmt.dwEffects =  CFE_AUTOCOLOR
+      end select      
+      SendMessage( CTL(wcOutput) , EM_SETCHARFORMAT , SCF_SELECTION , cast(LPARAM,@tFmt) )
+      var iNewTag = instr( iTag , sColoredText , chr(2) )
+      if iNewTag = 0 then iNewTag = len(sColoredText)+1      
+      var sText = mid(sColoredText,iTag,iNewTag-iTag)      
+      SendMessage( CTL(wcOutput) , EM_REPLACESEL , FALSE , cast(LPARAM,strptr(sText)) )
+      iTag = iNewTag
+   wend
+end sub 
+
 sub Do_Compile()   
    SetWindowText( CTL(wcStatus) , "Building..." )   
    var iMaxLen = GetWindowTextLength( CTL(wcEdit) )
@@ -419,7 +442,7 @@ sub Do_Compile()
    dim as string sOutput, sError, sFilePath = g_CurrentFilePath
    if len(sFilePath)=0 then sFilePath = "*"+GetTabName( g_iCurTab )
    sOutput = LegoScriptToLDraw( sScript , sError , sFilePath )   
-   SetWindowText( CTL(wcOutput) , iif(len(sError)=0,sOutput,sError) )   
+   SetColoredOutput( iif(len(sError)=0,sOutput,sError) )   
    if len(sOutput) orelse len(sError)=0 then
       if lcase(right(g_CurrentFilePath,3)) = ".ls" then
          Viewer.LoadMemory( sOutput , left(g_CurrentFilePath,len(g_CurrentFilePath)-3)+".ldr" )

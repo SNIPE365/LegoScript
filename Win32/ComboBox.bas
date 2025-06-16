@@ -6,7 +6,17 @@
    #define __Main "combobox.bas"
    #define __NoRender
    #define Standalone
+   #define _ifStandalone #ifdef standalone
+   #define _ifNotStandalone #ifndef standalone
+   #define _else #else
+   #define _endif #endif
    '#define DebugLoading
+#else
+   static shared as boolean g_StandaloneQuery = false
+   #define _ifStandalone if g_StandaloneQuery then
+   #define _ifNotStandalone if g_StandaloneQuery=false then
+   #define _else else
+   #define _endif end if
 #endif
 
 'kill exepath+"\PartCache.bin"
@@ -109,9 +119,9 @@ function SearchContainerMessages( hWnd as HWND , iMsg as integer , wParam as WPA
          select case wNotifyCode
          case LBN_SELCHANGE
             g_SearchChanged = true
-            #ifndef Standalone
+            _ifnotstandalone
               SendMessage( g_hCon , WM_KEYDOWN , 0 , 0 )
-            #endif
+            _endif
          end select
       end select
       return 0
@@ -133,16 +143,16 @@ end sub
    
 sub InitSearchWindow()
    
-   #ifdef Standalone
+   _ifstandalone
       g_hCon = GetConsoleWindow()
       var lWidHei = Width()
       g_ConWid = loword(lWidHei) : g_ConHei = hiword(lWidHei)
       GetClientRect(g_hCon,@g_rcCon)
       g_FntWid = g_rcCon.Right\g_ConWid
       g_FntHei = g_rcCon.Bottom\g_ConHei
-   #else
+   _else
       g_hCon = Ctl(wcEdit)
-   #endif
+   _endif
    
    const SearchContainer = "SearchContainer"
    dim as WNDCLASSEX wx
@@ -164,27 +174,27 @@ sub InitSearchWindow()
    
    dim as POINT tStatusPT = (0,g_rcCon.Bottom-24)
    ClientToScreen( g_hCon , @tStatusPT )
-   #ifdef Standalone
+   _ifStandalone
       g_hStatus = CreateWindowEx( cMainStyleEx , "edit" , NULL , cStatusStyle , tStatusPT.x,tStatusPT.y , g_rcCon.Right,24, g_hCon , NULL , hInstance , NULL)
       SetLayeredWindowAttributes( g_hStatus , 0 , 192 , LWA_ALPHA )
-   #else
+   _else
       g_hStatus = CTL(wcStatus)
-   #endif   
+   _endif
    g_hContainer = CreateWindowEx( cMainStyleEx, SearchContainer, SearchContainer ,cMainStyle,0, 0, 0, 0,g_hCon , NULL, hInstance, NULL ) 'HWND_MESSAGE   
    g_hSearch = CreateWindowExW( 0 , "listbox" , NULL , cListBoxStyle , 0,0,300,100 , g_hContainer , NULL, hInstance, NULL )
    SetLayeredWindowAttributes( g_hContainer , 0 , 192 , LWA_ALPHA )   
          
    UpdateSearchWindowFont( GetStockObject(DEFAULT_GUI_FONT) )
       
-   #ifdef Standalone
+   _ifStandalone
    SetForegroundWindow( g_hCon )
-   #endif
+   _endif
       
 end sub
 sub ProcessMessage( tMsg as MSG )
    if tMsg.hwnd <> g_hSearch then exit sub
    if tMsg.message = WM_LBUTTONDBLCLK then
-         #ifdef Standalone
+         _ifStandalone
             dim dwWritten as DWORD , tEvent as INPUT_RECORD 
             tEvent.EventType = KEY_EVENT
             with tEvent.Event.KeyEvent
@@ -195,15 +205,15 @@ sub ProcessMessage( tMsg as MSG )
                .dwControlKeyState = 0
             end with            
             WriteConsoleInput( GetStdHandle(STD_INPUT_HANDLE) , @tEvent , 1 , @dwWritten )
-         #else
+         _else
             SetFocus( g_hCon )            
             SendMessage( g_hCon , WM_CHAR , asc(" ") , 1 or (fb.SC_SPACE shl 16) or (1 shl 30) )
-         #endif
+         _endif
          exit sub 'continue while
       end if         
    if tMsg.message = WM_KEYDOWN then
       if (tMsg.wParam = VK_SPACE orelse tMsg.wParam = VK_RETURN orelse tMsg.wParam = VK_BACK) then
-         #ifdef Standalone
+         _ifStandalone
             SetForegroundWindow( g_hCon ) 
             if tMsg.wParam = VK_SPACE orelse tMsg.wParam = VK_BACK then 
                dim dwWritten as DWORD , tEvent as INPUT_RECORD 
@@ -217,42 +227,41 @@ sub ProcessMessage( tMsg as MSG )
                end with
                WriteConsoleInput( GetStdHandle(STD_INPUT_HANDLE) , @tEvent , 1 , @dwWritten )
             end if
-         #else
+         _else
             if tMsg.wParam = VK_SPACE orelse tMsg.wParam = VK_BACK then
                SetFocus( g_hCon ) : tMsg.hwnd = g_hCon
                TranslateMessage( @tMsg )
                DispatchMessage( @tMsg )
             end if
             'SendMessage( g_hCon , WM_CHAR , asc(" ") , 1 or (fb.SC_SPACE shl 16) or (1 shl 30) )
-         #endif
+         _endif
          exit sub 'continue while
       end if
    end if
 end sub
-#ifdef Standalone
 sub ProcessMessages()
-      
-   static as POINT rcOldPt   
-   dim as POINT rcPt = g_rcCursor
-   ClientToScreen( g_hCon , @rCpt )
-   if rcPt.x <> rcOldPt.x orelse rcPt.y <> rcOldPt.y then
-      rcOldPt = rcPt 
-      SetWindowPos( g_hContainer , NULL , rcPt.x , rcPt.y ,0,0, SWP_NOSIZE or SWP_NOZORDER or SWP_NOACTIVATE )
-      
-      GetClientRect( g_hCon , @g_rcCon )
-      dim as POINT tStatusPT = (0,g_rcCon.Bottom-24)      
-      ClientToScreen( g_hCon , @tStatusPT )
-      SetWindowPos( g_hStatus , NULL , tStatusPT.x,tStatusPT.y, g_rcCon.Right,24 , SWP_NOZORDER or SWP_NOACTIVATE )
-   end if    
-     
-   dim as MSG tMsg
-   while PeekMessage( @tMsg , NULL , 0,0 , PM_REMOVE )      
-      TranslateMessage( @tMsg )      
-      DispatchMessage( @tMsg )
-      ProcessMessage( tMsg )      
-   wend
+   _ifStandalone      
+      static as POINT rcOldPt   
+      dim as POINT rcPt = g_rcCursor
+      ClientToScreen( g_hCon , @rCpt )
+      if rcPt.x <> rcOldPt.x orelse rcPt.y <> rcOldPt.y then
+         rcOldPt = rcPt 
+         SetWindowPos( g_hContainer , NULL , rcPt.x , rcPt.y ,0,0, SWP_NOSIZE or SWP_NOZORDER or SWP_NOACTIVATE )
+         
+         GetClientRect( g_hCon , @g_rcCon )
+         dim as POINT tStatusPT = (0,g_rcCon.Bottom-24)      
+         ClientToScreen( g_hCon , @tStatusPT )
+         SetWindowPos( g_hStatus , NULL , tStatusPT.x,tStatusPT.y, g_rcCon.Right,24 , SWP_NOZORDER or SWP_NOACTIVATE )
+      end if    
+        
+      dim as MSG tMsg
+      while PeekMessage( @tMsg , NULL , 0,0 , PM_REMOVE )      
+         TranslateMessage( @tMsg )      
+         DispatchMessage( @tMsg )
+         ProcessMessage( tMsg )      
+      wend
+   _endif
 end sub
-#endif
 
 type FilteredListDump
    #define DeclareStringPerFlag( _Name , _Bit ) as string sIs##_Name
@@ -482,11 +491,11 @@ function HandleTokens( sText as string , tCtx as SearchQueryContext ) as long
          sPart = left(sPart,instrrev(sPart,".")-1)
          SetWindowText( g_hStatus , GetPartDescription(iPart) )         
          sText = left(sText,.iTokStart-1)+sPart+mid(sText,.iTokEnd+1)
-         #ifndef Standalone
+         _ifnotStandalone
             'update text in edit box without sending selection changed messages
             var iRowBegin = SendMessage( CTL(wcEdit) , EM_LINEINDEX  , .iRow , 0 )
             RichEdit_Replace(  CTL(wcEdit) , iRowBegin+.iTokStart-1 , iRowBegin+.iTokEnd , sPart , false )            
-         #endif
+         _endif
          
          .iCur = (.iTokStart-1)+len(sPart)
          if .bChanged=0 then .bChanged=-1 'changed but don't need to research
@@ -505,16 +514,16 @@ function HandleTokens( sText as string , tCtx as SearchQueryContext ) as long
          
          
          if .bChanged=1 then            
-            #ifdef Standalone
+            _ifStandalone
                g_rcCursor.x = pos()*g_FntWid : g_rcCursor.y = csrlin()*g_FntHei
-            #else
+            _else
                'get position from the current cursor and adjust the position based on font size
                dim as CHARRANGE tSelRange = any
                SendMessage( CTL(wcEdit) , EM_EXGETSEL , 0 , cast(LPARAM,@tSelRange) )
                SendMessage( CTL(wcEdit) , EM_POSFROMCHAR , cast(WPARAM,@g_RcCursor) , tSelRange.cpMin )
                g_RcCursor.x += g_tMainCtx.hFnt( wfEdit ).bCurWid+1
                g_RcCursor.y += g_tMainCtx.hFnt( wfEdit ).bCurHei+1
-            #endif
+            _endif
             g_SearchVis = iif( bDontSearch=0 andalso len(.sToken)>1 andalso UpdateSearch(.sToken) , SW_SHOWNA , SW_HIDE )
             ShowWindow( g_hContainer , g_SearchVis )               
             if g_SearchVis = SW_HIDE then SetWindowText( g_hStatus , .sStatusText )            
@@ -558,8 +567,8 @@ sub SearchAddPartSuffix( sText as string , tCtx as SearchQueryContext )
    end with
 end sub
 
-#ifdef Standalone
 function QueryText( sTextOrg as string ) as long   
+   _ifStandalone
    dim as long ConWid = width(), ConHei = hiword(ConWid)   
    ConWid = loword(ConWid)
    
@@ -713,6 +722,7 @@ function QueryText( sTextOrg as string ) as long
          end select
       loop
    end with
+   _endif
 end function
 
 'puts("3001 B1 s7 = 3001 B2 c1;")
@@ -720,7 +730,7 @@ end function
 'puts("1 0 0 0 0 1 0 0 0 1 0 0 0 1 3001.dat")
 
 '#include "LS2LDR.bas"
-
+#ifdef Standalone
    dim as string sText
    InitSearchWindow()
    QueryText(sText)

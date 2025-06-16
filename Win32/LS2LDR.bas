@@ -106,6 +106,7 @@ static shared as SnapPV g_NullSnap
 
 #include "LSModules\DictionaryTree.bas"
 #include "LSModules\LSFunctions.bas"
+#include once "Loader\Include\Colours.bas"
 
 'TODO: now check the remainder tokens, clutch/studs
 
@@ -162,10 +163,10 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
       #define LinkerError( _text ) color 12 : errorf(!"Error: %s\n",_text) : sResult="" : color 7
       #define LinkerWarning( _text ) color 14 : errorf(!Warning: %s\n",_text): color 7
    #else
-      #define ParserError( _text ) sOutput += "Error: " & SafeText(_text) & !"\r\nat '" & TokenFilename(iCurToken) & "':" & TokenLineNumber(iCurToken) & " '" & SafeText(sStatement) & !"'\r\n" : sResult="" : ChangeToTabByFile( TokenFilePath(iCurTokeN) , TokenLineNumber(iCurToken ) ) : exit while
-      #define ParserWarning( _text ) sOutput += "Warning: " & SafeText(_text) & !"\r\nat '" & TokenFilename(iCurToken) & "':" &  TokenLineNumber(iCurToken) & " '" & SafeText(sStatement) & !"'\r\n"
-      #define LinkerError( _text ) sOutput += "Error: " & _text & !"\r\n" : sResult=""
-      #define LinkerWarning( _text ) sOutput += "Warning: " & _text & !"\r\n" 
+      #define ParserError( _text ) sOutput += !"\2\12Error: " & SafeText(_text) & !"\r\nat '" & TokenFilename(iCurToken) & "':" & TokenLineNumber(iCurToken) & " '" & SafeText(sStatement) & !"'\r\n" : sResult="" : ChangeToTabByFile( TokenFilePath(iCurTokeN) , TokenLineNumber(iCurToken ) ) : exit while
+      #define ParserWarning( _text ) sOutput += !"\2\14Warning: " & SafeText(_text) & !"\r\nat '" & TokenFilename(iCurToken) & "':" &  TokenLineNumber(iCurToken) & " '" & SafeText(sStatement) & !"'\r\n"
+      #define LinkerError( _text ) sOutput += !"\2\12Error: " & _text & !"\r\n" : sResult=""
+      #define LinkerWarning( _text ) sOutput += !"\2\14Warning: " & _text & !"\r\n" 
    #endif
       
    with g_tPart(_NULLPARTNAME)
