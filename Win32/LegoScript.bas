@@ -95,7 +95,7 @@ end type
 redim shared g_tTabs(0) as TabStruct 
 dim shared as long g_iTabCount = 1 , g_iCurTab = 0
 
-const g_sMainFont  = "verdana" , g_sFixedFont = "consolas" , g_sArrowFont = "Wingdings 3"
+const g_sMainFont  = "verdana" , g_sFixedFont = "consolas" , g_sArrowFont = "Webdings"
 
 dim shared as FormContext g_tMainCtx
 dim shared as hinstance g_AppInstance  'instance

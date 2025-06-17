@@ -510,7 +510,7 @@ sub Output_ShowHide()
    for I as long = wcRadOutput to wcBtnMinOut-1
       ShowWindow( CTL(I) , iif(iOpen,SW_SHOWNA,SW_HIDE) )
    next I      
-   SetWindowText( CTL(wcBtnMinOut) , iif(iOpen,!"\x71",!"\x70") )
+   SetWindowText( CTL(wcBtnMinOut) , iif(iOpen,!"\x36",!"\x35") )
    var hWnd = CTL(wcMain)
    dim as RECT RcCli=any : GetClientRect(hWnd,@RcCli)      
    ResizeLayout( hWnd , g_tMainCtx.tForm , RcCli.right , RcCli.bottom )
