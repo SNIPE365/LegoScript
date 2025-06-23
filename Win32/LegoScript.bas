@@ -1,4 +1,4 @@
-#cmdline "res\ls.rc"
+#cmdline "res\ls.rc -g"
 '#cmdline "-gen gcc -O 3"
 #define __Main "LegoScript"
 
@@ -653,8 +653,8 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
    case WM_CREATE  'Window was created
       #include "LSModules\LSMainCreate.bas"          
       var sCurDir = curdir()+"\"
-      for N as long = 1 to ubound(sOpenFiles)
-         var sFile = sOpenFiles(N)
+      for N as long = 1 to ubound(g_sOpenFiles)
+         var sFile = g_sOpenFiles(N)
          if len(sFile)=0 then exit for
          for N as long = 0 to len(sFile)
             if sFile[N] = asc("/") then sFile[N] = asc("\")

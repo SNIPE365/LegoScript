@@ -567,14 +567,88 @@ sub SearchAddPartSuffix( sText as string , tCtx as SearchQueryContext )
    end with
 end sub
 
-function QueryText( sTextOrg as string ) as long   
+function LoadScriptFileAsArray( sFile as string , sOutArray() as string ) as boolean
+   
+   var f = freefile(), iResu = open(sFile for binary access read as #f)
+   if iResu orelse (lof(f) > (64*1024*1024)) then
+      if iResu=0 then close(f) 
+      return false
+   end if
+   
+   redim sOutArray(63)
+   dim as string sData = space(lof(f)), sRow = space(512)
+   dim as long iCurRow = 0   
+   get #f,,sData : close #f
+      
+   dim as long iOut=0, iLen = len(sData)
+   dim as boolean bDoneRow
+   for iN as long = 0 to iLen
+      dim as ubyte iChar = sData[iN]      
+      select case iChar
+      case 0
+         if iN >= iLen then bDoneRow = true
+      case asc(";") 'implicit EOL
+         'if there's comments or EOL in the line continuation then keep as is
+         var iT = iN         
+         do
+            iT += 1
+            select case sData[iT]
+            case asc(" "),9 : continue do
+            case 13,10      : iT = -1
+            case asc("/")   : if sData[iT+1] = asc("/") then iT = -1 
+            end select
+            exit do
+         loop  
+         'if there's another statement put it over next line
+         if iT <> -1 then
+            sRow[iOut] = iChar : iOut += 1            
+            do
+               iN += 1 : if iN >= iLen then bDoneRow = true : iN += 1 : exit do
+               iChar = sData[iN]
+               select case iChar
+               case 13,9,asc(" "),asc(";") 'ignore blanks
+               case 10
+                  bDoneRow = true : exit do                  
+               case else
+                  iN -= 1 : bDoneRow = true : exit do
+               end select
+            loop
+         end if
+      case 13 : continue for
+      case 10 : bDoneRow = true
+      end select
+      if bDoneRow then         
+         sOutArray(iCurRow) = left(sRow,iOut) 
+         printf(!"'%s'\n",sOutArray(iCurRow))
+         iOut = 0 : iCurRow += 1 : bDoneRow = false
+         if iN >= iLen then 
+            redim preserve sOutArray( iCurRow-1 )            
+         elseif iCurRow > ubound(sOutArray) then
+            redim preserve sOutArray( iCurRow+63 )
+         end if
+         continue for
+      end if      
+      sRow[iOut] = iChar : iOut += 1
+   next iN      
+   return true
+end function
+
+function QueryText( sFiles() as string ) as long   
+   
+   redim as string sTextLine()
+   if ubound(sFiles) >= 1 then
+      LoadScriptFileAsArray( sFiles(1) , sTextLine() )
+      puts("done")
+      end 0
+   end if
+   
    _ifStandalone
    dim as long ConWid = width(), ConHei = hiword(ConWid)   
    ConWid = loword(ConWid)
    
    dim as SearchQueryContext tCtx
       
-   dim as string sText = sTextOrg
+   dim as string sText = "" 'sTextOrg
    dim as long iLin=csrlin(),iCol=pos(),iViewWid=ConWid-iCol
    dim as long iStart=0 , iPrevLen   
          
@@ -647,7 +721,7 @@ function QueryText( sTextOrg as string ) as long
                g_SearchChanged = true
             end if
          case 13            'enter      - finish editing
-            sTextOrg = sText : return 1
+            'sTextOrg = sText : return 1
          case 27            'escape     - cancels editing
             return 0
          case _alt(D)       'alt+D      - toggle filtering for Donor parts

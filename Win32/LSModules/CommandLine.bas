@@ -1,6 +1,6 @@
 #include "file.bi"
 
-redim shared as string sOpenFiles(0)
+redim shared as string g_sOpenFiles(0)
 
 sub PrintColoredOutput( sColoredText as string )
    dim as long iTag = instr( sColoredText , chr(2) )
@@ -34,6 +34,7 @@ sub ShowHelp()
       CRLF _
       "GUI Options:" CRLF _            
       "  -?     show help :)" CRLF _
+      "  -ci    use interactive console mode (automatically if no input file is given)" CRLF _
       "  -c     use console mode (all options after this are only for console)" CRLF _
       CRLF _
       "CONSOLE Options:" CRLF _
@@ -54,6 +55,18 @@ sub ConsoleOnly( bIsConsole as boolean , sParm as string )
    _GiveUp(1)
 end sub
 
+#include "crt.bi"
+
+#ifdef __FB_WIN32__
+   #undef _isatty
+   function _isatty( iFileNum as long ) as bool
+      dim as DWORD dwMode
+      var hFile = cast(HANDLE,_get_osfhandle(iFileNum))
+      if hFile=INVALID_HANDLE_VALUE then return 0
+      return GetConsoleMode( hFile , @dwMode )
+   end function
+#endif
+
 function ParseCmdLine() as long
    #define _errorf(_Parms...) fprintf(stderr,_Parms)
    #define _GiveUp(_N) end _N
@@ -63,13 +76,14 @@ function ParseCmdLine() as long
    dim as boolean bUseConsole = false , bDumpToConsole = false , bTempOutput = true
    dim as boolean bInteractive = false
    dim as string sOutputFile
+      
    do
       var sParm = command(iN) : iN += 1
       if len(sParm)=0 then exit do
       if len(sParm)>1 andalso sParm[0] = asc("-") then 'options
          select case sParm[1]         
          case asc("h"),asc("?"): ShowHelp()
-         case asc("c"),asc("C"): bUseConsole = true
+         case asc("c"),asc("C"): bUseConsole = true : bInteractive = ((sParm[2] or 32)=asc("i"))
          case asc("f"),asc("F"): _ConsoleOnly : bAutoFile = true : bTempOutput = false            
          case asc("v"),asc("V"): _ConsoleOnly : bViewOutput = true
          case asc("y"),asc("Y"): _ConsoleOnly : bOverwriteOutput = true
@@ -93,9 +107,9 @@ function ParseCmdLine() as long
             color 12: _errorf("Invalid option: '%s'\n",sParm): color 7: _GiveUp(1)
          end select
       else
-         var iFile = ubound(sOpenFiles)+1
-         redim preserve sOpenFiles( iFile )
-         sOpenFiles(iFile) = sParm
+         var iFile = ubound(g_sOpenFiles)+1
+         redim preserve g_sOpenFiles( iFile )
+         g_sOpenFiles(iFile) = sParm
       end if
    loop
    
@@ -104,15 +118,26 @@ function ParseCmdLine() as long
       color 12: _errorf("when '-f' is used no output filename is allowed")
       color 7 : _GiveUp(1)
    end if   
-   if ubound(sOpenFiles)=0 then bInteractive = true
+   if ubound(g_sOpenFiles)=0 then bInteractive = true
       'color 12: _errorf("console requires at least one input file")
       'color 7 : _GiveUp(1)
    'end if
+      
+   var isOutTTY = _isatty( _fileno(stdout) ) , isInTTY = _isatty( _fileno(stdin) )   
+   if bInteractive then               
+      if isOutTTY = 0 orelse isInTTY = 0 then
+         color 12: _Errorf(!"Interactive mode can't have redirected input/output")
+         color 7: _GiveUp(1)
+      end if      
+      cls : g_StandaloneQuery = true
+      InitSearchWindow()
+      QueryText( g_sOpenFiles() ) ': sScript = trim(sScript)
+      end 0f
+   end if  
    
-   var isOutTTY = _isatty( _fileno(stdout) ) , isInTTY = _isatty( _fileno(stdin) )
    dim as string sText,sScript
-   for iN = 1 to iif(bInteractive,1,ubound(sOpenFiles))
-      var sInput = sOpenFiles(1)
+   for iN = 1 to ubound(g_sOpenFiles)
+      var sInput = g_sOpenFiles(iN)
       
       if bInteractive = false then
          if sInput = "-" orelse lcase(sinput)="stdin" then
@@ -172,21 +197,6 @@ function ParseCmdLine() as long
          end if
       #endmacro
       CheckFileExists((bTempOutput=false andalso bAutoFile=false))
-      
-      if bInteractive then         
-         cls : g_StandaloneQuery = true : sScript = ""
-         InitSearchWindow()
-         QueryText(sScript) : sScript = trim(sScript)
-         if len(sScript)=0 then
-            color 12: _Errorf(!"Empty input from console")
-            color 7: _GiveUp(1)
-         end if        
-         
-         if len(sScript)=0 then
-            color 12: _Errorf(!"Empty input from console")
-            color 7: _GiveUp(1)
-         end if         
-      end if
       
       if bAutoFile then            
          sOutputFile = trim( sScript , any !"\r\n" )+".ldr"
