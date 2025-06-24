@@ -567,95 +567,43 @@ sub SearchAddPartSuffix( sText as string , tCtx as SearchQueryContext )
    end with
 end sub
 
-function LoadScriptFileAsArray( sFile as string , sOutArray() as string ) as boolean
-   
-   var f = freefile(), iResu = open(sFile for binary access read as #f)
-   if iResu orelse (lof(f) > (64*1024*1024)) then
-      if iResu=0 then close(f) 
-      return false
-   end if
-   
-   redim sOutArray(63)
-   dim as string sData = space(lof(f)), sRow = space(512)
-   dim as long iCurRow = 0   
-   get #f,,sData : close #f
-      
-   dim as long iOut=0, iLen = len(sData)
-   dim as boolean bDoneRow
-   for iN as long = 0 to iLen
-      dim as ubyte iChar = sData[iN]      
-      select case iChar
-      case 0
-         if iN >= iLen then bDoneRow = true
-      case asc(";") 'implicit EOL
-         'if there's comments or EOL in the line continuation then keep as is
-         var iT = iN         
-         do
-            iT += 1
-            select case sData[iT]
-            case asc(" "),9 : continue do
-            case 13,10      : iT = -1
-            case asc("/")   : if sData[iT+1] = asc("/") then iT = -1 
-            end select
-            exit do
-         loop  
-         'if there's another statement put it over next line
-         if iT <> -1 then
-            sRow[iOut] = iChar : iOut += 1            
-            do
-               iN += 1 : if iN >= iLen then bDoneRow = true : iN += 1 : exit do
-               iChar = sData[iN]
-               select case iChar
-               case 13,9,asc(" "),asc(";") 'ignore blanks
-               case 10
-                  bDoneRow = true : exit do                  
-               case else
-                  iN -= 1 : bDoneRow = true : exit do
-               end select
-            loop
-         end if
-      case 13 : continue for
-      case 10 : bDoneRow = true
-      end select
-      if bDoneRow then         
-         sOutArray(iCurRow) = left(sRow,iOut) 
-         printf(!"'%s'\n",sOutArray(iCurRow))
-         iOut = 0 : iCurRow += 1 : bDoneRow = false
-         if iN >= iLen then 
-            redim preserve sOutArray( iCurRow-1 )            
-         elseif iCurRow > ubound(sOutArray) then
-            redim preserve sOutArray( iCurRow+63 )
-         end if
-         continue for
-      end if      
-      sRow[iOut] = iChar : iOut += 1
-   next iN      
-   return true
-end function
+type ConEditContext extends SearchQueryContext
+   as ulong lSignature
+   as long ConWid,ConHei,iViewWid
+   as long iLin,iCol,iStart
+   as string sText
+end type
 
-function QueryText( sFiles() as string ) as long   
-   
-   redim as string sTextLine()
-   if ubound(sFiles) >= 1 then
-      LoadScriptFileAsArray( sFiles(1) , sTextLine() )
-      puts("done")
-      end 0
-   end if
+sub InitEditContext( tCtx as ConEditContext )
+   _ifStandalone
+   with tCtx
+      .lSignature = cvl("CCTX")
+      .ConWid = width()
+      .ConHei = hiword(.ConWid)   
+      .ConWid = loword(.ConWid)
+      .iViewWid=.ConWid-1
+      .iLin=csrlin() : .iCol=1
+      .iStart=0 : .iCur=0
+      .sText=""
+   end with
+   _endif
+end sub
+function RowEdit( tCtx as ConEditContext ) as long   
    
    _ifStandalone
-   dim as long ConWid = width(), ConHei = hiword(ConWid)   
-   ConWid = loword(ConWid)
    
-   dim as SearchQueryContext tCtx
+   #define sqCtx *cptr(SearchQueryContext ptr,@tCtx)
+   
+   with tCtx
+      if .lSignature <> cvl("CCTX") then
+         InitEditContext( tCtx )         
+      end if
       
-   dim as string sText = "" 'sTextOrg
-   dim as long iLin=csrlin(),iCol=pos(),iViewWid=ConWid-iCol
-   dim as long iStart=0 , iPrevLen   
-         
-   var hPrevFore = GetForegroundWindow()
-   with tCtx      
+      dim as long iPrevLen = len(.sText)
+      var hPrevFore = GetForegroundWindow()
+
       redim .sTokenTxt(.iMaxTok-1)
-      .iCur=len(sText) : iPrevLen=.iCur      
+      
       do
          var sKey = inkey()
          if len(sKey)=0 then 
@@ -683,13 +631,17 @@ function QueryText( sFiles() as string ) as long
                end if
                hPrevFore = hForeground
             end if
-            if HandleTokens( sText , tCtx ) then
+            if HandleTokens( .sText , sqCtx ) then
                'update the screen
-               var iExtra = iPrevLen-len(sText)
+               var iExtra = iPrevLen-len(.sText)
                if iExtra < 1 then iExtra = 0
-               iPrevLen = len(sText)
-               locate iLin,iCol: print mid(sText+space(iExtra),iStart+1,iViewWid)
-               locate iLin,iCol+.iCur-iStart
+               'locate 23,1 : print .iStart;.iCol;.iViewWid;iPrevLen;iExtra;"      ";
+               iPrevLen = len(.sText)               
+               'static as long iSwap = 11 : iSwap xor = 3
+               locate ,,0 ': color iSwap
+               locate .iLin,.iCol: print mid(.sText+space(iExtra),.iStart+1,.iViewWid);
+               locate .iLin,.iCol+.iCur-.iStart,1               
+               color 7
             end if
             sleep 10,1 : ProcessMessages() : continue do
          end if
@@ -698,17 +650,20 @@ function QueryText( sFiles() as string ) as long
          #define _alt(_K)  (-fb.SC_##_K)
          #define _ctrl(_K) (1+asc(#_K)-asc("A"))
          #define _shift (GetKeyState(VK_SHIFT) shr 1)      
-         select case iKey      
+         select case as const iKey      
          case 8             'backspace - remove character from left
             if .iCur>0 then 
                'if sText[iCur-1]=32 then bReCalcTokens=true 'recalc every space
-               sText = left(sText,.iCur-1)+mid(sText,.iCur+1)
+               if .iCur <= len(.sText) then .sText = left(.sText,.iCur-1)+mid(.sText,.iCur+1)
                .iCur -= 1 : .bChanged = 1
+               while .iStart >0 andalso (.iCur-.iStart)<.iViewWid 
+                  .iStart -= 1
+               wend
             end if
          case -fb.SC_DELETE 'delete    - remove character from right
-            if .iCur<len(sText) then
+            if .iCur<len(.sText) then
                'if sText[iCur]=32 then bReCalcTokens=true 'recalc every space
-               sText = left(sText,.iCur)+mid(sText,.iCur+2)
+               .sText = left(.sText,.iCur)+mid(.sText,.iCur+2)
                .bChanged = 1
             end if
          case 9,-15         'tab        - auto complete (-15 = shift+tab)
@@ -719,11 +674,7 @@ function QueryText( sFiles() as string ) as long
                if iSel = LB_ERR then iSel=0 else iSel = (iSel+iCount+iif(iKey=9,1,-1)) mod iCount
                SendMessage( g_hSearch , LB_SETCURSEL , iSel , 0 )
                g_SearchChanged = true
-            end if
-         case 13            'enter      - finish editing
-            'sTextOrg = sText : return 1
-         case 27            'escape     - cancels editing
-            return 0
+            end if         
          case _alt(D)       'alt+D      - toggle filtering for Donor parts
             g_FilterFlags xor= wIsDonor    : .bChanged = 1
          case _alt(P)       'alt+P      - toggle filtering for Path/Printed parts
@@ -753,46 +704,63 @@ function QueryText( sFiles() as string ) as long
                rem
             end if         
          case -fb.SC_HOME   'home       - move cursor to start
-            if .iCur then .iCur=0 : locate iLin,iCol+.iCur-iStart : .bChanged = 1
+            if .iCur then .iCur=0 : .iStart=0 : locate .iLin,.iCol+.iCur-.iStart : .bChanged = 1
          case -fb.SC_END    'end        - move cursor to end
-            if .iCur<>len(sText) then .iCur=len(sText) : locate iLin,iCol+.iCur-iStart : .bChanged = 1
+            if .iCur<>len(.sText) then 
+               if len(.sText) > .iViewWid then .iStart=len(.sText)-.iViewWid
+               .iCur=len(.sText) : locate .iLin,.iCol+.iCur-.iStart : .bChanged = 1
+            end if
          case -fb.SC_LEFT   'left       - move cursor to previous character
             if .iCur>0 then 
-               .iCur -= 1 : locate iLin,iCol+.iCur-iStart 
-               if sText[.iCur]=32 then .bChanged = 1
+               .iCur -= 1 : locate .iLin,.iCol+.iCur-.iStart 
+               if .iStart > .iCur then .iStart -= 1 : .bChanged = 1
+               if .sText[.iCur]=32 then .bChanged = 1
             end if
          case -115          'ctrl+left  - move cursor to previous token
             if .iCur>0 then
-               if sText[.iCur-1]=32 then
-                  do : .iCur -= 1 : loop while .iCur andalso sText[.iCur]=32
+               if .iCur > len(.sText) then 
+                  .iCur = len(.sText)
                else
-                  do : .iCur -= 1 : loop while .iCur andalso sText[.iCur]<>32
-               end if               
+                  if .sText[.iCur-1]=32 then
+                     do : .iCur -= 1 : loop while .iCur andalso .sText[.iCur]=32
+                  else
+                     do : .iCur -= 1 : loop while .iCur andalso .sText[.iCur]<>32
+                  end if               
+               end if
                .bChanged = 1
             end if
          case -fb.SC_RIGHT  'right      - move cursor to next character
-            if .iCur<len(sText) then 
-               .iCur += 1 : locate iLin,iCol+.iCur-iStart 
-               if sText[.iCur]=32 then .bChanged = 1
+            if .iCur<len(.sText) then 
+               if (.iCur-.iStart) >= .iViewWid then .iStart += 1: .bChanged = 1
+               .iCur += 1 : locate .iLin,.iCol+.iCur-.iStart 
+               if .sText[.iCur]=32 then .bChanged = 1
             end if
          case -116          'ctrl+right - move cursor to next token
-            if .iCur<len(sText) then
-               if sText[.iCur+1]=32 then
-                  do : .iCur += 1 : loop while .iCur<len(sText) andalso sText[.iCur]=32
+            if .iCur<len(.sText) then
+               if .sText[.iCur+1]=32 then
+                  do : .iCur += 1 : loop while .iCur<len(.sText) andalso .sText[.iCur]=32
                else
-                  do : .iCur += 1 : loop while .iCur<len(sText) andalso sText[.iCur]<>32
+                  do : .iCur += 1 : loop while .iCur<len(.sText) andalso .sText[.iCur]<>32
                end if               
                .bChanged = 1
             end if
-         case is < 32       'special    - ignore all other special keys
-           SetWindowText( GetConsoleWindow() , "Special = " & iKey )
+         case 13,10,27      'external actions keys, returning informing the key
+            return iKey
+         case -fb.SC_UP,-fb.SC_DOWN,-fb.SC_PAGEUP,-fb.SC_PAGEDOWN ''
+            return iKey
          case else          'printable  - add to the string
-            ''if iKey<>32 andalso (len(sText)=0 orelse sText[iCur-1]=32) then bReCalcTokens=true 'recalc every space
-            ''if iKey=32 then bRecalcTokens=true
-            if iKey=32 then SearchAddPartSuffix( sText , tCtx )            
-            sText = left(sText,.iCur)+sKey+mid(sText,.iCur+1) 
-            .iCur += len(sKey): if .iCur>iViewWid then iStart = iViewWid-.iCur         
-            .bChanged = 1
+            if iKey < 32 then               
+               SetWindowText( GetConsoleWindow() , "Special = " & iKey )
+            else
+               ''if iKey<>32 andalso (len(sText)=0 orelse sText[iCur-1]=32) then bReCalcTokens=true 'recalc every space
+               ''if iKey=32 then bRecalcTokens=true
+               if .iCur > len(.sText) then .sText += space(.iCur-len(.sText))
+               var iPrevLen = len(.sText)
+               if iKey=32 then SearchAddPartSuffix( .sText , sqCtx )            
+               .sText = left(.sText,.iCur)+sKey+mid(.sText,.iCur+1) 
+               .iCur += len(.sText)-iPrevLen: if (.iCur-.iStart)>.iViewWid then .iStart = len(.sText)-.iViewWid
+               .bChanged = 1
+            end if
          end select
       loop
    end with
@@ -805,8 +773,15 @@ end function
 
 '#include "LS2LDR.bas"
 #ifdef Standalone
-   dim as string sText
-   InitSearchWindow()
-   QueryText(sText)
-   sleep
+   dim as ConEditContext tCtx
+   'width 40,25   
+   InitSearchWindow()   
+   InitEditContext( tCtx )
+   'tCtx.iLin = 10
+   'tCtx.iCol = 10   
+   'tCtx.iViewWid = 10
+   'tCtx.sText = "3001"
+   'tCtx.iCur = len(tCtx.sText)
+   RowEdit(tCtx)
+   'sleep
 #endif
