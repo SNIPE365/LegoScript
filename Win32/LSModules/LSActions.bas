@@ -173,7 +173,7 @@ function NewTab( sNewFile as string , iLinked as long = -1 , iReplaceTab as long
       SetWindowTheme( hWnd , "" , "" )
       g_tTabs( iNewTab ).hEdit = hWnd
       SendMessage( hWnd , EM_EXLIMITTEXT , 0 , 16*1024*1024 ) '16mb text limit
-      SendMessage( hWnd , EM_SETEVENTMASK , 0 , ENM_SELCHANGE or ENM_KEYEVENTS or ENM_SCROLL )
+      SendMessage( hWnd , EM_SETEVENTMASK , 0 , ENM_CLIPFORMAT or ENM_SELCHANGE or ENM_KEYEVENTS ) ' or ENM_SCROLL )
       SendMessage( hWnd , EM_SETMODIFY , 0 , 0 )
       dim as TC_ITEM tItem = type( TCIF_TEXT , 0,0 , @"   " , 0,-1 , 0 ) 
       TabCtrl_InsertItem( CTL(wcTabs) , iNewTab , @tItem )         

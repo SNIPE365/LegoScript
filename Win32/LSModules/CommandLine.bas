@@ -119,7 +119,7 @@ function LoadScriptFileAsArray( sFile as string , sOutArray() as string ) as boo
       end select
       if bDoneRow then         
          sOutArray(iCurRow) = left(sRow,iOut) 
-         printf(!"'%s'\n",sOutArray(iCurRow))
+         'printf(!"'%s'\n",sOutArray(iCurRow))
          iOut = 0 : iCurRow += 1 : bDoneRow = false
          if iN >= iLen then 
             redim preserve sOutArray( iCurRow-1 )            
@@ -132,15 +132,160 @@ function LoadScriptFileAsArray( sFile as string , sOutArray() as string ) as boo
    next iN      
    return true
 end function
+function SaveScriptFileFromArray( sFile as string , sInArray() as string , iRows as long ) as boolean
+   
+   var f = freefile(), iResu = open(sFile for binary access write as #f)
+   if iResu then return false   
+   
+   for N as long = 0 to iRows-1
+      if N=(iRows-1) then 
+         print #f,sInArray(N);
+      else
+         print #f,sInArray(N)
+      end if
+   next N
+   close #f
+   
+   return true
+   
+end function
 
-function ConsoleEdit( sFiles() as string ) as long
-   redim as string sTextLine()
+
+function ConsoleEdit( sFiles() as string ) as long         
+   dim as ConEditContext tCtx
+   InitEditContext( tCtx )
+   redim as string sCode(0)
+   dim as byte bUnsaved, bUnnamed 
    if ubound(sFiles) >= 1 then
-      LoadScriptFileAsArray( sFiles(1) , sTextLine() )
-      puts("done")
-      end 0
-   end if
-   return 0
+      LoadScriptFileAsArray( sFiles(1) , sCode() )
+   else
+      sFiles(1) = "Unnamed.ls": bUnnamed = 1
+   end if   
+   with tCtx
+      .iCodeLines = ubound(sCode)+1
+      .iViewWid -= 6 : .iViewHei = .ConHei-4
+      .iCol += 6 : .iStartLine = 0 : .iCurLine = 0
+      .bUpdateCaption = true: .bUpdateScroll = true : .bUpdateRowsBar = true      
+      do
+         'update whole screen
+         if .bUpdateCaption then
+            .bUpdateCaption=false
+            var sCaption = "File: "+sFiles(1)
+            locate 1,1,0 : color 14,1 : print sCaption;
+            print space(.ConWid-len(sCaption));: color 7,0
+         end if
+         
+         if .bUpdateScroll then            
+            locate ,,0
+            for N as long = 0 to .iViewHei-1
+               var iLine=.iStartLine+N
+               if iLine >= .iCodeLines then 
+                  locate 2+N,1 : print space(.iViewWid+5);
+               else
+                  if .bUpdateRowsBar then locate 2+N, 1 : color 0,7 : print right("    " & 1+iLine,5);
+                  color 7,0 : locate 2+N,.iCol : print left(mid(sCode(iLine),1+.iStart)+space(.ConWid),.iViewWid);
+               end if
+            next N
+            .bUpdateScroll = false : .bUpdateRowsBar = false
+         end if
+                           
+         .iLin = 2+(.iCurLine-.iStartLine)         
+         .sText = sCode(.iCurLine)
+         var iCode = RowEdit(tCtx)
+         if sCode(.iCurLine) <> .sText then 
+            bUnsaved = 1 : sCode(.iCurLine) = .sText
+         end if
+         
+         #define _ctrl(_K) (1+asc(#_K)-asc("A"))
+         
+         select case iCode
+         case 8                'move to the end of previous line and proceed as DELETE (falltrough)
+            if .iCurLine < 1 then continue do
+            .iCurLine -= 1 : .iCur = len(sCode(.iCurLine))
+            goto _FALLTROUGH_DELETE_
+         case -fb.SC_DELETE    'concat two lines removing one line
+            _FALLTROUGH_DELETE_:                        
+            if .iCodeLines = 1 then sCode(0)="" : continue do
+            if (.iCurLine+1) >= .iCodeLines then continue do 'andalso .iCur then continue do
+            .iCodeLines -= 1    
+            sCode(.iCurLine) += sCode(.iCurLine+1)
+            for N as long = .iCurLine+1 to .iCodeLines-1
+               sCode(N) = sCode(N+1) 
+               '*cptr(fbStr ptr,@sCode(N)) = *cptr(fbStr ptr,@sCode(N+1))
+            next N          
+            'clear *(@sCode(.iCodeLines)),0,sizeof(fbStr) 'sCode(.iCodeLines)=""
+            'if (ubound(sCode)-.iCodeLines)>16 then redim preserve sCode(.iCodeLines-15)
+            .bUpdateScroll = true : .bChanged = 1
+            if .iCodeLines < .iViewHei then .bUpdateRowsBar = true
+            if (.iCodeLines-.iStartLine) > .iViewHei then continue do
+            if (.iCurLine+1) > .iCodeLines then .iCurLine -= 1 : .iCur = len(sCode(.iCurLine))
+            if .iStartLine >0 then .iStartLine -= 1 
+            .bUpdateRowsBar = true            
+         case 13               'split a line, inserting a new line
+            .iCodeLines += 1
+            if .iCodeLines >= ubound(sCode) then redim preserve sCode(.iCodeLines+15)
+            for N as long = .iCodeLines-1 to .iCurLine+2 step -1
+               'sCode(N) = sCode(N-1) 
+               *cptr(fbStr ptr,@sCode(N)) = *cptr(fbStr ptr,@sCode(N-1))
+            next N
+            clear *(@sCode(.iCurLine+1)),0,sizeof(fbStr) 'sCode(.iCurLine+1)=""
+            sCode(.iCurLine+1) = mid( sCode(.iCurLine) , .iCur+1 ) 
+            sCode(.iCurLine) = left( sCode(.iCurLine) , .iCur )
+            .iCur = 0 : .iCurLine += 1 
+            .bUpdateScroll = true : .bChanged = 1
+            if .iCodeLines < .iViewHei then .bUpdateRowsBar = true
+            if (.iCurLine-.iStartLine) < .iViewHei then continue do
+            .iStartLine += 1 : .bUpdateRowsBar = true
+         case -fb.SC_UP        'move cursor up (previous line)
+            if .iCurLine <= 0 then continue do
+            .iCurLine -= 1 : .bChanged = 1
+            if .iCurLine>=.iStartLine then continue do
+            .iStartLine -= 1 : .bUpdateScroll = true : .bUpdateRowsBar = true
+         case -fb.SC_DOWN      'move cursor down (next line)
+            if .iCurLine >= (.iCodeLines-1) then continue do
+            .iCurLine += 1 : .bChanged = 1
+            if (.iCurLine-.iStartLine) < .iViewHei then continue do
+            .iStartLine += 1 : .bUpdateScroll = true : .bUpdateRowsBar = true
+         case -fb.SC_PAGEUP    'scroll one page up
+            .iCurLine -= .iViewHei : .iStartLine -= .iViewHei            
+            if .iStartLine < 0 then .iCurLine -= .iStartLine : .iStartLine=0
+            .bUpdateScroll = true : .bUpdateRowsBar = true
+         case -fb.SC_PAGEDOWN  'scroll one page down
+            .iCurLine += .iViewHei : .iStartLine += .iViewHei            
+            while (.iStartLine+.iViewHei) > .iCodeLines
+               .iStartLine -= 1 : .iCurLine -= 1
+            wend
+            .bUpdateScroll = true : .bUpdateRowsBar = true
+         case _ctrl(S),_ctrl(W)'save
+            if bUnnamed orelse multikey(fb.SC_LSHIFT) orelse multikey(fb.SC_RSHIFT) then
+               locate .iViewHei+2,1 : color 11
+               print space(.iViewWid);!"\r";
+               print "Save as: ";: color 7               
+               var sFile = sFiles(1)
+               input "", sFile: sFile = trim(sFile)
+               locate ,1 : print space(.iViewWid);
+               if len(sFile)=0 then continue do
+               bUnnamed = 0 : .bUpdateCaption = true : sFiles(1) = sFile
+            end if
+            SaveScriptFileFromArray( sFiles(1) , sCode() , .iCodeLines )            
+            bUnsaved = 0
+         case _ctrl(Q)         'quit
+            if bUnsaved then
+               locate .iViewHei+2,1 : color 14
+               print "File not saved, lose changes ";
+               color 11: print "(Y/N)? ";: color 7
+               select case getkey()
+               case asc("Y"),asc("y") : cls : return 1
+               end select
+               locate ,1 : print space(.iViewWid);
+            else
+               cls : return 1
+            end if
+         end select
+         
+      loop
+   end with   
+   return 1
 end function
 
 function ParseCmdLine() as long

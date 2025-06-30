@@ -568,10 +568,15 @@ sub SearchAddPartSuffix( sText as string , tCtx as SearchQueryContext )
 end sub
 
 type ConEditContext extends SearchQueryContext
-   as ulong lSignature
-   as long ConWid,ConHei,iViewWid
+   as ulong lSignature   
+   as long ConWid,ConHei,iViewWid,iViewHei
+   as hwnd hPrevFore
+   'variables specific to the LINE editor
    as long iLin,iCol,iStart
    as string sText
+   'variables speicifc to the overall editor
+   as long iStartLine, iCodeLines, iCurLine
+   as boolean bUpdateCaption, bUpdateScroll, bUpdateRowsBar
 end type
 
 sub InitEditContext( tCtx as ConEditContext )
@@ -585,6 +590,11 @@ sub InitEditContext( tCtx as ConEditContext )
       .iLin=csrlin() : .iCol=1
       .iStart=0 : .iCur=0
       .sText=""
+      .hPrevFore = GetForegroundWindow()
+      'overall
+      .bUpdateCaption = true
+      .bUpdateScroll = true
+      .bUpdateRowsBar = true
    end with
    _endif
 end sub
@@ -600,15 +610,23 @@ function RowEdit( tCtx as ConEditContext ) as long
       end if
       
       dim as long iPrevLen = len(.sText)
-      var hPrevFore = GetForegroundWindow()
+      var iStart = .iStart, iPrevCur = -1      
+            
+      locate .iLin,.iCol+.iCur-.iStart ,1
 
       redim .sTokenTxt(.iMaxTok-1)
       
       do
          var sKey = inkey()
          if len(sKey)=0 then 
+            if iPrevCur <> .iCur then
+               locate .iViewHei+2,1,0 : color 12
+               print .iCurLine+1 , .iCur+1;"   ";
+               color 7 : locate .iLin,.iCol+.iCur-.iStart ,1 
+               iPrevCur = .iCur
+            end if
             var hForeground = GetForegroundWindow()         
-            if hForeground <> hPrevFore then
+            if hForeground <> .hPrevFore then
                #if 0 'debug for Window change...
                   scope
                      dim as zstring*256 wintit=any, wincls=any
@@ -624,12 +642,12 @@ function RowEdit( tCtx as ConEditContext ) as long
                   ShowWindow( g_hContainer , g_SearchVis   )
                   ShowWindow( g_hStatus    , SW_SHOWNA   )
                else
-                  if hPrevFore = g_hCon orelse hPrevFore = g_hContainer then
+                  if .hPrevFore = g_hCon orelse .hPrevFore = g_hContainer then
                      ShowWindow( g_hContainer , SW_HIDE )
                      ShowWindow( g_hStatus    , SW_HIDE )
                   end if
                end if
-               hPrevFore = hForeground
+               .hPrevFore = hForeground
             end if
             if HandleTokens( .sText , sqCtx ) then
                'update the screen
@@ -642,8 +660,9 @@ function RowEdit( tCtx as ConEditContext ) as long
                locate .iLin,.iCol: print mid(.sText+space(iExtra),.iStart+1,.iViewWid);
                locate .iLin,.iCol+.iCur-.iStart,1               
                color 7
-            end if
-            sleep 10,1 : ProcessMessages() : continue do
+            end if            
+            if iStart <> .iStart then .bUpdateScroll=true: return 1
+            sleep 10,1 : ProcessMessages() : continue do            
          end if
          dim as long iKey = sKey[0]
          if iKey=255 then iKey = -sKey[1]      
@@ -659,12 +678,16 @@ function RowEdit( tCtx as ConEditContext ) as long
                while .iStart >0 andalso (.iCur-.iStart)<.iViewWid 
                   .iStart -= 1
                wend
+            else
+               return iKey
             end if
          case -fb.SC_DELETE 'delete    - remove character from right
             if .iCur<len(.sText) then
                'if sText[iCur]=32 then bReCalcTokens=true 'recalc every space
                .sText = left(.sText,.iCur)+mid(.sText,.iCur+2)
                .bChanged = 1
+            else
+               return iKey
             end if
          case 9,-15         'tab        - auto complete (-15 = shift+tab)
             if len(.sToken)>1 then
@@ -693,7 +716,7 @@ function RowEdit( tCtx as ConEditContext ) as long
             g_FilterFlags xor= wIsHelper   : .bChanged = 1         
          case _alt(F)       'alt+F      - toggle part filtering
             g_FilterFlags xor= wIsHidden   : .bChanged = 1      
-         case _ctrl(S)      'ctrl+S     - toggle filtering for sticker parts
+         case _ctrl(K)      'ctrl+K     - toggle filtering for sticker parts
             g_FilterFlags xor= wIsSticker  : .bChanged = 1      
          case _ctrl(F)      'ctrl+F     - clear all filters
             g_FilterFlags=0 : .bChanged = 1
@@ -748,6 +771,8 @@ function RowEdit( tCtx as ConEditContext ) as long
             return iKey
          case -fb.SC_UP,-fb.SC_DOWN,-fb.SC_PAGEUP,-fb.SC_PAGEDOWN ''
             return iKey
+         case _ctrl(W),_ctrl(S),_ctrl(O),_ctrl(Q),-fb.SC_F6                ''
+            return iKey
          case else          'printable  - add to the string
             if iKey < 32 then               
                SetWindowText( GetConsoleWindow() , "Special = " & iKey )
@@ -775,8 +800,10 @@ end function
 #ifdef Standalone
    dim as ConEditContext tCtx
    'width 40,25   
+   cls
    InitSearchWindow()   
    InitEditContext( tCtx )
+   
    'tCtx.iLin = 10
    'tCtx.iCol = 10   
    'tCtx.iViewWid = 10

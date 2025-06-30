@@ -20,10 +20,9 @@
 ' !!! some pieces have unmatched studs vs clutch (and i suspect that's their design problem) !!!
 ' !!! because when using ldraw it does not matter the order, so they never enforced that     !!!
 
-
+'TODO (30/06/25): continue fixing/improving the row counter
 'TODO (13/06/25): fix LS2LDR showing wrong error line numbers with #defines
 'TODO (04/06/25): show debug of connectors when viewing a single part
-'TODO (30/05/25): fix crash when not finding a valid part name
 'TODO (19/05/25): fix LS2LDR parsing bugs (prevent part that is connected from moving)
 'TODO (17/05/25): investigate crash when building before opening graphics window
 'TODO (16/05/25): clutches [slide=true] are real clutches??
@@ -195,11 +194,12 @@ function CreateMainMenu() as HMENU
 end function
 
 static shared as long g_iPrevTopRow = 0 , g_iPrevRowCount = 0 , g_RowDigits = 2
+static shared as long g_ZoomNum , g_ZoomDiv
 static shared as zstring*128 g_zRows
 static shared as SearchQueryContext g_SQCtx
 static shared as string sLastSearch
 
-sub Lines_Draw( hEdit as HWND , tDraw as DRAWITEMSTRUCT )   
+sub Lines_Draw( hEdit as HWND , tDraw as DRAWITEMSTRUCT )
    with tDraw      
       dim PT as POINT = any
       var iCharIdx = Sendmessage( hEdit , EM_LINEINDEX  , g_iPrevTopRow , 0 )
@@ -224,9 +224,33 @@ sub RichEdit_Replace( hCtl as HWND , iStart as long , iEnd as long , sText as st
    SendMessage( hCtl , EM_SETEVENTMASK , 0 , iMask)
 end sub
 sub RichEdit_TopRowChange( hCtl as HWND )
+   
    var iTopRow = SendMessage( hCTL , EM_GETFIRSTVISIBLELINE , 0,0 )
    var iRows = SendMessage( hCTL , EM_GETLINECOUNT , 0,0 )
+   dim as LPARAM lZoomNum = any , lZoomDiv = any
+   SendMessage( CTL(wcEdit) , EM_GETZOOM , cast(WPARAM,@lZoomNum) , cast(LPARAM,@lZoomDiv) )
+   if g_ZoomNum <> lZoomNum orelse g_ZoomDiv <> lZoomDiv then
+      g_ZoomNum = lZoomNum : g_ZoomDiv = lZoomDiv      
+      g_iPrevRowCount = -1 : g_RowDigits = -1 : g_iPrevTopRow = -1
+   end if
+   
+   if g_iPrevTopRow <> iTopRow orelse g_iPrevRowCount <> iRows then
+      g_iPrevTopRow = iTopRow 
+      var pzRows = @g_zRows      
+      for N as long = 1 to iif(iRows<15,iRows,15)
+         pzRows += sprintf(pzRows,!"%i\r\n",iTopRow+N)
+      next N
+      'InvalidateRect( CTL(wcLines) , NULL , FALSE )
+      SendMessage( CTL(wcLines) , WM_SETREDRAW , 0 , 0 )
+      SetWindowText( CTL(wcLines) , g_zRows )      
+      SendMessage( CTL(wcLines) , WM_SETREDRAW , 1 , 0 )
+      SendMessage( CTL(wcLines) , EM_SETZOOM , lZoomNum , lZoomDiv )
+      'if g_iPrevRowCount <> iRows then SendMessage( CTL(wcLines) , WM_SETREDRAW , 1 , 0 )
+   end if
+   
    if g_iPrevRowCount <> iRows then
+      'puts("rows changed")
+      g_iPrevRowCount = iRows
       var iRowDigits = 2
       if iRows > 99 then iRowDigits += 1
       if iRows > 999 then iRowDigits += 1
@@ -234,17 +258,9 @@ sub RichEdit_TopRowChange( hCtl as HWND )
       if iRows > 99999 then iRowDigits += 1
       if iRowDigits <> g_RowDigits then
          g_RowDigits = iRowDigits
+         'printf(!"Num=%i , Div=%i\n",g_ZoomNum,g_zoomDiv)
          PostMessage( CTL(wcMain) , WM_USER+3 , 0 , 0 )
       end if
-   end if
-   if g_iPrevTopRow <> iTopRow orelse g_iPrevRowCount <> iRows then
-      g_iPrevTopRow = iTopRow : g_iPrevRowCount = iRows
-      var pzRows = @g_zRows      
-      for N as long = 1 to iif(iRows<15,iRows,15)
-         pzRows += sprintf(pzRows,!"%i\r\n",iTopRow+N)
-      next N      
-      InvalidateRect( CTL(wcLines) , NULL , FALSE )
-      'SetWindowText( CTL(wcLines) , zRows )      
    end if
 end sub
 sub RichEdit_SelChange( hCtl as HWND , iRow as long , iCol as long )
@@ -336,6 +352,12 @@ sub RichEdit_IncDec( hCtl as HWND , bIsInc as boolean )
    SendMessage( hCtl , EM_EXSETSEL , 0 , cast(LPARAM,@tRg.chrg) )
    SendMessage( hCtl , EM_SETEVENTMASK , 0 , iMask)   
    SetFocus( hCtl )
+end sub
+sub RichEdit_Update( hCtl as HWND )   
+   'dim as CHARFORMAT2A tFmt = type( sizeof(CHARFORMAT2A) , CFM_WEIGHT )   
+   'SendMessage( hCtl , EM_GETCHARFORMAT , SCF_DEFAULT , cast(LPARAM,@tFmt) )
+   g_iPrevTopRow = -1 ': g_iPrevRowCount = -1   
+   RichEdit_TopRowChange( hCtl )   
 end sub
 
 sub ProcessAccelerator( iID as long )
@@ -501,16 +523,22 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
       end select
    
    case WM_TIMER
-      dim as Matrix4x4 tMat
-      tMat = g_tIdentityMatrix
-      static as double dBeg : if dBeg = 0 then dBeg = timer
-      MatrixRotateX( tMat , tMat , timer-dBeg )
-      dim as zstring*256 zOutput = any
-      with tMat
-         sprintf(zOutput,!"1 %i %f %f %f %g %g %g %g %g %g %g %g %g %s\r\n",16,.fPosX,.fPosY,.fPosZ, _
-            .m(0),.m(1),.m(2),.m(4),.m(5),.m(6),.m(8),.m(9),.m(10) , "3011.dat" )
-      end with
-      Viewer.LoadMemory( zOutput , "memory.ldr" )
+      select case wParam
+      case wcEdit*256         
+         KillTimer( hWnd , wParam )
+         RichEdit_Update( CTL(wcEdit) )
+      case else      
+         dim as Matrix4x4 tMat
+         tMat = g_tIdentityMatrix
+         static as double dBeg : if dBeg = 0 then dBeg = timer
+         MatrixRotateX( tMat , tMat , timer-dBeg )
+         dim as zstring*256 zOutput = any
+         with tMat
+            sprintf(zOutput,!"1 %i %f %f %f %g %g %g %g %g %g %g %g %g %s\r\n",16,.fPosX,.fPosY,.fPosZ, _
+               .m(0),.m(1),.m(2),.m(4),.m(5),.m(6),.m(8),.m(9),.m(10) , "3011.dat" )
+         end with
+         Viewer.LoadMemory( zOutput , "memory.ldr" )
+      end select
    case WM_MENUSELECT 'track newest menu handle/item/state
       var iID = cuint(LOWORD(wParam)) , fuFlags = cuint(HIWORD(wParam)) , hMenu = cast(HMENU,lParam) 
       if hMenu then g_CurItemID = iID : g_hCurMenu = hMenu            
@@ -583,6 +611,14 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
       select case wID
       case wcEdit     'Main editor control actions
          select case wNotifyCode
+         case EN_UPDATE
+            static as double dLastUpdate
+            if abs(timer-dLastUpdate) > .05 then
+               RichEdit_Update( hwndCtl )
+               dLastUpdate = timer
+            else
+               SetTimer( hwnd , wcEdit*256 , 100 , NULL )            
+            end if            
          case EN_SETFOCUS               
             ShowWindow( g_hContainer , g_SearchVis   )               
          case EN_KILLFOCUS
@@ -595,8 +631,7 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
          case EN_VSCROLL
             RichEdit_TopRowChange( hwndCtl )
          end select
-      end select
-      
+      end select      
       return 0
     
    case WM_SIZE       'window is sizing/was sized
@@ -614,8 +649,9 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
    case WM_USER+2 'gfx moved
       DockGfxWindow()
    case WM_USER+3 'Resize Number border
-      puts("?")
-      SetControl( wcLines , cMarginL , _BtP(wcButton,0.5) , _pct(((.18+2*g_RowDigits))) , _pct(53) , CTL(wcLines) )
+      dim as single fMul = 1.9
+      if g_ZoomNum andalso g_ZoomDiv then fMul = (fMul*g_ZoomNum)/g_zoomDiv      
+      SetControl( wcLines , cMarginL , _BtP(wcButton,0.5) , _pct(fMul*(g_RowDigits+1)) , _pct(53) , CTL(wcLines) )
       ResizeMainWindow()      
    case WM_ACTIVATE  'Activated/Deactivated
       static as boolean b_IgnoreActivation
@@ -725,7 +761,7 @@ sub WinMain ()
          
    'WS_EX_COMPOSITED
    'or WS_CLIPCHILDREN
-   hWnd = CreateWindowEx(WS_EX_LAYERED,sAppName,sAppName, WS_TILEDWINDOW, _
+   hWnd = CreateWindowEx(WS_EX_LAYERED,sAppName,sAppName, WS_TILEDWINDOW, _ 'or WS_MAXIMIZE
    200,200,g_WndWid,g_WndHei,null,hMenu,g_AppInstance,0)
    
    'SetClassLong( hwnd , GCL_HBRBACKGROUND , CLNG(GetSysColorBrush(COLOR_INFOBK)) )
