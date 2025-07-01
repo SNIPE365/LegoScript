@@ -13,7 +13,7 @@ InitFont( wfArrows  , g_sArrowFont  , 12 )
 AddButtonAT(wcBtnClose  , _pct(10)  , _pct(2) , _pct(3)  , _pct(4) , "X" )
 AddTabsA  ( wcTabs      , cMarginL  , cMarginT  , _pct(85) , cRow(1.25) , cRow(1.25) , WS_CLIPCHILDREN )
 AddButtonA( wcButton    , _NextCol  , _SameRow  , cMarginR , cRow(1.25) , "Build" )
-AddRichA  ( wcLines     , cMarginL  , _NextRow0 , _pct(1.9*(2+1)) , _pct(53) ,  "" , WS_DISABLED ) 'SS_OWNERDRAW )
+AddRichA  ( wcLines     , cMarginL  , _NextRow0 , _pct(1.9*(2+1)) , _pct(53) ,  "" , WS_DISABLED or ES_RIGHT ) 'SS_OWNERDRAW )
 AddRichA  ( wcEdit      , _NextCol0 , _SameRow  , cMarginR , _pct(53) , "" , WS_HSCROLL or WS_VSCROLL or ES_AUTOHSCROLL or ES_DISABLENOSCROLL or ES_NOHIDESEL )            
 AddButtonA( wcRadOutput , cMarginL  , _NextRow  , _pct(15) , cRow(1) , "Output" , WS_GROUP or BS_AUTORADIOBUTTON or BS_PUSHLIKE )
 AddButtonA( wcRadQuery  , _NextCol0 , _SameRow  , _pct(15) , cRow(1) , "Query"  , BS_AUTORADIOBUTTON or BS_PUSHLIKE )
@@ -38,6 +38,7 @@ SetWindowTheme( CTL(wcQuery) , "" , "" )
 SendMessage( CTL(wcEdit) , EM_EXLIMITTEXT , 0 , 16*1024*1024 ) '16mb text limit
 SendMessage( CTL(wcEdit) , EM_SETEVENTMASK , 0 , ENM_CLIPFORMAT or ENM_SELCHANGE or ENM_KEYEVENTS) ' or ENM_SCROLL )
 OrgEditProc = cast(any ptr,SetWindowLongPtr( CTL(wcEdit) , GWLP_WNDPROC , cast(LONG_PTR,@WndProcEdit) ))
+OrgLinesProc = cast(any ptr,SetWindowLongPtr( CTL(wcLines) , GWLP_WNDPROC , cast(LONG_PTR,@WndProcLines) ))
 
 dim as TC_ITEM tItem = type( TCIF_TEXT or TCIF_PARAM , 0,0 , @"Unnamed" , 0,-1 , 0 ) 
 with g_tTabs(0)
@@ -76,6 +77,27 @@ if g_GfxHwnd = 0 then return -1 'failed
 'SetWindowPos( g_hContainer , 0 , 0,0,100,100 , SWP_NOZORDER or SWP_SHOWWINDOW or SWP_NOMOVE )
 'ShowWindow( g_hContainer , SW_SHOW )
 ResizeMainWindow( true )    
+
+scope
+   dim as WINDOWPLACEMENT tPlace = type(sizeof(WINDOWPLACEMENT))
+   var f = freefile()
+   if open(exepath+"\LegoScript.cfg" for binary access read as #f)=0 then
+      get #f,,tPlace : close #f
+      dim as long lShow      
+      with tPlace
+         select case .showCmd
+         case SW_SHOWMAXIMIZED,SW_MAXIMIZE : lShow = SW_MAXIMIZE
+         case SW_SHOWMINIMIZED,SW_MINIMIZE : lShow = SW_MINIMIZE
+         case else : lShow = SW_SHOW
+         end select
+         .flags = 0 : .showCmd = SW_HIDE
+      end with
+      SetWindowPlacement( hWnd , @tPlace )      
+      ShowWindowAsync( hWnd , lShow )
+   end if   
+end scope
+
+
 File_New()    
 'LoadFileIntoEditor( exePath+"\sample.ls" )
 SetForegroundWindow( ctl(wcMain) )

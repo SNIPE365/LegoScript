@@ -243,8 +243,16 @@ sub RichEdit_TopRowChange( hCtl as HWND )
       'InvalidateRect( CTL(wcLines) , NULL , FALSE )
       SendMessage( CTL(wcLines) , WM_SETREDRAW , 0 , 0 )
       SetWindowText( CTL(wcLines) , g_zRows )      
+      
       SendMessage( CTL(wcLines) , WM_SETREDRAW , 1 , 0 )
       SendMessage( CTL(wcLines) , EM_SETZOOM , lZoomNum , lZoomDiv )
+      
+      'SendMessage( CTL(wcLines) , EM_SETRECT , 0 , cast(LPARAM,@Type<RECT>(0,10,100,100)) )
+      'dim as RECT tRC = any
+      'SendMessage( CTL(wcEdit) , EM_GETRECT , 0 , cast(LPARAM,@tRc) )
+      'with tRc
+      '   printf(!"(%i,%i)-(%i,%i)\n",.left,.top,.right,.bottom)
+      'end with
       'if g_iPrevRowCount <> iRows then SendMessage( CTL(wcLines) , WM_SETREDRAW , 1 , 0 )
    end if
    
@@ -495,6 +503,33 @@ function WndProcEdit ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam a
    return CallWindowProc( OrgEditProc , hWnd , message , wParam, lParam )   
 end function
 
+static shared as any ptr OrgLinesProc
+function WndProcLines ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LPARAM ) as LRESULT
+   select case message
+   case WM_ERASEBKGND
+      var hDC = cast(HDC,wParam)
+      dim as POINT PT = any , PT0 = any
+      var iCharIdx = Sendmessage( CTL(wcEdit) , EM_LINEINDEX  , g_iPrevTopRow , 0 )      
+      SendMessage( CTL(wcLines) , EM_POSFROMCHAR , cast(WPARAM,@PT0) , 0 )
+      SendMessage( CTL(wcEdit) , EM_POSFROMCHAR , cast(WPARAM,@PT) , iCharIdx )
+      SetViewportOrgEx( hDC , 0 , PT.y-PT0.y , NULL )
+      'printf(!"hdc=%p\n",hDC)   
+      return 1
+   case WM_PAINT      
+      puts("Paint!")            
+      InvalidateRect( hWnd , NULL , true )
+      ValidateRect( hWnd , @type<RECT>(0,-1000,1000,0) )
+      'dim as PAINTSTRUCT tPaint
+      'BeginPaint( hWnd , @tPaint )      
+      'CallWindowProc( OrgEditProc , hWnd , WM_PRINTCLIENT , cast(WPARAM,tPaint.hDC), PRF_CLIENT )
+      ''var iResu = CallWindowProc( OrgEditProc , hWnd , message , cast(WPARAM,tPaint.hDC), lParam )
+      'EndPaint( hWnd , @tPaint )
+      'return 0   
+   end select
+   return CallWindowProc( OrgEditProc , hWnd , message , wParam, lParam )   
+end function
+
+
 ' *************** Procedure Function ****************
 function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LPARAM ) as LRESULT
       
@@ -514,7 +549,7 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
       var hCtl = cast(HWND,lParam) : printf(!"static=%X\n",hCtl)
       if hCtl = CTL(wcTabs) then puts("Tabs changed? (static)")      
       'TabCtrl_GetItemRect(
-   #endif
+   #endif   
 
    case WM_DRAWITEM   'item in a control is being drawn (owner draw)
       var wID = clng(wParam) , ptDrw = cast(LPDRAWITEMSTRUCT,lparam)
@@ -709,10 +744,11 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
       next N
       return 0
    case WM_CLOSE   'close button was clicked
-      if File_Quit()=false then return 0      
+      if File_Quit()=false then return 0            
       PostQuitMessage(0) ' to quit
+      return 0
    case WM_DESTROY 'Windows was closed/destroyed
-    PostQuitMessage(0) ' to quit
+      PostQuitMessage(0) ' to quit
     return 0 
    end select
    
@@ -769,8 +805,8 @@ sub WinMain ()
     
    '' Process windows messages
    ' *** all messages(events) will be read converted/dispatched here ***
-   ShowWindow( hWnd , SW_SHOW )
-   UpdateWindow( hWnd )
+   'ShowWindow( hWnd , SW_SHOW )
+   'UpdateWindow( hWnd )
      
    dim as HWND hOldFocus = cast(HWND,-1)
    while( GetMessage( @tMsg, NULL, 0, 0 ) <> FALSE )    
@@ -788,7 +824,19 @@ sub WinMain ()
             end if
          end if
       end if
-   wend    
+   wend 
+      
+   dim as WINDOWPLACEMENT tPlace = type(sizeof(WINDOWPLACEMENT),0)
+   if GetWindowPlacement( hWnd , @tPlace ) then
+      DestroyWindow(hWnd)
+      var f = freefile()
+      if open(exepath+"\LegoScript.cfg" for binary access write as #f)=0 then
+         put #f,,tPlace : close #f   
+      end if
+   else
+      puts("Failed")
+      sleep 5000
+   end if
 
 end sub
 
