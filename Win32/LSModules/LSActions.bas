@@ -9,10 +9,10 @@ sub NotifySelChange( iID as long )
    SendMessage( hParent , WM_NOTIFY , iID , cast(LPARAM,@tSelChange) )   
 end sub
    
-function LoadFileIntoEditor( sFile as string ) as boolean
+function LoadFileIntoEditor( sFile as string , bCreate as boolean=false ) as boolean
    
-   dim as string sScript
-   if LoadScriptFile( sFile , sScript )=false then
+   dim as string sScript   
+   if bCreate=false andalso LoadScriptFile( sFile , sScript )=false then
       MessageBox( CTL(wcMain) , !"Failed to open:\n\n'"+sFile+"'" , NULL , MB_ICONERROR )
       return false
    end if   
@@ -224,8 +224,10 @@ sub LoadScript( sFile as string )
          end if
       end with
    next N      
+   var bCreate = len(sFile) andalso sFile[0] = asc(":")
+   if bCreate then sFile = mid(sFile,2)   
    ChangeToTab(NewTab( sFile ))
-   LoadFileIntoEditor( sFile )
+   LoadFileIntoEditor( sFile , bCreate )
 end sub
 sub ChangeToTabByFile( sFullPath as string , iLine as long = -1 )
    dim as long iTab = -1 'not found
@@ -505,7 +507,7 @@ end sub
 sub Output_ShowHide()
    var iOpen = SendMessage( CTL(wcBtnMinOut) , BM_GETCHECK , 0 , 0 )   
    g_tMainCtx.hCTL( wcEdit ).tH = iif(iOpen , _pct(53) , _BottomP(-5) )
-   g_tMainCtx.hCTL( wcLines ).tH = g_tMainCtx.hCTL( wcEdit ).tH
+   g_tMainCtx.hCTL( wcLines ).tH = _pct(100) '_BottomP(-5) 'g_tMainCtx.hCTL( wcEdit ).tH
    g_tMainCtx.hCTL( wcBtnMinOut ).tX = iif(iOpen, _RtP(wcOutput,-4) , _RtP(wcOutput,-3))   
    for I as long = wcRadOutput to wcBtnMinOut-1
       ShowWindow( CTL(I) , iif(iOpen,SW_SHOWNA,SW_HIDE) )

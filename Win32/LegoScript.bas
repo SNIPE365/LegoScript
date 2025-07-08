@@ -236,8 +236,9 @@ sub RichEdit_TopRowChange( hCtl as HWND )
    
    if g_iPrevTopRow <> iTopRow orelse g_iPrevRowCount <> iRows then
       g_iPrevTopRow = iTopRow 
-      var pzRows = @g_zRows      
-      for N as long = 1 to iif(iRows<15,iRows,15)
+      var pzRows = @g_zRows , iRowsMax = 15
+      if g_ZoomDiv then iRowsMax = (iRowsMax*g_ZoomDiv)\g_ZoomNum
+      for N as long = 1 to iif(iRows<iRowsMax,iRows,iRowsMax)
          pzRows += sprintf(pzRows,!"%i\r\n",iTopRow+N)
       next N
       'InvalidateRect( CTL(wcLines) , NULL , FALSE )
@@ -510,15 +511,24 @@ function WndProcLines ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam 
       var hDC = cast(HDC,wParam)
       dim as POINT PT = any , PT0 = any
       var iCharIdx = Sendmessage( CTL(wcEdit) , EM_LINEINDEX  , g_iPrevTopRow , 0 )      
-      SendMessage( CTL(wcLines) , EM_POSFROMCHAR , cast(WPARAM,@PT0) , 0 )
-      SendMessage( CTL(wcEdit) , EM_POSFROMCHAR , cast(WPARAM,@PT) , iCharIdx )
+      SendMessage( hwnd , EM_POSFROMCHAR , cast(WPARAM,@PT0) , 0 )
+      SendMessage( CTL(wcEdit) , EM_POSFROMCHAR , cast(WPARAM,@PT) , iCharIdx )            
+      
+      'dim as RECT tRC = any
+      'GetClientRect( hwnd , @tRC )
+      'tRc.top = tRc.bottom + (PT.y-PT0.y)
+      'tRc.Bottom += PT.y-PT0.y
+      'FillRect( hDC , @tRC , GetSysColorBrush(COLOR_BTNFACE) )
+      
       SetViewportOrgEx( hDC , 0 , PT.y-PT0.y , NULL )
+      'SetViewportExtEx( hDC , 0 , -(PT.y-PT0.y) , NULL )
       'printf(!"hdc=%p\n",hDC)   
       return 1
-   case WM_PAINT      
-      puts("Paint!")            
+   case WM_PAINT            
       InvalidateRect( hWnd , NULL , true )
       ValidateRect( hWnd , @type<RECT>(0,-1000,1000,0) )
+      dim as RECT tRc = any : GetWindowRect( CTL(wcEdit) , @tRc )
+      ValidateRect( hWnd , @type<RECT>(0,tRc.bottom-tRc.top,1000,1000) )
       'dim as PAINTSTRUCT tPaint
       'BeginPaint( hWnd , @tPaint )      
       'CallWindowProc( OrgEditProc , hWnd , WM_PRINTCLIENT , cast(WPARAM,tPaint.hDC), PRF_CLIENT )
@@ -537,7 +547,7 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
    #include "LSModules\Controls.bas"
    #include "LSModules\ControlsMacros.bas"
    
-   select case( message )       
+   select case( message )
    #if 0
    case WM_CTLCOLORBTN  
       var hCtl = cast(HWND,lParam) : printf(!"btn=%X\n",hCtl)
@@ -686,7 +696,7 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
    case WM_USER+3 'Resize Number border
       dim as single fMul = 1.9
       if g_ZoomNum andalso g_ZoomDiv then fMul = (fMul*g_ZoomNum)/g_zoomDiv      
-      SetControl( wcLines , cMarginL , _BtP(wcButton,0.5) , _pct(fMul*(g_RowDigits+1)) , _pct(53) , CTL(wcLines) )
+      SetControl( wcLines , cMarginL , _BtP(wcButton,0.5) , _pct(fMul*(g_RowDigits+1)) , _pct(100) , CTL(wcLines) )
       ResizeMainWindow()      
    case WM_ACTIVATE  'Activated/Deactivated
       static as boolean b_IgnoreActivation
@@ -733,8 +743,13 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
          if FileExists(sCurDir+sFile) then 
             sFile = sCurDir + sFile
          elseif FileExists(sFile)=0 then
-            MessageBox( CTL(wcMain) , "File not found: '"+sFile+"'" , NULL , MB_ICONERROR )
-            continue for
+            var iResu = MessageBox( CTL(wcMain) , _
+               !"File does not exist: \r\n\r\n" _
+               !"'"+sFile+!"'\r\n\r\n" _
+               !"Create it?", NULL , MB_ICONERROR or MB_YESNOCANCEL )
+            if iResu = IDCANCEL then exit for
+            if iResu = IDNO then continue for            
+            sFile = ":"+sFile
          end if      
          'puts(sFile)
          var pzTemp = cptr(zstring ptr,malloc(65536))
