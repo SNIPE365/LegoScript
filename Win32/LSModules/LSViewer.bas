@@ -160,9 +160,9 @@ namespace Viewer
             end select
          wend
                      
-         while IsWindowVisible( g_GfxHwnd ) = 0
-            flip : sleep 10,1
-         wend
+         if IsWindowVisible( g_GfxHwnd ) = 0 then
+            flip : sleep 10,1 : continue do
+         end if
          flip
          
          static as double dLimitFps
@@ -375,6 +375,8 @@ namespace Viewer
          
       loop
       
+      puts("ending gfx")
+      Screen 0, , , fb.GFX_SCREEN_EXIT
       mutexdestroy( g_Mutex )
       
    end sub

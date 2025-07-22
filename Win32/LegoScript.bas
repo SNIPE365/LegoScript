@@ -1,4 +1,4 @@
-#cmdline "res\ls.rc -g"
+#cmdline "res\ls.rc -gen gcc -O 3 -g"
 '#cmdline "-gen gcc -O 3"
 #define __Main "LegoScript"
 
@@ -106,6 +106,7 @@ dim shared g_hCurMenu as any ptr , g_CurItemID as long , g_CurItemState as long
 dim shared as HANDLE g_hResizeEvent
 dim shared as hwnd g_GfxHwnd
 dim shared as byte g_DoQuit , g_Show3D , g_Dock3D
+dim shared as any ptr g_ViewerThread
 dim shared as string g_CurrentFilePath
 
 declare sub DockGfxWindow( bForce as boolean = false )
@@ -462,6 +463,8 @@ end sub
 static shared as any ptr OrgEditProc
 function WndProcEdit ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LPARAM ) as LRESULT   
    static as long iMod   
+   
+   if OrgEditProc=0 then return 0
 
    select case message
    case WM_KEYDOWN      
@@ -473,7 +476,10 @@ function WndProcEdit ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam a
          var iResu = RichEdit_KeyPress( hWnd , wParam , iMod ) 
          if iResu then return iResu
       end select      
-      if wParam=VK_ESCAPE then return CallWindowProc( OrgEditProc , hWnd , EM_SETSEL , -1 , 0 )
+      if wParam=VK_ESCAPE then 
+         if OrgEditProc = 0 then return 0
+         return CallWindowProc( OrgEditProc , hWnd , EM_SETSEL , -1 , 0 )
+      end if
    case WM_KEYUP
       select case wParam
       case VK_SHIFT   : iMod and= (not FSHIFT)
@@ -492,15 +498,18 @@ function WndProcEdit ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam a
             next N         
          end if
       case 3,24 'Ctrl-C / Ctrl-X
+         if OrgEditProc=0 then return 0
          var lResu = CallWindowProc( OrgEditProc , hWnd , message , wParam, lParam )      
          GetClipboard() : return lResu
       end select      
    case WM_VSCROLL
+      if OrgEditProc=0 then return 0
       var iResu = CallWindowProc( OrgEditProc , hWnd , message , wParam, lParam )
       g_iPrevRowCount = 0
       RichEdit_TopRowChange( hWnd )
       return iResu   
    end select
+   if OrgEditProc=0 then return 0
    return CallWindowProc( OrgEditProc , hWnd , message , wParam, lParam )   
 end function
 
@@ -531,12 +540,13 @@ function WndProcLines ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam 
       ValidateRect( hWnd , @type<RECT>(0,tRc.bottom-tRc.top,1000,1000) )
       'dim as PAINTSTRUCT tPaint
       'BeginPaint( hWnd , @tPaint )      
-      'CallWindowProc( OrgEditProc , hWnd , WM_PRINTCLIENT , cast(WPARAM,tPaint.hDC), PRF_CLIENT )
+      'CallWindowProc( OrgLinesProc , hWnd , WM_PRINTCLIENT , cast(WPARAM,tPaint.hDC), PRF_CLIENT )
       ''var iResu = CallWindowProc( OrgEditProc , hWnd , message , cast(WPARAM,tPaint.hDC), lParam )
       'EndPaint( hWnd , @tPaint )
       'return 0   
    end select
-   return CallWindowProc( OrgEditProc , hWnd , message , wParam, lParam )   
+   if OrgLinesProc=0 then return 0
+   return CallWindowProc( OrgLinesProc , hWnd , message , wParam, lParam )   
 end function
 
 
@@ -759,7 +769,18 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
       next N
       return 0
    case WM_CLOSE   'close button was clicked
-      if File_Quit()=false then return 0            
+      if File_Quit()=false then return 0
+      puts("" & IsWindow( CTL(wcEdit) ) & " // " & IsWindow( CTL(wcLines) ))
+      if OrgEditProc then 
+         OrgEditProc = @DefWindowProc
+         SetWindowLongPtr( CTL(wcEdit) , GWLP_WNDPROC , cast(LONG_PTR,@OrgEditProc) )
+         OrgEditProc = @DefWindowProc : DestroyWindow( CTL(wcEdit) )
+      end if
+      if OrgLinesProc then 
+         OrgEditProc = @DefWindowProc
+         SetWindowLongPtr( CTL(wcLines) , GWLP_WNDPROC , cast(LONG_PTR,@OrgLinesProc) )
+         OrgLinesProc = @DefWindowProc : DestroyWindow( CTL(wcLines) )
+      end if
       PostQuitMessage(0) ' to quit
       return 0
    case WM_DESTROY 'Windows was closed/destroyed
@@ -872,6 +893,8 @@ if ParseCmdLine()=0 then
    WinMain() '<- main function
 end if
 g_DoQuit = 1
+puts("Waiting viewer thread")
+if g_ViewerThread then ThreadWait( g_ViewerThread )
 
 #if 0
    3865 BP10 #7 s69 = 3001p11 B1 y90 c1;

@@ -3,7 +3,7 @@ _InitForm()
       
 var hEventGfxReady = CreateEvent( NULL , FALSE , FALSE , NULL )    
 g_hResizeEvent = CreateEvent( NULL , FALSE , FALSE , NULL )
-ThreadDetach( ThreadCreate( @Viewer.MainThread , hEventGfxReady ) )
+g_ViewerThread = ThreadCreate( @Viewer.MainThread , hEventGfxReady )
 
 InitFont( wfDefault , g_sMainFont   , 12 ) 'default application font
 InitFont( wfStatus  , g_sMainFont   , 10 )  'status bar font

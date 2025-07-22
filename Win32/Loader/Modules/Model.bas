@@ -260,6 +260,7 @@ static shared as long g_TotalLines , g_TotalOptis , g_TotalTrigs , g_TotalQuads
 sub SizeModel( pPart as DATFile ptr , tSize as PartSize , iPartWanted as long = -1 , byref iPartNum as long = -1 , pRoot as DATFile ptr = NULL )
    
    if pRoot = NULL then pRoot = pPart
+   memset( @tSize , 0 , sizeof(tSize) )
    
    #macro CheckZ( _Var ) 
       if bWantSize then

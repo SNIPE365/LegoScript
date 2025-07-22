@@ -115,7 +115,7 @@ namespace Menu
       tItem.fState     = bState and (not MFT_RADIOCHECK)
       tItem.wID        = iID
       tItem.dwItemData = cast(long_ptr,pEvent)
-      if len(sText) then tItem.dwTypeData = strptr(sText)
+      if len(sText) then tItem.dwTypeData = strptr(sText) else tItem.dwTypeData = NULL
       InsertMenuItemA( hMenu , &hFFFFFFFF , true , @tItem )
       'DrawMenuBar( g_GfxWnd )
       return iID

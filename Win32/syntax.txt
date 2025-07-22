@@ -1,0 +1,13 @@
+#INCLUDE
+
+<File><ID>
+<File><ID>[#Attributes]<primative> = <File><ID>[#Attributes]<primative>
+<ID>[#Attributes]<primative> = <ID>[#Attributes]<primative>
+
+3021 B3;
+3022 B4;
+B3 s1 = B4 c1;
+3024 B1 s1 = 3025 B2 c1;
+
+
+

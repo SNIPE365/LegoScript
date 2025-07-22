@@ -192,6 +192,10 @@ function ConsoleEdit( sFiles() as string ) as long
          .iLin = 2+(.iCurLine-.iStartLine)         
          .sText = sCode(.iCurLine)
          var iCode = RowEdit(tCtx)
+         #define sqCtx *cptr(SearchQueryContext ptr,@tCtx)
+         if HandleCasing( .sText , sqCtx ) then
+            .bUpdateScroll = true : .bChanged = 1
+         end if
          if sCode(.iCurLine) <> .sText then 
             bUnsaved = 1 : sCode(.iCurLine) = .sText
          end if

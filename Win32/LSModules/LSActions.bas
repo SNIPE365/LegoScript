@@ -61,7 +61,7 @@ sub UpdateTabCloseButton()
    TabCtrl_GetItemRect( CTL(wcTabs) , g_iCurTab , cptr(RECT ptr,@tPt(0)) )
    var hFont = cast(HFONT,SendMessage( CTL(wcTabs) , WM_GETFONT , 0,0 ))
    if hFont=0 then end
-   var hDC = GetDC(0) : SelectObject( hDC , hFont )      
+   var hDC = GetDC(0) , hOrgFont = SelectObject( hDC , hFont )      
    dim as SIZE tSz = any : GetTextExtentPoint32( hDC , @"        " , cCloseLen , @tSz )
    tPt(1).x += g_tMainCtx.hCTL( wcTabs ).iX
    with g_tMainCtx.hCTL( wcBtnClose )      
@@ -71,6 +71,7 @@ sub UpdateTabCloseButton()
       SetWindowPos( CTL(wcBtnClose) , 0 , .iX,.iY , .iW,.iH , SWP_NOZORDER or SWP_NOACTIVATE )
       InvalidateRect( CTL(wcBtnClose) , NULL , true )
    end with
+   SelectObject( hDC , hOrgFont )
    ReleaseDC( NULL , hDC )
 end sub
 sub ChangeToTab( iNewTab as long , bForce as boolean = false )    

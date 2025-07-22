@@ -192,6 +192,7 @@ sub ResizeLayout( hWnd as HWND , tForm as FormStruct , iWidth as long , iHeight 
     ' **** Re-creating fonts ****
     var hDC = GetDC(hWnd) 
     var iLogY = GetDeviceCaps(hDC, LOGPIXELSY) , iDPI = (360*72)\iSzH '360
+    var hOrgFont = GetCurrentObject( hDC , OBJ_FONT )
     
     dim as HFONT hOldFont(.iFntCnt-1)
     for N as integer = 0 to .iFntCnt-1
@@ -223,6 +224,8 @@ sub ResizeLayout( hWnd as HWND , tForm as FormStruct , iWidth as long , iHeight 
          #endif
       end if
     next N
+    
+    SelectObject( hDC , hOrgFont )
     ReleaseDC( hWnd , hDC )
     for N as integer = 0 to .iFntCnt-1
       if hOldFont(N) then DeleteObject(hOldFont(N)):hOldFont(N)=0

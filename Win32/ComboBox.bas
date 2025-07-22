@@ -36,6 +36,7 @@
 'TODO: make the edit scroll as if it was editing a line
 'TODO: (NEED MORE?) check if Brick or Plate? (what about others?)
 'TODO: will primative aliases be included in the primative number combo box?
+'TODO: finish handling auto-case for tokens after line change
 
 ' donor parts (alt + d)
 ' path parts (alt + p)
@@ -445,12 +446,18 @@ type SearchQueryContext
    redim as string sTokenTxt(any)
 end type
 
-function HandleTokens( sText as string , tCtx as SearchQueryContext ) as long
+function HandleCasing( sText as string , tCtx as SearchQueryContext ) as long
+   with tCtx      
+      sText = ucase(sText)
+   end with
+   return 1
+end function
+function HandleTokens( sText as string , tCtx as SearchQueryContext ) as long   
    function = 0
-   dim as byte bDontSearch = 0
+   dim as byte bDontSearch = 0   
    with tCtx
       'split tokens and count
-      if .bChanged orelse .bReCalcTokens then
+      if .bChanged orelse .bReCalcTokens then         
          .bReCalcTokens=false
          dim as long I = 1,iStart=0
          .iTokCnt = 0 : .iCurTok = 0
@@ -508,8 +515,8 @@ function HandleTokens( sText as string , tCtx as SearchQueryContext ) as long
          'grab current token
          .iTokStart = instrrev(sText," ",.iCur)+1
          .iTokEnd   = instr(.iCur+1,sText," ")-1
-         if .iTokEnd <= 0 then .iTokEnd = len(sText)
-         .sToken = mid(sText,.iTokStart,(.iTokEnd-.iTokStart)+1)
+         if .iTokEnd <= 0 then .iTokEnd = len(sText)         
+         .sToken = mid(sText,.iTokStart,(.iTokEnd-.iTokStart)+1)         
          'SetWindowText( GetConsoleWindow() , iTokStart & "," & iTokEnd & " '"+sToken+"'")
          
          
@@ -542,6 +549,7 @@ function HandleTokens( sText as string , tCtx as SearchQueryContext ) as long
       end if
    end with
 end function
+
 sub SearchAddPartSuffix( sText as string , tCtx as SearchQueryContext )
    with tCtx
       if g_SearchVis<>SW_HIDE andalso .iCur=.iTokEnd then
@@ -598,6 +606,7 @@ sub InitEditContext( tCtx as ConEditContext )
    end with
    _endif
 end sub
+   
 function RowEdit( tCtx as ConEditContext ) as long   
    
    _ifStandalone
@@ -789,6 +798,7 @@ function RowEdit( tCtx as ConEditContext ) as long
          end select
       loop
    end with
+   
    _endif
 end function
 
