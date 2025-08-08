@@ -55,11 +55,11 @@ const PI = atn(1)*4
    end with'
 #endif
 
-'puts("3001 B1 #2 s7 = 3001 B2 #2 c1;")
-'puts("")
-'puts("3001 B1 s7 = 3001 B2 c1;")
-'puts("1 0 40 -24 -20 1 0 0 0 1 0 0 0 1 3001.dat")
-'puts("1 0 0 0 0 1 0 0 0 1 0 0 0 1 3001.dat")
+'dbg_puts("3001 B1 #2 s7 = 3001 B2 #2 c1;")
+'dbg_puts("")
+'dbg_puts("3001 B1 s7 = 3001 B2 c1;")
+'dbg_puts("1 0 40 -24 -20 1 0 0 0 1 0 0 0 1 3001.dat")
+'dbg_puts("1 0 0 0 0 1 0 0 0 1 0 0 0 1 3001.dat")
 
 enum SeparatorType
    stNone
@@ -121,19 +121,13 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
    end type
    '<PartCode> <PartName> <PartPosition> =
    '<PartName> <PartPosition> =
-     
-   
+      
    dim as string sStatement, sToken(15), sResult
    dim as long iTokenLineNumber=1 , iCurFile = 1 , iStackPos = 0 , iFileCount = 1
    dim as byte bNullSkip = 1
    sOutput = "" : g_iPartCount = 1 : g_iConnCount = 0
    
-   static as TreeNode g_tDefineList
-   var pDefineList = @g_tDefineList
-   if g_tDefineList.iCount = 0 then
-      #define AddColorDefine( _Name , _Code , Unused... ) AddEntry( pDefineList , "#" #_Name , "#" #_Code , true )
-      ForEachColor( AddColorDefine )  
-   end if
+   LS_InitDefineList( g_tDefineList )   
                
    #define iStStart aFile(iCurFile).uStStart
    #define iLineNumber aFile(iCurFile).uLineNumber
@@ -182,8 +176,14 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
    '#define DbgCrash() puts("" & __LINE__)
    #define DbgCrash()
    
-   #define DbgBuild(_s) puts("" & __LINE__ & ": " & _s)
-   '#define DbgBuild(_s)
+   '#define DbgBuild(_s) puts("" & __LINE__ & ": " & _s)
+   #define DbgBuild(_s)
+   
+   #define Dbg_Printf  rem
+   '#define Dbg_Printf printf
+   #define Dbg_Puts rem
+   '#define Dbg_Puts puts
+   
    
    DbgBuild(!"\r"+string(60,"-"))
    DbgBuild( "!! building '"+sMainFile+"'" )
@@ -208,8 +208,8 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
       '========================== split tokens ===============================
       '=======================================================================
       dim as long iErrToken = 0
-      var iTokCnt = LS_SplitTokens( sStatement , sToken() , iCurFile , pDefineList , iLineNumber , iErrToken )
-      puts("err: " & iErrToken)
+      var iTokCnt = LS_SplitTokens( sStatement , sToken() , iCurFile , @g_tDefineList , iLineNumber , iErrToken )
+      ''puts("err: " & iErrToken)
       if iErrToken < 0 then
          iErrToken = not iErrToken
          #define iCurToken iErrToken
@@ -288,7 +288,7 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
             next N
             var bCanOverwrite = (sToken(0)[1]=asc("r"))
             'puts( "'"+sToken(1)+"' '"+sDefineValue+"'" )
-            var pzNew = AddEntry( pDefineList , "" & sToken(1) , sDefineValue , , bCanOverwrite )
+            var pzNew = AddEntry( @g_tDefineList , "" & sToken(1) , sDefineValue , , bCanOverwrite )
             'puts("new: " & pzNew & " ovr: " & bCanOverwrite)
             if pzNew = NULL then
                ParserError( "'"+sToken(1)+"' is already defined" )
@@ -316,7 +316,7 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
          #ifdef __Standalone
             errorf(!"{%s}",SafeText(sToken(N)))
          #else
-            'printf("{%s}",SafeText(sToken(N)))
+            'dbg_printf("{%s}",SafeText(sToken(N)))
          #endif
       next N
       #ifdef __Standalone
@@ -487,7 +487,7 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                            if iConn > .lClutchCnt then iConn=0: ParserWarning("part "+sFullName+" only have " & .lClutchCnt & " clutches.")
                            if tRight(Part) < 0 then tLeft(Type)=spClutch : tLeft(Num)=iConn else tRight(Type)=spClutch : tRight(Num)=iConn
                         end select
-                        'printf(!"Studs=%i Clutchs=%i Aliases=%i Axles=%i Axlehs=%i Bars=%i Barhs=%i Pins=%i Pinhs=%i\n", _
+                        'dbg_printf(!"Studs=%i Clutchs=%i Aliases=%i Axles=%i Axlehs=%i Bars=%i Barhs=%i Pins=%i Pinhs=%i\n", _
                         '.lStudCnt , .lClutchCnt , .lAliasCnt , .lAxleCnt , .lAxleHoleCnt ,.lBarCnt , .lBarHoleCnt , .lPinCnt , .lPinHoleCnt )
                      end with
                      if tLeft(Type) = tRight(Type) then ParserError("same type of connector")                  
@@ -520,12 +520,12 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
    DbgCrash()
    
    #macro DebugParts()
-      puts("ID   sNam sPrimative  Colr Idx Ct Ok LocX LocY LocZ AngX AngY AngZ SX    1    2    4   SY    6    8    9   SZ")
+      dbg_puts("ID   sNam sPrimative  Colr Idx Ct Ok LocX LocY LocZ AngX AngY AngZ SX    1    2    4   SY    6    8    9   SZ")
       for N as long = bNullSkip to g_iPartCount-1      
          with g_tPart(N)
             var sPrim = .sPrimative , iPos = instrrev(sPrim,"\") 
             if iPos then sPrim = mid(sPrim,iPos+1)
-            printf( _
+            dbg_printf( _
                !"%-4i %-4s %-11s %4i %-3i %-2i %-2i " _
                !"%4i %4i %4i %4i %4i %4i " _
                !"%1.1f  %1.1f  %1.1f  " _
@@ -548,7 +548,7 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
    #endif
    
    'remove preprocessor entries now as they are unecessary (unless we use them for debug later)
-   RemoveAllEntries( pDefineList )
+   RemoveAllEntries( @g_tDefineList )
    
    'remove connection flags for all parts...
    for N as long = 1 to g_iPartCount-1
@@ -615,7 +615,7 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                            sResult += zTemp 
                            #ifdef __Standalone
                            'errorf("(first) %s",zTemp)
-                           printf("%s",zTemp)
+                           dbg_printf("%s",zTemp)
                            #endif                                
                         end with
                         DbgBuild(">> This left part is a key-part")
@@ -708,17 +708,17 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                   
                   DbgCrash()
                   
-                  printf(!"Left <%g %g %g>\n",pLeft->fPX,pLeft->fPY,pLeft->fPZ)
+                  dbg_printf(!"Left <%g %g %g>\n",pLeft->fPX,pLeft->fPY,pLeft->fPZ)
                   MatrixTranslate( .tMatrix , -pLeft->fPX , --pLeft->fPY , -pLeft->fpZ )
                   
                   #if 0
-                     ''puts("pLeft:" & pLeft & " // pRight:" & pRight)
+                     ''dbg_puts("pLeft:" & pLeft & " // pRight:" & pRight)
                      if pLeft->pMatOrg then 
-                        puts("Prev rotation")
+                        dbg_puts("Prev rotation")
                         MultMatrix4x4( .tMatrix , .tMatrix , pLeft->pMatOrg )
                      end if
                      if pRight->pMatOrg then 
-                        puts("Auto Rotating")
+                        dbg_puts("Auto Rotating")
                         MultMatrix4x4( .tMatrix , .tMatrix , pRight->pMatOrg )
                      end if    
                   #endif
@@ -738,7 +738,7 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                   ''dim as single tVec3R(2) = { pRight->fPX , pRight->fPY , pRight->fPZ }
                   '''if pRight->pMatOrg then MultiplyMatrixVector( @tVec3R(0) , pRight->pMatOrg )
                   '''MultiplyMatrixVector( @tVec3R(0) , @.tMatrix )
-                  printf(!"Right <%g %g %g>\n",pRight->fPX,pRight->fPY,pRight->fPZ)
+                  dbg_printf(!"Right <%g %g %g>\n",pRight->fPX,pRight->fPY,pRight->fPZ)
                   'MatrixTranslate( .tMatrix , pRight->fPX , -pRight->fPY , pRight->fpZ )
                   'MatrixTranslate( .tMatrix , .tLocation.fPX , -.tLocation.fPY , .tLocation.fpZ )
                   
@@ -762,7 +762,7 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                   dim as PartSize tPart = any  : tPart = pModel->tSize
                   var iIdx = .iModelIndex
                   'with tPart
-                  '   printf(!"Part: %i = x:%f>%f y:%f>%f z:%f>%f\n", _
+                  '   dbg_printf(!"Part: %i = x:%f>%f y:%f>%f z:%f>%f\n", _
                   '     iIdx , .xMin,.xMax , .yMin,.yMax , .zMin,.zMax )
                   'end with
                   if (tPart.yMin-(-4)) < .0001 then tPart.yMin = 0
@@ -803,14 +803,14 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                   end with
                   sResult += zTemp 
                   #ifdef __Standalone
-                  'printf("<%i>%s",__LINE__,zTemp)
-                  printf("%s",zTemp)
+                  'dbg_printf("<%i>%s",__LINE__,zTemp)
+                  dbg_printf("%s",zTemp)
                   #endif
                end with  
                
                DbgCrash()
-               'puts("1 0 40 -24 -20 1 0 0 0 1 0 0 0 1 3001.dat")
-               'puts("1 0 0 0 0 1 0 0 0 1 0 0 0 1 3001.dat")
+               'dbg_puts("1 0 40 -24 -20 1 0 0 0 1 0 0 0 1 3001.dat")
+               'dbg_puts("1 0 0 0 0 1 0 0 0 1 0 0 0 1 3001.dat")
             end with
          next I   
                    

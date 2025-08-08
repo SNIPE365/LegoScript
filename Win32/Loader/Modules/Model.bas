@@ -259,8 +259,7 @@ end sub
 static shared as long g_TotalLines , g_TotalOptis , g_TotalTrigs , g_TotalQuads
 sub SizeModel( pPart as DATFile ptr , tSize as PartSize , iPartWanted as long = -1 , byref iPartNum as long = -1 , pRoot as DATFile ptr = NULL )
    
-   if pRoot = NULL then pRoot = pPart
-   memset( @tSize , 0 , sizeof(tSize) )
+   if pRoot = NULL then pRoot = pPart : memset( @tSize , 0 , sizeof(tSize) )
    
    #macro CheckZ( _Var ) 
       if bWantSize then
@@ -601,20 +600,114 @@ for iY as long = 0 to 31
    MaleStipple(iY)   = iif(iY and 1,&h55555555,&hAAAAAAAA)
    FeMaleStipple(iY) = iif(iY and 1,&hAAAAAAAA,&h55555555)
 next iY
-sub DrawMaleShape( fX as single , fY as single , fZ as single , fRadius as single , fLength as single , bRound as byte )
+
+static shared as single g_fNX=-.95,g_fNY=.95
+function ndcToWorld(x as single, y as single, z as single , byref OutX as single, byref OutY as single, byref OutZ as single) as long
+    
+
+    dim as double modelview(15)=any
+    dim as double projection(15)=any
+    dim as integer viewport(3)=any
+    glGetDoublev(GL_MODELVIEW_MATRIX, @modelview(0))
+    glGetDoublev(GL_PROJECTION_MATRIX, @projection(0))
+    glGetIntegerv(GL_VIEWPORT, @viewport(0))
+
+    dim as double winX = (x + 1) * 0.5 * viewport(2)
+    dim as double winY = (y + 1) * 0.5 * viewport(3)
+    dim as double winZ = z
+
+    dim as double objX=any, objY=any, objZ=any
+    gluUnProject(winX, winY, winZ, @modelview(0), @projection(0), @viewport(0), @objX, @objY, @objZ)
+    OutX = objX : OutY = ObjY : OutZ = ObjZ
+    
+    return 1
+end function
+function worldToNDC(x as single, y as single, z as single, byref ndcX as single, byref ndcY as single) as long
+    dim as double modelview(15)=any
+    dim as double projection(15)=any
+    dim as integer viewport(3)=any
+    dim as double winX=any, winY=any, winZ=any
+
+    glGetDoublev(GL_MODELVIEW_MATRIX, @modelview(0))
+    glGetDoublev(GL_PROJECTION_MATRIX, @projection(0))
+    glGetIntegerv(GL_VIEWPORT, @viewport(0))
+
+    ' Use gluProject to get window coordinates
+    if gluProject(x, y, z, @modelview(0), @projection(0), @viewport(0), @winX, @winY, @winZ) = GL_TRUE then
+        ' Convert window coords to NDC (-1 to 1)
+        ndcX = (winX / viewport(2)) * 2.0 - 1.0
+        ndcY = ((winY / viewport(3)) * 2.0 - 1.0)
+        return 1 ' success
+    else
+        return 0 ' failure
+    end if
+end function
+
+
+sub DrawMaleShape( fX as single , fY as single , fZ as single , fRadius as single , fLength as single , bRound as byte , sName as string = "M?" )
    'dim as single fVec(2) = {fX_,fY_,fZ_}
    'MultiplyMatrixVector( @fVec(0) )
    '#define FX fVec(0)
    '#define FY fVec(1)
    '#define FZ fVec(2)
-   
-   glEnable( GL_POLYGON_STIPPLE )
+      
    glPushMatrix()   
    glLoadCurrentMatrix()
-   glTranslatef( fX , fY-fLength/2.0 , fZ )
+   glTranslatef( fX , fY-fLength/2.0 , fZ )      
+   glColor3f( 1 , 1 , 0 )
+   
+   #if 0
+      glColor4f( 0 , 0 , 0 , .5 )   
+      glLineWidth( 2 )
+      
+      #if 0
+         dim as single fOX,fOY,fOZ   
+         ndcToWorld( g_fNX , g_fNY , 0 , fOX,fOY,fOZ )
+         g_fNX += .05
+            
+         glBegin(GL_LINES)
+         glVertex3D(0,0,0)   
+         glVertex3D(fOX,fOY,fOZ)   
+         glEnd()
+      #else
+         dim as single fOX,fOY , fNX,fNY,fNZ
+         worldToNDC( 0,0,0 , fOX , fOY )
+         
+         glMatrixMode(GL_PROJECTION)
+         glPushMatrix()
+         glLoadIdentity()
+         glOrtho(-1, 1, -1, 1, -1, 1)      
+         glMatrixMode(GL_MODELVIEW)
+         glPushMatrix()
+         glLoadIdentity()      
+         glDisable(GL_DEPTH_TEST)
+         
+         dim as single fA = atan2( fOY , fOX )
+         dim as single fPX, fPY
+         fPX = cos(fA)*8 : fPY = sin(fA)*8
+         glBegin(GL_LINES)
+         glVertex3D(fPX,fPY,0)      
+         glVertex3D(fOX,fOY,0)
+         glEnd()
+         
+         glEnable(GL_DEPTH_TEST)
+         glPopMatrix() ' MODELVIEW
+         glMatrixMode(GL_PROJECTION)
+         glPopMatrix()
+         glMatrixMode(GL_MODELVIEW)
+         
+      #endif
+      
+      glLineWidth( 1 )
+   #endif      
+   glDrawText( sName ,0,-fLength,0 , fRadius/len(sName),fRadius , true )
+   
+   glPopMatrix() : exit sub 'ignore display of shape
+   
+   glEnable( GL_POLYGON_STIPPLE )
    glRotatef( 90 , 1,0,0 )      
    glPolygonStipple(	cptr(glbyte ptr,@MaleStipple(0)) )   
-   glColor3f( 1 , 1 , 0 )   
+   
    if bRound then
       glScalef( 8/7 , 8/7 , (fLength/fRadius)*(5/7) ) 'cylinder
       glutSolidSphere( fRadius , 18 , 7 ) 'male round (.5,.5,N\2)
@@ -622,22 +715,35 @@ sub DrawMaleShape( fX as single , fY as single , fZ as single , fRadius as singl
       glScalef( 2 , 2 , (fLength/fRadius) ) 'square
       glutSolidCube(fRadius) 'male square (1,1,N)
    end if
-   glPopMatrix()
+   
    glDisable( GL_POLYGON_STIPPLE )
+   
+   glPopMatrix()
+   
 end sub
-sub DrawFemaleShape( fX as single , fY as single , fZ as single , fRadius as single , fLength as single , bRound as byte )   
+sub DrawFemaleShape( fX as single , fY as single , fZ as single , fRadius as single , fLength as single , bRound as byte , sName as string = "F?" )   
    'dim as single fVec(2) = {fX_,fY_,fZ_}
    'MultiplyMatrixVector( @fVec(0) )
    '#define FX fVec(0)
    '#define FY fVec(1)
    '#define FZ fVec(2)   
-   glEnable( GL_POLYGON_STIPPLE )
+   
    glPushMatrix()   
+   
    glLoadCurrentMatrix()
    glTranslatef( fX , fY-fLength/2.0 , fZ )   
-   glRotatef( 90 , 1,0,0 )   
-   glPolygonStipple(	cptr(glbyte ptr,@FeMaleStipple(0)) )
-   glColor3f( 1 , 0 , 0 )   
+   
+   glColor3f( 1 , 0 , 0 )
+   
+   glRotatef( 180 , 1,0,0 )
+   glDrawText( sName ,0,-abs(fLength*.5),0 , fRadius/len(sName) , fRadius , true )
+   glRotatef( 180 , 1,0,0 )
+   
+   glPopMatrix() : exit sub 'ignore display of shape
+   
+   glRotatef( 90 , 1,0,0 )
+   glEnable( GL_POLYGON_STIPPLE )
+   glPolygonStipple(	cptr(glbyte ptr,@FeMaleStipple(0)) )      
    if bRound then      
       glScalef( 1 , 1 , fLength )      
       glutSolidTorus( 0.5 , fRadius , 18 , 18 ) 'female round? (.5,.5,N*8)
@@ -652,9 +758,9 @@ end sub
 #endif
 
 #ifdef ShadowCalcMatrix
-sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false , pRoot as DATFile ptr = NULL )
+sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false , pRoot as DATFile ptr = NULL )   
    #ifdef __NoRender
-   bDraw=false
+   bDraw=false   
    #endif
    if pRoot = NULL then pRoot = pPart        
    with *pPart      
@@ -1094,13 +1200,13 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false 
    end with   
 end sub
 #else
-
 'sub RenderModel( pPart as DATFile ptr , iBorders as long , uCurrentColor as ulong = &h70605040 , lDrawPart as long = -1 , uCurrentEdge as ulong = 0 DebugPrimParm )
 sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , lDrawPart as long = -2 , pRoot as DATFile ptr = NULL )   
    #ifdef __NoRender
-   lDrawPart=-2
+   lDrawPart=-2   
    #endif
-   if pRoot = NULL then pRoot = pPart        
+   static as integer iMale=0 , iFemale=0
+   if pRoot = NULL then pRoot = pPart : iMale=0 : iFemale=0 : 'puts("-----------------")
    with *pPart
       if .tSize.zMax = .tSize.zMin then
          dim as PartSize tSz : SizeModel( pPart , tSz )
@@ -1214,11 +1320,13 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , lDrawPart as long = -2
                                     'end with
                                  'end if                                 
                                  'if lDrawPart <> -2 then 
-                                    DrawMaleShape( __Position__ , p->wFixRadius/100 , p->bLength , bRound )                                 
+                                    iMale += 1
+                                    DrawMaleShape( __Position__ , p->wFixRadius/100 , p->bLength , bRound , "" & iMale )
                                  'end if
                               else
                                  'if lDrawPart <> -2 then 
-                                    DrawFemaleShape( __Position__ , p->wFixRadius/100 , p->bLength , bRound ) '*(pMat->fScaleY)
+                                    iFemale += 1
+                                    DrawFemaleShape( __Position__ , p->wFixRadius/100 , p->bLength , bRound , "" & iFemale ) '*(pMat->fScaleY)
                                  'end if
                               end if
                               
@@ -1321,6 +1429,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , lDrawPart as long = -2
                                     'var p = pPart
                                     with *pMat
                                        'printf(!"stud ori: %p\n",pMatOri)
+                                       puts("Male: " & iMale)
                                        SnapAddStud( tSnap , iConCnt , type(fPX+.fPosX , fPY+.fPosY , fPZ+.fPosZ) )
                                     end with
                                  end if                                 
@@ -1369,6 +1478,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , lDrawPart as long = -2
                                     if bDidClutch=0 then
                                        bDidClutch=1
                                        with *pMat
+                                          puts("Female: " & iFemale)
                                           SnapAddClutch( tSnap , iConCnt , type(fPX+.fPosX , fPY+.fPosY , fPZ+.fPosZ) )                                       
                                        end with
                                     end if
@@ -1431,6 +1541,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , lDrawPart as long = -2
                                        with *pMat                                       
                                           for iGX as long = 0 to xCnt
                                              for iGZ as long = 0 to zCnt
+                                                puts("Female: " & iFemale)
                                                 SnapAddClutch( tSnap , 1 , type(fPX+.fPosX+iGX*pG->xStep , fPY+.fPosY , fPZ+.fPosZ+iGZ*pG->zStep) )
                                              next igZ
                                           next iGX
@@ -1464,6 +1575,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , lDrawPart as long = -2
                            'printf(!"Sides=%i\n",bSides)
                            if lDrawPart=-2 then
                               with *pMat
+                                 puts("Female: " & iFemale)
                                  SnapAddClutch( tSnap , iConCnt , type(fPX+.fPosX , fPY+.fPosY , fPZ+.fPosZ) )                                       
                               end with
                               DbgConnect(!"Clutch += %i (Fallback {ignored})\n",iConCnt)

@@ -236,8 +236,10 @@ namespace Viewer
                         )
                      #endif
                      if bResetAttributes then
-                        fPositionX = 0 '((.xMin + .xMax)\-2)-.xMin
-                        fPositionY = (.yMin + .yMax)\-2
+                        'fPositionX = 0 '((.xMin + .xMax)\-2)-.xMin
+                        'fPositionY = (.yMin + .yMax)\-2
+                        fPositionX = ((.xMax-.xMin)\-2)-.xMin
+                        fPositionY = ((.yMax-.yMin)\2)+.yMin
                         fPositionZ = (.zMax-.zMin) 'abs(.zMax)-abs(.zMin)
                         fPositionZ = sqr(fPositionZ)*-40
                      end if

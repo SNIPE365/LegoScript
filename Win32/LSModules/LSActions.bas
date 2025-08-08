@@ -684,6 +684,8 @@ end sub
 sub Completion_Enable()
    puts(__FUNCTION__)
    var iToggledState = g_CurItemState xor MFS_CHECKED
+   g_CompletionEnable = (iToggledState and MFS_CHECKED)<>0
+   g_SQCtx.iCur = -1
    Menu.MenuState( g_hCurMenu,g_CurItemID,iToggledState )   
    EnableMenuItem( g_hCurMenu , sbeCompletion_Filters , iif( iToggledState and MFS_CHECKED , MF_ENABLED , MF_GRAYED ) )
    if (iToggledState and MFS_CHECKED)=0 then ShowWindow( g_hContainer , SW_HIDE )

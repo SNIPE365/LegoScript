@@ -40,6 +40,128 @@
 
 'const ScrWid=640,ScrHei=480
 
+static shared as GLuint g_FontUI
+const cUIFontWid=16 , cUIFontHei=16
+sub checkGLError(message as string="")
+    dim as GLenum ierr
+    ierr = glGetError()
+    while err <> GL_NO_ERROR
+        select case ierr
+        case GL_INVALID_ENUM
+            puts( message & ": GL_INVALID_ENUM" )
+        case GL_INVALID_VALUE
+            puts( message & ": GL_INVALID_VALUE")
+        case GL_INVALID_OPERATION
+            puts( message & ": GL_INVALID_OPERATION")
+        case GL_STACK_OVERFLOW
+            puts( message & ": GL_STACK_OVERFLOW")
+        case GL_STACK_UNDERFLOW
+            puts( message & ": GL_STACK_UNDERFLOW")
+        case GL_OUT_OF_MEMORY
+            puts( message & ": GL_OUT_OF_MEMORY")
+        case else
+            puts( message & ": Unknown OpenGL error: " &  ierr)
+        end select
+        ierr = glGetError() '???
+    wend
+end sub
+sub glDrawText( sText as string , fPX as single = 0 , fPY as single = 0 , fPZ as single , fWid as single = 1.0 , fHei as single = 1.0 , bCenter as boolean = false )
+   
+   glEnable (GL_ALPHA_TEST)
+   glDisable(GL_BLEND)
+   glDisable(GL_LIGHTING)
+
+   glBindTexture(GL_TEXTURE_2D, g_FontUI)
+   
+   if bCenter then fPX -= len(sText)*fWid*.5 : fPZ -= fHei*.5
+   dim as single fPXO = fPX
+   
+   
+   for I as long = 0 to len(sText)-1
+      const Q = 1/16
+      var bChar = sText[I] 
+      if bChar=13 then continue for
+      if bChar=10 then fPX = fPXO : fPZ += fHei
+      var fX = (bChar and 15)/16 , fY = (bChar\16)/16
+      glBegin(GL_QUADS)
+         glTexCoord2f(fX  , fY+Q) : glVertex3f(fPX      , fPY , fPZ     )
+         glTexCoord2f(fX+Q, fY+Q) : glVertex3f(fPX+fWid , fPY , fPZ     )
+         glTexCoord2f(fX+Q, fY  ) : glVertex3f(fPX+fWid , fPY , fPZ+fHei)
+         glTexCoord2f(fX  , fY  ) : glVertex3f(fPX      , fPY , fPZ+fHei)
+      glEnd()
+      fPX += fWid
+   next I    
+   glBindTexture(GL_TEXTURE_2D, 0)
+   
+   glEnable(GL_LIGHTING)
+   glDisable(GL_ALPHA_TEST)
+   glEnable(GL_BLEND)
+   'glEnable( GL_CULL_FACE )
+   'glDisable( GL_CULL_FACE )
+   'glFrontFace( GL_CCW ): glCullFace(	GL_BACK )
+   
+end sub
+sub glInitFont()
+         
+   '--- create 16x16 white font with black border ---
+   dim as fb.image ptr imgFont = ImageCreate( 16*cUIFontWid , 16*cUIFontHei , rgb(255,0,255) )
+   dim as fb.image ptr imgChar = ImageCreate(cUIFontWid,cUIFontHei)
+   dim as fb.image ptr imgChar2 = ImageCreate(cUIFontWid,cUIFontHei)
+   for N as long = 0 to 255    
+    line imgChar2, (0,0)-(cUIFontWid-1,cUIFontHei-1),rgb(255,0,255),bf
+    for M as long = 0 to 1
+      line imgChar, (0,0)-(cUIFontWid-1,cUIFontHei-1),rgb(255,0,255),bf
+      draw string imgChar, (0,0), chr(N), iif( M , rgb(255,255,255) , rgb(8,8,8) )      
+      for iX as long = 7 to 0 step-1
+        put imgChar,(iX*2+1,0), imgChar,(iX,0)-(iX,7), pset
+        put imgChar,(iX*2  ,0), imgChar,(iX,0)-(iX,7), pset
+      next iX
+      for iY as long = 7 to 0 step-1
+        put imgChar,(0,iY*2+1), imgChar,(0,iY)-(cUIFontWid-1,iY), pset
+        put imgChar,(0,iY*2  ), imgChar,(0,iY)-(cUIFontHei-1,iY), pset
+      next iY
+            
+      if M then
+        put imgChar2,(1,1), imgChar, trans
+        var iPX = (N and 15)*cUIFontWid , iPY = (N\16)*cUIFontHei      
+        put imgFont,(iPX,iPY),imgChar2,trans
+      else        
+        for iOY as long = -2 to 2
+          for iOX as long = -2 to 2
+            put imgChar2,(1+iOX,1+iOY), imgChar,trans
+          next iOX
+        next iOY        
+      end if
+      
+    next M        
+    
+   next N
+   var pPix = cptr(ulong ptr,imgFont+1)
+   for iN as long = 0 to ((imgFont->Pitch\4)*(imgFont->Height))-1
+      if pPix[iN] = rgb(255,0,255) then pPiX[iN] = 0 else pPix[iN] or= &hFF000000
+   next iN  
+  '--- upload font as OpenGL texture ---
+   glGenTextures(1, @g_FontUI)
+   glBindTexture(GL_TEXTURE_2D, g_FontUI)
+   checkGLError()
+   
+   ' Upload the texture
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, imgFont->width, imgFont->height, 0, GL_RGBA, GL_UNSIGNED_BYTE, imgFont+1)
+   checkGLError()
+      
+   ' Set texture filtering and wrapping
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+   'glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+   'glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+   
+   glBindTexture(GL_TEXTURE_2D, 0)
+    
+   ImageDestroy( imgFont )
+   ImageDestroy( imgChar )
+   ImageDestroy( imgChar2 )
+  
+end sub
 
 function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    
@@ -76,10 +198,12 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    glHint GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST '' Really Nice Perspective Calculations
    glEnable GL_BLEND
    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+   glAlphaFunc( GL_GREATER , 0.5 )
    
    'glPolygonMode( GL_FRONT_AND_BACK , GL_LINE )
    'GL_POINT, GL_LINE, and GL_FILL.    
-   
+      
+   glEnable(GL_TEXTURE_2D)
    glEnable(GL_LINE_SMOOTH)
    'glEnable(GL_POLYGON_SMOOTH)
    'glEnable(GL_MULTISAMPLE)
@@ -116,6 +240,8 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
     
     glEnable(GL_COLOR_MATERIAL)
     glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE)        
+    
+    glInitFont()
         
     return hwndGFX
 

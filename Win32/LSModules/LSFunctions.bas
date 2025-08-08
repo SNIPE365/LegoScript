@@ -330,6 +330,15 @@ type lsString
    end union
 end type
 
+static shared g_tDefineList as TreeNode
+sub LS_InitDefineList( tDefineList as TreeNode )   
+   var pDefineList = @tDefineList
+   if tDefineList.iCount = 0 then
+      #define AddColorDefine( _Name , _Code , Unused... ) AddEntry( pDefineList , "#" #_Name , "#" #_Code , true )
+      ForEachColor( AddColorDefine )  
+   end if
+end sub
+
 '??? if there's a missing ; then the output statement is one char short ???
 function LS_GetNextStatement( sScript as string , iStStart as long , Out_sStatement as string , byref InOut_iLineNumber as long ) as long
    

@@ -1,5 +1,6 @@
-#cmdline "res\ls.rc -gen gcc -O 3 -g"
-'#cmdline "-gen gcc -O 3"
+#cmdline "res\ls.rc"
+'#cmdline "res\ls.rc  -gen gcc -O 3 -g"
+'#cmdline "res\ls.rc  -gen gcc -O 3"
 #define __Main "LegoScript"
 
 #include once "windows.bi"
@@ -30,7 +31,6 @@
 'TODO (16/05/25): TAB structure must keep the selection position
 'TODO (13/05/25): load/save settings for Legoscript main window
 'TODO (25/03/25): re-organize the LS2LDR code, so that it looks better and explain better
-'TODO (20/03/25): process keys to toggle filters and to change the text/add type (plate/brick/etc...)
 'TODO (06/03/25): check bug regarding wheel positioning and the line numbers
 'TODO (21/04/25): prevent buffer overflow when doing a FIND/REPLACE when the selected text is bigger than 32k
 
@@ -105,7 +105,7 @@ dim shared g_hCurMenu as any ptr , g_CurItemID as long , g_CurItemState as long
 
 dim shared as HANDLE g_hResizeEvent
 dim shared as hwnd g_GfxHwnd
-dim shared as byte g_DoQuit , g_Show3D , g_Dock3D
+dim shared as byte g_DoQuit , g_Show3D , g_Dock3D , g_CompletionEnable
 dim shared as any ptr g_ViewerThread
 dim shared as string g_CurrentFilePath
 
@@ -138,6 +138,12 @@ sub LogError( sError as string )
    SetWindowText( CTL(wcStatus) , sError )   
    MessageBox( CTL(wcMain) , sError , NULL , MB_ICONERROR )
 end sub
+
+static shared as long g_iPrevTopRow = 0 , g_iPrevRowCount = 0 , g_RowDigits = 2
+static shared as long g_ZoomNum , g_ZoomDiv
+static shared as zstring*128 g_zRows
+static shared as SearchQueryContext g_SQCtx
+static shared as string sLastSearch
 
 #include "LsModules\LSMenu.bas"
 #include "LsModules\LSViewer.bas"
@@ -193,12 +199,6 @@ function CreateMainMenu() as HMENU
    
    return hMenu
 end function
-
-static shared as long g_iPrevTopRow = 0 , g_iPrevRowCount = 0 , g_RowDigits = 2
-static shared as long g_ZoomNum , g_ZoomDiv
-static shared as zstring*128 g_zRows
-static shared as SearchQueryContext g_SQCtx
-static shared as string sLastSearch
 
 sub Lines_Draw( hEdit as HWND , tDraw as DRAWITEMSTRUCT )
    with tDraw      
@@ -276,12 +276,6 @@ end sub
 sub RichEdit_SelChange( hCtl as HWND , iRow as long , iCol as long )
    
    'puts(__FUNCTION__)
-   
-   
-   'changed to edit (for now?) only matter if Auto Completion is enabled
-   g_SQCtx.iRow = iRow : g_SQCtx.iCol = iCol
-   if Menu.IsChecked(meCompletion_Enable)=0 then exit sub
-   
    #define zRow t.zRow_      
    type tBuffer
       union
@@ -289,10 +283,29 @@ sub RichEdit_SelChange( hCtl as HWND , iRow as long , iCol as long )
          zRow_ as zstring*1024
       end union
    end type
-   dim t as tBuffer = any : t.wSize = 1023
+   dim t as tBuffer = any : t.wSize = 1023   
+   
+   'changed to edit (for now?) only matter if Auto Completion is enabled
+      
+   if g_SQCtx.iRow <> iRow then 'row changed, handle case
+      var iSz = SendMessage( hCtl , EM_GETLINE , g_SQCtx.iRow , cast(LRESULT,@t) )
+      if iSz then 'if line is not empty
+         zRow[iSz-1]=0 : var sText = zRow
+         if HandleCasing( sText , g_SQCtx ) then 'if case was changed update line
+            var iStart = SendMessage( hCTL , EM_LINEINDEX , g_SQCtx.iRow , 0 )
+            RichEdit_Replace( hCtl , iStart , iStart+iSz-1 , sText )
+         end if
+      end if
+   end if   
+   
+   g_SQCtx.iRow = iRow : g_SQCtx.iCol = iCol
+   if g_CompletionEnable=0 orelse Menu.IsChecked(meCompletion_Enable)=0 then exit sub
+      
    var iSz = SendMessage( hCtl , EM_GETLINE , iRow , cast(LRESULT,@t) )
+         
    if iSz < 0 orelse iSz > 1023 then exit sub   
-   var iWid = 80 : zRow[iSz-2]=0   
+         
+   var iWid = 80 : zRow[iSz-1]=0
    'printf( !"%i:%s\t%f\r",iSz,left(zRow+space(iWid-6),iWid-5),timer )   
    with g_SQCtx
       if ubound(.sTokenTxt) < 0 then redim .sTokenTxt(.iMaxTok-1)      
@@ -325,7 +338,7 @@ function RichEdit_KeyPress( hCtl as HWND , iKey as long , iMod as long ) as long
       end if      
    end select
    
-   if g_SearchChanged then      
+   if g_SearchChanged andalso g_CompletionEnable then      
       Try()
          HandleTokens( sLastSearch , g_SQCtx )
          Catch()
@@ -491,11 +504,14 @@ function WndProcEdit ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam a
    case WM_CHAR
       select case wParam      
       case asc(" ")
-         var sFix = "" : SearchAddPartSuffix( sFix , g_SQCtx )
-         if len(sFix) then
-            for N as long = 0 to len(sFix)
-               PostMessage( hWnd , WM_CHAR , sFix[N] , 0 )
-            next N         
+         if g_CompletionEnable then
+            var sFix = "" : SearchAddPartSuffix( sFix , g_SQCtx )
+            puts("'"+sFix+"'")
+            if len(sFix) then
+               for N as long = 0 to len(sFix)
+                  PostMessage( hWnd , WM_CHAR , sFix[N] , 0 )
+               next N         
+            end if
          end if
       case 3,24 'Ctrl-C / Ctrl-X
          if OrgEditProc=0 then return 0
@@ -892,9 +908,10 @@ if ParseCmdLine()=0 then
    g_AppInstance = GetModuleHandle(null)
    WinMain() '<- main function
 end if
-g_DoQuit = 1
+'g_DoQuit = 1
 puts("Waiting viewer thread")
-if g_ViewerThread then ThreadWait( g_ViewerThread )
+'if g_ViewerThread then ThreadWait( g_ViewerThread )
+TerminateProcess( GetCurrentProcess , 0 )
 
 #if 0
    3865 BP10 #7 s69 = 3001p11 B1 y90 c1;

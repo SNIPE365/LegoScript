@@ -215,9 +215,9 @@ sub ProcessMessage( tMsg as MSG )
    if tMsg.message = WM_KEYDOWN then
       if (tMsg.wParam = VK_SPACE orelse tMsg.wParam = VK_RETURN orelse tMsg.wParam = VK_BACK) then
          _ifStandalone
-            SetForegroundWindow( g_hCon ) 
-            if tMsg.wParam = VK_SPACE orelse tMsg.wParam = VK_BACK then 
-               dim dwWritten as DWORD , tEvent as INPUT_RECORD 
+            SetForegroundWindow( g_hCon )
+            if tMsg.wParam = VK_SPACE orelse tMsg.wParam = VK_BACK then
+               dim dwWritten as DWORD , tEvent as INPUT_RECORD
                tEvent.EventType = KEY_EVENT
                with tEvent.Event.KeyEvent
                   .bKeyDown = 1 : .wRepeatCount = 1
@@ -325,7 +325,7 @@ function IsPartFiltered( pPart as SearchPartStruct ptr ) as boolean
    
 end function
 function UpdateSearch(sSearch as string) as long
-               
+   
    dim as long iPart = -1, iFound = 0
       
    SendMessage( g_hSearch , WM_SETREDRAW , false , 0 )
@@ -447,12 +447,47 @@ type SearchQueryContext
 end type
 
 function HandleCasing( sText as string , tCtx as SearchQueryContext ) as long
-   with tCtx      
-      sText = ucase(sText)
-   end with
-   return 1
+   dim as string sToken(15)
+   var iTokens = LS_SplitTokens( sText , sToken() , 0 , NULL )
+   dim as byte bGotPartID = 0, bGotPrimative=0, bGotPartNum=0, bGotEqual=0, bChanged=0
+   for N as long = 0 to iTokens-1
+      if sToken(N)[0] = asc("#") then if bGotPartID=0 then exit for else continue for
+      if sToken(N)[0] = asc("=") then 
+         if bGotEqual orelse bGotPartID=0 orelse bGotPrimative=0 then exit for else 
+         bGotEqual = 1 : bGotPartID=0 : bGotPrimative=0 : bGotPartNum=0
+         continue for
+      end if
+      if bGotPartID=0 then
+         'if searching for primitive name then skip primitives
+         if (cuint(sToken(N)[0])-asc("0")) < 10 then
+            if bGotPartNum then exit for
+            bGotPartNum=1 : continue for
+         end if
+         'then this token must be partID... so uppercase it
+         for I as long = 0 to len(sToken(N))-1
+            select case sToken(N)[I]
+            case asc("a") to asc("z"): sToken(N)[I] -= 32 : bChanged = 1
+            end select
+         next I
+         bGotPartID=1 : continue for
+      end if
+      'now it can only be attributes or the primative
+      if (bGotEqual andalso N = iTokens) orelse (N<(iTokens-1) andalso sToken(N+1)[0] = asc("=")) then
+         'last token is primative... so lowercase it
+         for I as long = 0 to len(sToken(N))-1
+            select case sToken(N)[I]
+            case asc("A") to asc("Z"): sToken(N)[I] += 32 : bChanged = 1
+            end select            
+         next I
+         bGotPrimative = 1
+      end if
+   next N   
+   clear sToken(0),0,16*sizeof(fbStr)   
+   return bChanged
 end function
+
 function HandleTokens( sText as string , tCtx as SearchQueryContext ) as long   
+         
    function = 0
    dim as byte bDontSearch = 0   
    with tCtx
@@ -511,7 +546,7 @@ function HandleTokens( sText as string , tCtx as SearchQueryContext ) as long
       if .bChanged then            
          
          function = .bChanged
-         
+                           
          'grab current token
          .iTokStart = instrrev(sText," ",.iCur)+1
          .iTokEnd   = instr(.iCur+1,sText," ")-1
@@ -552,6 +587,7 @@ end function
 
 sub SearchAddPartSuffix( sText as string , tCtx as SearchQueryContext )
    with tCtx
+      'puts(g_SearchVis & "," & SW_HIDE & "," & .iCur & "," & .iTokEnd)
       if g_SearchVis<>SW_HIDE andalso .iCur=.iTokEnd then
          var iSel  = SendMessage( g_hSearch , LB_GETCURSEL , 0 , 0 )               
          if iSel <> LB_ERR then               
@@ -572,7 +608,7 @@ sub SearchAddPartSuffix( sText as string , tCtx as SearchQueryContext )
             end if
          end if
       end if
-   end with
+   end with   
 end sub
 
 type ConEditContext extends SearchQueryContext
