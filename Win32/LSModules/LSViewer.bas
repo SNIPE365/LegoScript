@@ -28,9 +28,18 @@ namespace Viewer
    sub MainThread( hReadyEvent as any ptr )
       
       g_Mutex = MutexCreate()
-      dim as long ScrWid,ScrHei : screeninfo ScrWid,ScrHei
+      dim as long ScrWid,ScrHei : screeninfo ScrWid,ScrHei      
       g_GfxHwnd = InitOpenGL(ScrWid,ScrHei)   
-      SetWindowPos( g_GfxHwnd , NULL , 0,0 , 400,300 , SWP_NOMOVE or SWP_NOZORDER or SWP_NOACTIVATE )
+      
+      scope
+         dim as RECT tRcWnd = any , tRcCli = any
+         GetWindowRect( g_GfxHwnd , @tRcWnd ): GetClientRect( g_GfxHwnd , @tRcCli ) 
+         tRcWnd.right -= tRcWnd.left : tRcWnd.bottom -= tRcWnd.top
+         tRcWnd.right -= tRcCli.right : tRcWnd.bottom -= tRcCli.Bottom
+         SetWindowPos( g_GfxHwnd , NULL , g_tCfg.lGfxX,g_tCfg.lGfxY , _
+            tRcWnd.right+g_tCfg.lGfxWid , tRcWnd.bottom+g_tCfg.lGfxHei , _
+            SWP_NOMOVE or SWP_NOZORDER or SWP_NOACTIVATE )
+      end scope
       ShowWIndow( g_GfxHwnd , SW_HIDE )
       if hReadyEvent then SetEvent( hReadyEvent )
       SetEvent( g_hResizeEvent )

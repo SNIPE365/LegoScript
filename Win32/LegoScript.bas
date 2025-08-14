@@ -100,7 +100,7 @@ dim shared as FormContext g_tMainCtx
 dim shared as hinstance g_AppInstance  'instance
 dim shared as string sAppName        'AppName (window title 'prefix')
 dim shared as HMENU g_WndMenu        'Main Menu handle
-dim shared as long g_WndWid=640 , g_WndHei=480
+'dim shared as long g_WndWid=640 , g_WndHei=480
 dim shared g_hCurMenu as any ptr , g_CurItemID as long , g_CurItemState as long
 
 dim shared as HANDLE g_hResizeEvent
@@ -117,6 +117,7 @@ declare sub RichEdit_Replace( hCtl as HWND , iStart as long , iEnd as long , sTe
 
 declare sub ChangeToTabByFile( sFullPath as string , iLine as long = -1 )
 
+#include once "LSModules\Settings.bas"
 #include "Loader\LoadLDR.bas"
 #include "Loader\Include\Colours.bas"
 #include "Loader\Modules\Clipboard.bas"
@@ -431,31 +432,40 @@ sub DockGfxWindow( bForce as boolean = false )
    'NotifySelChange( wcEdit ) ??Why this was here??
    iOnce = true
 end sub   
-sub ResizeMainWindow( bCenter as boolean = false )            
-   static as boolean bResize
-   if bResize then exit sub   
+sub ResizeMainWindow( bInit as boolean = false )            
+   static as boolean bResize   
+   if bResize then exit sub    
    'Calculate Client Area Size
    dim as RECT RcWnd=any,RcCli=any,RcDesk=any
    var hWnd = CTL(wcMain)
-   if hWnd=0 orelse IsIconic(hWnd) orelse IsWindowVisible(hWnd)=0 then exit sub
-   bResize = true : GetClientRect(hWnd,@RcCli)      
-   if bCenter then 'initial position
-      GetWindowRect(hWnd,@RcWnd)
-      'Window Rect is in SCREEN coordinate.... make right/bottom become WID/HEI
-      with RcWnd
-         .right  -= .left : .bottom -= .top              'get window size
-         .right -= RcCli.right : .bottom -= RcCli.bottom 'make it be difference from wnd/client
-         .right += g_WndWid : .bottom += g_WndHei        'add back desired client area size
+   if hWnd=0 orelse IsIconic(hWnd) orelse (bInit=0 andalso IsWindowVisible(hWnd)=0) then exit sub   
+   bResize = true : GetClientRect(hWnd,@RcCli)
+   GetWindowRect(hWnd,@RcWnd)
+   'Window Rect is in SCREEN coordinate.... make right/bottom become WID/HEI
+   if 1 then 'bInit then 'orelse (RcCli.right<>g_tCfg.lGuiWid) orelse (RcCli.bottom<>g_tCfg.lGuiHei) then
+      with RcWnd      
+         .right -= .left : .bottom -= .top                   'get window size
+         .right -= RcCli.right : .bottom -= RcCli.bottom      'make it be difference from wnd/client
+         .right += g_tCfg.lGuiWid : .bottom += g_tCfg.lGuiHei 'add back desired client area size
          GetClientRect(GetDesktopWindow(),@RcDesk)         
          dim as RECT RcGfx=any : GetWindowRect( g_GfxHwnd , @RcGfx )         
          var iAllWid = .right , iGfxHei = RcGfx.bottom-RcGfx.top
-         if iGfxHei > .bottom then .bottom = iGfxHei
-         iAllWid = .right + RcGfx.right-RcGfx.left         
-         var iCenterX = (RcDesk.right-iAllWid)\2 , iCenterY = (RcDesk.bottom-.bottom)\2        
-         SetWindowPos(hwnd,null,iCenterX,iCenterY,.right,.bottom,SWP_NOZORDER)
-         RcCli.right = g_WndWid : RcCli.bottom = g_WndHei
-      end with 
+         'if using default settings then center the window
+         if bInit andalso g_tCfg.lGuiX = clng(CW_USEDEFAULT) then
+            if iGfxHei > .bottom then .bottom = iGfxHei
+            iAllWid = .right + RcGfx.right-RcGfx.left         
+            var iCenterX = (RcDesk.right-iAllWid)\2 , iCenterY = (RcDesk.bottom-.bottom)\2                 
+            SetWindowPos(hwnd,null,iCenterX,iCenterY,.right,.bottom,SWP_NOZORDER or SWP_NOSENDCHANGING)
+         else            
+            SetWindowPos(hwnd,null,.left,.top,.right,.bottom,SWP_NOZORDER or SWP_NOSENDCHANGING)                     
+         end if
+         'puts("Wid: " & g_tCfg.lGuiWid & " Hei: " & g_tCfg.lGuiHei )
+         'GetClientRect( hWnd , @RcCli )
+         'puts("Wid?: " & RcCli.right & " Hei?: " & RcCli.bottom )
+      end with   
    end if
+   RcCli.right = g_tCfg.lGuiWid : RcCli.bottom = g_tCfg.lGuiHei
+   
       
    'recalculate control sizes based on window size
    ShowWindow( g_hContainer , SW_HIDE )      
@@ -470,6 +480,7 @@ sub ResizeMainWindow( bCenter as boolean = false )
    SendMessage( CTL(wcStatus) , SB_SETPARTS , 2 , cast(LPARAM,@aWidths(0)) )
    DockGfxWindow()   
    bResize=false   
+   puts("...")
    
 end sub
 
@@ -571,8 +582,8 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
       
    var pCtx = (@g_tMainCtx)      
    #include "LSModules\Controls.bas"
-   #include "LSModules\ControlsMacros.bas"
-   
+   #include "LSModules\ControlsMacros.bas"  
+
    select case( message )
    #if 0
    case WM_CTLCOLORBTN  
@@ -708,8 +719,12 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
    case WM_SIZE       'window is sizing/was sized
       'puts("Main Size")
       if wParam <> SIZE_MINIMIZED andalso wParam <> SIZE_MAXHIDE then 
-         ResizeMainWindow()
-         UpdateTabCloseButton() 
+         var lWid = clng(LOWORD(lParam)) , lHei = clng(HIWORD(lParam))
+         if g_tCfg.lGuiWid <> lWid orelse g_tCfg.lGuiHei <> lHei then
+            'puts("SIZE CHANGED!")
+            g_tCfg.lGuiWid = lWid : g_tCfg.lGuiHei = lHei : g_bSettingsChanged = true
+            ResizeMainWindow() : UpdateTabCloseButton() 
+         end if         
          return 0
       end if
    case WM_MOVE       'window is moving/was moved
@@ -722,7 +737,7 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
    case WM_USER+3 'Resize Number border
       dim as single fMul = 1.9
       if g_ZoomNum andalso g_ZoomDiv then fMul = (fMul*g_ZoomNum)/g_zoomDiv      
-      SetControl( wcLines , cMarginL , _BtP(wcButton,0.5) , _pct(fMul*(g_RowDigits+1)) , _pct(100) , CTL(wcLines) )
+      SetControl( wcLines , cMarginL , _BtP(wcButton,0.5) , _pct(fMul*(g_RowDigits+1)) , _pct(100) , CTL(wcLines) )      
       ResizeMainWindow()      
    case WM_ACTIVATE  'Activated/Deactivated
       static as boolean b_IgnoreActivation
@@ -785,17 +800,17 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
       next N
       return 0
    case WM_CLOSE   'close button was clicked
-      if File_Quit()=false then return 0
-      puts("" & IsWindow( CTL(wcEdit) ) & " // " & IsWindow( CTL(wcLines) ))
-      if OrgEditProc then 
-         OrgEditProc = @DefWindowProc
-         SetWindowLongPtr( CTL(wcEdit) , GWLP_WNDPROC , cast(LONG_PTR,@OrgEditProc) )
-         OrgEditProc = @DefWindowProc : DestroyWindow( CTL(wcEdit) )
+      if File_Quit()=false then return 0      
+      'puts("" & IsWindow( CTL(wcEdit) ) & " // " & IsWindow( CTL(wcLines) ))
+      if OrgEditProc then          
+         var pOrgProc = OrgEditProc : OrgEditProc = @DefWindowProc         
+         SetWindowLongPtr( CTL(wcEdit) , GWLP_WNDPROC , cast(LONG_PTR,pOrgProc) )         
+         if IsWindow(CTL(wcEdit)) then DestroyWindow( CTL(wcEdit) )         
       end if
       if OrgLinesProc then 
-         OrgEditProc = @DefWindowProc
-         SetWindowLongPtr( CTL(wcLines) , GWLP_WNDPROC , cast(LONG_PTR,@OrgLinesProc) )
-         OrgLinesProc = @DefWindowProc : DestroyWindow( CTL(wcLines) )
+         var pOrgProc = OrgLinesProc : OrgLinesProc = @DefWindowProc
+         SetWindowLongPtr( CTL(wcLines) , GWLP_WNDPROC , cast(LONG_PTR,pOrgProc) )
+         if IsWindow(CTL(wcLines)) then DestroyWindow( CTL(wcLines) )
       end if
       PostQuitMessage(0) ' to quit
       return 0
@@ -850,15 +865,15 @@ sub WinMain ()
    'WS_EX_COMPOSITED
    'or WS_CLIPCHILDREN
    hWnd = CreateWindowEx(WS_EX_LAYERED,sAppName,sAppName, WS_TILEDWINDOW, _ 'or WS_MAXIMIZE
-   200,200,g_WndWid,g_WndHei,null,hMenu,g_AppInstance,0)
-   
+   g_tCfg.lGuiX,g_tCfg.lGuiY,320,200,null,hMenu,g_AppInstance,0)   
    'SetClassLong( hwnd , GCL_HBRBACKGROUND , CLNG(GetSysColorBrush(COLOR_INFOBK)) )
    SetLayeredWindowAttributes( hwnd , GetSysColor(COLOR_INFOBK) , 192 , LWA_COLORKEY )
     
    '' Process windows messages
    ' *** all messages(events) will be read converted/dispatched here ***
-   'ShowWindow( hWnd , SW_SHOW )
-   'UpdateWindow( hWnd )
+   
+   ShowWindow( hWnd , SW_SHOW )
+   UpdateWindow( hWnd )
      
    dim as HWND hOldFocus = cast(HWND,-1)
    while( GetMessage( @tMsg, NULL, 0, 0 ) <> FALSE )    
@@ -878,17 +893,31 @@ sub WinMain ()
       end if
    wend 
       
-   dim as WINDOWPLACEMENT tPlace = type(sizeof(WINDOWPLACEMENT),0)
-   if GetWindowPlacement( hWnd , @tPlace ) then
-      DestroyWindow(hWnd)
-      var f = freefile()
-      if open(exepath+"\LegoScript.cfg" for binary access write as #f)=0 then
-         put #f,,tPlace : close #f   
+   puts("Checking settings")
+   if IsWindow( hWnd ) then
+      dim as boolean bMaximized = (IsZoomed( hWnd )<>0)
+      if bMaximized orelse (IsIconic(hWnd)<>0) then ShowWindow( hWnd , SW_SHOWNORMAL )
+      dim as RECT tRcWnd , tRcCli
+      GetWindowRect( hWnd , @tRcWnd ) : GetClientRect( hWnd , @tRcCli )
+      if bMaximized <> g_tCfg.bGuiMaximized then 
+         g_tCfg.bGuiMaximized = bMaximized : g_bSettingsChanged = true
       end if
-   else
-      puts("Failed")
-      sleep 5000
-   end if
+      if tRcWnd.left <> g_tCfg.lGuiX orelse tRcWnd.top <> g_tCfg.lGuiY then
+         g_tCfg.lGuiX = tRcWnd.left : g_tCfg.lGuiY = tRcWnd.top : g_bSettingsChanged = true
+      end if
+      if tRcCli.right <> g_tCfg.lGuiWid orelse tRcCli.bottom <> g_tCfg.lGuiHei then
+         g_tCfg.lGuiWid = tRcCli.right : g_tCfg.lGuiHei = tRcCli.bottom  : g_bSettingsChanged = true
+      end if
+      if IsZoomed(g_GfxHwnd) orelse IsIconic(g_GfxHwnd) then ShowWindow( g_GfxHwnd , SW_SHOWNORMAL )
+      GetWindowRect( g_GfxHwnd , @tRcWnd ) : GetClientRect( g_GfxHwnd , @tRcCli )
+      if tRcWnd.left <> g_tCfg.lGfxX orelse tRcWnd.top <> g_tCfg.lGfxY then
+         g_tCfg.lGfxX = tRcWnd.left : g_tCfg.lGfxY = tRcWnd.top : g_bSettingsChanged = true
+      end if
+      if tRcCli.right <> g_tCfg.lGfxWid orelse tRcCli.bottom <> g_tCfg.lGfxHei then
+         g_tCfg.lGfxWid = tRcCli.right : g_tCfg.lGfxHei = tRcCli.bottom  : g_bSettingsChanged = true
+      end if
+   end if   
+   SaveSettings()   
 
 end sub
 
@@ -908,10 +937,10 @@ if ParseCmdLine()=0 then
    g_AppInstance = GetModuleHandle(null)
    WinMain() '<- main function
 end if
-'g_DoQuit = 1
+g_DoQuit = 1
 puts("Waiting viewer thread")
-'if g_ViewerThread then ThreadWait( g_ViewerThread )
-TerminateProcess( GetCurrentProcess , 0 )
+if g_ViewerThread then ThreadWait( g_ViewerThread )
+'TerminateProcess( GetCurrentProcess , 0 )
 
 #if 0
    3865 BP10 #7 s69 = 3001p11 B1 y90 c1;

@@ -1,6 +1,6 @@
 if CTL(wcMain) then return 0
 _InitForm()
-      
+
 var hEventGfxReady = CreateEvent( NULL , FALSE , FALSE , NULL )    
 g_hResizeEvent = CreateEvent( NULL , FALSE , FALSE , NULL )
 g_ViewerThread = ThreadCreate( @Viewer.MainThread , hEventGfxReady )
@@ -69,34 +69,14 @@ SendMessage( CTL(wcRadQuery) , BM_CLICK , 0,0 )
 'SendMessage( CTL(wcRadOutput) , BM_CLICK , 0,0 )
 SendMessage( CTL(wcBtnMinOut) , BM_CLICK , 0,0 )
 
-
 WaitForSingleObject( hEventGfxReady , INFINITE )    
 CloseHandle( hEventGfxReady )
 if g_GfxHwnd = 0 then return -1 'failed
 
 'SetWindowPos( g_hContainer , 0 , 0,0,100,100 , SWP_NOZORDER or SWP_SHOWWINDOW or SWP_NOMOVE )
 'ShowWindow( g_hContainer , SW_SHOW )
-ResizeMainWindow( true )    
-
-scope
-   dim as WINDOWPLACEMENT tPlace = type(sizeof(WINDOWPLACEMENT))
-   var f = freefile()
-   if open(exepath+"\LegoScript.cfg" for binary access read as #f)=0 then
-      get #f,,tPlace : close #f
-      dim as long lShow      
-      with tPlace
-         select case .showCmd
-         case SW_SHOWMAXIMIZED,SW_MAXIMIZE : lShow = SW_MAXIMIZE
-         case SW_SHOWMINIMIZED,SW_MINIMIZE : lShow = SW_MINIMIZE
-         case else : lShow = SW_SHOW
-         end select
-         .flags = 0 : .showCmd = SW_HIDE
-      end with
-      SetWindowPlacement( hWnd , @tPlace )      
-      ShowWindowAsync( hWnd , lShow )
-   end if   
-end scope
-
+'puts "IniWid: " & g_tCfg.lGuiWid : puts "IniHei: " & g_tCfg.lGuiHei
+ResizeMainWindow( true )
 
 File_New()    
 'LoadFileIntoEditor( exePath+"\sample.ls" )
