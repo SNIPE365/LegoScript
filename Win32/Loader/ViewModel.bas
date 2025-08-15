@@ -17,7 +17,8 @@
 #include "Modules\Matrix.bas"
 #include "Modules\Model.bas"
 
-' TODO: make the GUI window so that it can be part of LS in GUI/CLI mode but also part of the lego game.
+
+' TODO: load extra info from STUDIO.io collision files parse 9 as "special bounding" boxes
 ' TODO: we need now the full polygon collision to detect better if the bounding boxes collide
 ' TODO: change the collision bounding boxes, to line markers that extend outside the model
 ' TODO: handle the case where viewing a part file instead of a model file (as subparts shouldnt be checked for collision)

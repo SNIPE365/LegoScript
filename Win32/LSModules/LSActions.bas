@@ -631,6 +631,7 @@ end sub
 sub File_Export()
    puts(__FUNCTION__)
 end sub
+
 sub Edit_Undo()
    puts(__FUNCTION__)
 end sub
@@ -723,6 +724,7 @@ sub Completion_Toggle()
    case meFilter_Stickers    : ChgFilter( wIsSticker )
    end select
 end sub
+
 sub View_ToggleGW()
    var iToggledState = g_CurItemState xor MFS_CHECKED
    g_Show3D = (iToggledState and MFS_CHECKED)<>0
@@ -788,6 +790,7 @@ sub View_Toggle()
    SendMessage( g_GfxHwnd , WM_KEYDOWN , VK_TAB , 0 )   
    SendMessage( g_GfxHwnd , WM_KEYUP   , VK_TAB , 0 )
 end sub
+
 sub Help_About()
    puts(__FUNCTION__)
 end sub

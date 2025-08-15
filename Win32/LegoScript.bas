@@ -586,16 +586,16 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
 
    select case( message )
    #if 0
-   case WM_CTLCOLORBTN  
-      var hCtl = cast(HWND,lParam) : printf(!"btn=%X\n",hCtl)
-      if hCtl = CTL(wcTabs) then puts("Tabs changed? (button)")
-   case WM_CTLCOLORSCROLLBAR  
-      var hCtl = cast(HWND,lParam) : printf(!"scroll=%X\n",hCtl)
-      if hCtl = CTL(wcTabs) then puts("Tabs changed? (scroll)")
-   case WM_CTLCOLORSTATIC  
-      var hCtl = cast(HWND,lParam) : printf(!"static=%X\n",hCtl)
-      if hCtl = CTL(wcTabs) then puts("Tabs changed? (static)")      
-      'TabCtrl_GetItemRect(
+      case WM_CTLCOLORBTN  
+         var hCtl = cast(HWND,lParam) : printf(!"btn=%X\n",hCtl)
+         if hCtl = CTL(wcTabs) then puts("Tabs changed? (button)")
+      case WM_CTLCOLORSCROLLBAR  
+         var hCtl = cast(HWND,lParam) : printf(!"scroll=%X\n",hCtl)
+         if hCtl = CTL(wcTabs) then puts("Tabs changed? (scroll)")
+      case WM_CTLCOLORSTATIC  
+         var hCtl = cast(HWND,lParam) : printf(!"static=%X\n",hCtl)
+         if hCtl = CTL(wcTabs) then puts("Tabs changed? (static)")      
+         'TabCtrl_GetItemRect(
    #endif   
 
    case WM_DRAWITEM   'item in a control is being drawn (owner draw)
@@ -702,7 +702,7 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
                SetTimer( hwnd , wcEdit*256 , 100 , NULL )            
             end if            
          case EN_SETFOCUS               
-            ShowWindow( g_hContainer , g_SearchVis   )               
+            if g_CompletionEnable then ShowWindow( g_hContainer , g_SearchVis   )               
          case EN_KILLFOCUS
             'printf(!"%p (%p) (%p)\n",GetFocus(),g_hContainer,CTL(wcEdit))
             'if GetForegroundWindow() <> g_hContainer then 

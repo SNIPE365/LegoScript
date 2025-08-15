@@ -472,7 +472,7 @@ function HandleCasing( sText as string , tCtx as SearchQueryContext ) as long
          bGotPartID=1 : continue for
       end if
       'now it can only be attributes or the primative
-      if (bGotEqual andalso N = iTokens) orelse (N<(iTokens-1) andalso sToken(N+1)[0] = asc("=")) then
+      if (bGotEqual andalso N = (iTokens-1)) orelse (N<(iTokens-1) andalso sToken(N+1)[0] = asc("=")) then
          'last token is primative... so lowercase it
          for I as long = 0 to len(sToken(N))-1
             select case sToken(N)[I]
