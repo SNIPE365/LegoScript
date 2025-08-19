@@ -105,8 +105,8 @@ static shared as SnapPV g_NullSnap
 'g_NullSnap.pMatOrg = @g_tIdentityMatrix
 
 #include "LSModules\DictionaryTree.bas"
-#include "LSModules\LSFunctions.bas"
 #include once "Loader\Include\Colours.bas"
+#include "LSModules\LSFunctions.bas"
 
 'TODO: now check the remainder tokens, clutch/studs
 
@@ -132,7 +132,7 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
    #define iStStart aFile(iCurFile).uStStart
    #define iLineNumber aFile(iCurFile).uLineNumber
    #define sScript (*aFile(iCurFile).psScript)
-   
+         
    redim aFile(1 to 8) as FileStruct   
    redim iFileStack(15) as long
    
@@ -151,7 +151,7 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
    #define TokenFileName(_N) (*(aFile(TokenFileNumber(_N)).psFilename))
    #define TokenFilePath(_N) (*(aFile(TokenFileNumber(_N)).psFilepath))
       
-   #ifdef __Standalone
+   #ifdef __Standalone      
       #define ParserError( _text ) color 12:errorf(!"Error: %s\r\nat '%s':%i '%s'\n",SafeText(_text),TokenFilename(iCurToken), TokenLineNumber(iCurToken),SafeText(sStatement)) : sResult="" : color 7: exit while
       #define ParserWarning( _text ) color 14:errorf(!"Warning: %s\r\nat '%s':%i '%s'\n",SafeText(_text),TokenFilename(iCurToken),TokenLineNumber(iCurToken),SafeText(sStatement)):color 7
       #define LinkerError( _text ) color 12 : errorf(!"Error: %s\n",_text) : sResult="" : color 7
@@ -176,13 +176,13 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
    '#define DbgCrash() puts("" & __LINE__)
    #define DbgCrash()
    
-   '#define DbgBuild(_s) puts("" & __LINE__ & ": " & _s)
-   #define DbgBuild(_s)
+   #define DbgBuild(_s) puts("" & __LINE__ & ": " & _s)
+   '#define DbgBuild(_s)
    
-   #define Dbg_Printf  rem
-   '#define Dbg_Printf printf
-   #define Dbg_Puts rem
-   '#define Dbg_Puts puts
+   '#define Dbg_Printf  rem
+   #define Dbg_Printf printf
+   '#define Dbg_Puts rem
+   #define Dbg_Puts puts
    
    
    DbgBuild(!"\r"+string(60,"-"))
@@ -519,7 +519,7 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
    wend   
    DbgCrash()
    
-   #macro DebugParts()
+   #macro DebugParts()      
       dbg_puts("ID   sNam sPrimative  Colr Idx Ct Ok LocX LocY LocZ AngX AngY AngZ SX    1    2    4   SY    6    8    9   SZ")
       for N as long = bNullSkip to g_iPartCount-1      
          with g_tPart(N)
@@ -543,8 +543,10 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
          end with
       next N
    #endmacro      
-   #if len(__FB_QUOTE__(DbgBuild))
+   #if len(__FB_QUOTE__(DbgBuild))     
+     dbg_puts(">>> ------------- >>>")
      DebugParts()   
+     dbg_puts("<<< ------------- <<<")
    #endif
    
    'remove preprocessor entries now as they are unecessary (unless we use them for debug later)
@@ -615,7 +617,7 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                            sResult += zTemp 
                            #ifdef __Standalone
                            'errorf("(first) %s",zTemp)
-                           dbg_printf("%s",zTemp)
+                           dbg_printf("first: %s",zTemp)
                            #endif                                
                         end with
                         DbgBuild(">> This left part is a key-part")
@@ -709,7 +711,7 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                   DbgCrash()
                   
                   dbg_printf(!"Left <%g %g %g>\n",pLeft->fPX,pLeft->fPY,pLeft->fPZ)
-                  MatrixTranslate( .tMatrix , -pLeft->fPX , --pLeft->fPY , -pLeft->fpZ )
+                  MatrixTranslate( .tMatrix , pLeft->fPX , -pLeft->fPY , pLeft->fpZ )
                   
                   #if 0
                      ''dbg_puts("pLeft:" & pLeft & " // pRight:" & pRight)
@@ -871,50 +873,55 @@ else
    end if
    print ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> in memory script <<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
    #if 0
-   sScript = _
-      !"// part 3024 B1 is of type 'Plate' but was referenced as 'Brick' without a cast.\r\n;" _
-      !"3001 /*Comment*/ B1;" _
-      !"B1 #2 s7 = 3001 B2 c1;    ;" _
-      !"B2 s7=3001 B3 c1;" _
-      !"B3 #3 s1 = 3001 B4 c3;" _
-      !"B3 s8 = 3002 B5 c3;"
+      sScript = _
+         !"// part 3024 B1 is of type 'Plate' but was referenced as 'Brick' without a cast.\r\n;" _
+         !"3001 /*Comment*/ B1;" _
+         !"B1 #2 s7 = 3001 B2 c1;    ;" _
+         !"B2 s7=3001 B3 c1;" _
+         !"B3 #3 s1 = 3001 B4 c3;" _
+         !"B3 s8 = 3002 B5 c3;"
    #endif
    
    #if 0
-   sScript = _
-     !"3865 BP10 #7 s69 = 3001p11 B1 y90 c1;" _ '4070 (side stud) (87087 have shadow problems)
-     !"B1 s1 = 3001p11 B2 #2 c5;" _
-     !"B2 s1 = 3001p11 B3 #3 c6;" _
-     !"B3 c5 = 3001p11 B4 #4 s1;" _ '71752 '3021
-     !"B4 c1 = 4070 B5 #5 s2;"    'collision
-     '!"003238a P1 #2 c1 = 003238b P2 #4 s1;"
-   #endif
-   
+      sScript = _
+        !"3865 BP10 #7 s69 = 3001p11 B1 y90 c1;" _ '4070 (side stud) (87087 have shadow problems)
+        !"B1 s1 = 3001p11 B2 #2 c5;" _
+        !"B2 s1 = 3001p11 B3 #3 c6;" _
+        !"B3 c5 = 3001p11 B4 #4 s1;" _ '71752 '3021
+        !"B4 c1 = 4070 B5 #5 s2;"    'collision
+        '!"003238a P1 #2 c1 = 003238b P2 #4 s1;"
+   #endif   
    #if 0
-   'sScript = _ 
-   '   !"87087 B1 s1 = 87087 B2 #2 x-90 c1;"
-   sScript = _
-      !"3865 BP10 #7 s69 = 3001p11 B1 c1; \n" _
-      !"B1 s1 = 3001p11 B2 #2 c5; \n " _
-      !"B2 s1 = 3001p11 B3 #3 c6; \n" _
-      !"B3 c5 = 3001p11 B4 #4 s1; \n" _
-      !"B4 c1 = 4070 B5 #5 s22; \n" 
-   #endif
-   
+      'sScript = _ 
+      '   !"87087 B1 s1 = 87087 B2 #2 x-90 c1;"
+      sScript = _
+         !"3865 BP10 #7 s69 = 3001p11 B1 c1; \n" _
+         !"B1 s1 = 3001p11 B2 #2 c5; \n " _
+         !"B2 s1 = 3001p11 B3 #3 c6; \n" _
+         !"B3 c5 = 3001p11 B4 #4 s1; \n" _
+         !"B4 c1 = 4070 B5 #5 s22; \n" 
+   #endif   
    #if 0
-   sScript = _
-      "3002 B2 #7 s1 = 3001p11 B1 xo12 c1;" !"\n" '_
-      '"3001 B3 #2 s2 = B1 c1;"         !"\n"
-   #endif
-   
+      sScript = _
+         "3002 B2 #7 s1 = 3001p11 B1 xo12 c1;" !"\n" '_
+         '"3001 B3 #2 s2 = B1 c1;"         !"\n"
+   #endif   
    #if 0
       sScript = _
       "3023 P1 #1 c1 = 3023 P2 #2 s2;" !"\n" _
       "3001 P3 #4 c1 = P2 s1;"         !"\n"
    #endif
+   #if 0
       sScript = _
-   "3001 B1 #2 y90 xo100 c1 = 3001 B2 #3 s1;" !"\n" _
-   "3002 B3 #4 c1 = 3002 B4 #5 s1;"           !"\n" _
+         "3001 B1 #2 y90 xo100 c1 = 3001 B2 #3 s1;" !"\n" _
+         "3002 B3 #4 c1 = 3002 B4 #5 s1;"           !"\n" _
+   #endif
+   #if 1
+      '"3958 B1 #black s1 = 3005 B2 c1;"
+      sScript = _         
+         "3001 B1 #black s1 = 3001 B2 c1;"
+   #endif
+
      
 end if
 var sModel = LegoScriptToLDraw(sScript)

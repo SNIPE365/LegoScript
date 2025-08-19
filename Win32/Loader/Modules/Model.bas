@@ -10,6 +10,8 @@
    #define DebugPrimIdent
 #endif
 
+static shared as boolean g_bRenderShadow , g_bRenderConnector
+
 'Get SubPartType (based on the name !shouldnt be used we should trust the shadow library!)
 function GetSubPartType( sPartName as string , bDebug as boolean = false ) as long
    'all duplos studs/clutches are hollow
@@ -65,8 +67,7 @@ sub RenderModel( pPart as DATFile ptr , iBorders as long , uCurrentColor as ulon
    with *pPart      
       'for M as long = 0 to 1
       for N as long = 0 to .iPartCount-1
-         dim as byte bDoDraw
-         if (lDrawPart<0 orelse lDrawPart=N) then bDoDraw = 1
+         dim as byte bDoDraw = (lDrawPart<0 orelse lDrawPart=N)
          dim as ulong uColor = any', uEdge = any
          with .tParts(N)
             #ifdef DebugPrimitive
@@ -259,7 +260,11 @@ end sub
 static shared as long g_TotalLines , g_TotalOptis , g_TotalTrigs , g_TotalQuads
 sub SizeModel( pPart as DATFile ptr , tSize as PartSize , iPartWanted as long = -1 , byref iPartNum as long = -1 , pRoot as DATFile ptr = NULL )
    
-   if pRoot = NULL then pRoot = pPart : memset( @tSize , 0 , sizeof(tSize) )
+   dim as boolean bInitSizeStruct
+   if pRoot = NULL then 
+      pRoot = pPart 
+      dim as typeof(tSize) tTemp : tSize = tTemp
+   end if
    
    #macro CheckZ( _Var ) 
       if bWantSize then
@@ -522,6 +527,7 @@ type SnapPV
    as float fPX,fPY,fPZ 'position
    as float fAX,fAY,fAZ 'direction vector
    as Matrix4x4 ptr pMatOrg
+   as Matrix4x4 tOriMat 
 end type
 type PartSnap
    lStudCnt     as long
@@ -566,7 +572,7 @@ sub SnapAddClutch( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) 
             tPV.pMatOrg = 0
          else
             tPV.pMatOrg = allocate( sizeof(Matrix4x4) )
-            *tPV.pMatOrg = tMatrixStack( g_CurrentMatrix )            
+            *tPV.pMatOrg = tMatrixStack( g_CurrentMatrix )
          end if
          .pClutch[.lClutchCnt-1] = tPV
       next N
@@ -580,6 +586,7 @@ sub SnapAddStud( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) )
         .pStud = reallocate(.pStud,sizeof(tPV)*.lStudCnt)
         .pStud[.lStudCnt-1] = tPV
         .pStud[.lStudCnt-1].pMatOrg = 0
+        .pStud[.lStudCnt-1].tOriMat = tMatrixStack( g_CurrentMatrix )
       next N
    end with
 end sub
@@ -589,6 +596,8 @@ sub SnapAddClutch( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) 
         .lClutchCnt += 1
         .pClutch = reallocate(.pClutch,sizeof(tPV)*.lClutchCnt)
         .pClutch[.lClutchCnt-1] = tPV
+        .pClutch[.lClutchCnt-1].pMatOrg = 0
+        .pClutch[.lClutchCnt-1].tOriMat = tMatrixStack( g_CurrentMatrix )
       next N
    end with
 end sub 
@@ -643,66 +652,68 @@ function worldToNDC(x as single, y as single, z as single, byref ndcX as single,
     end if
 end function
 
-
 sub DrawMaleShape( fX as single , fY as single , fZ as single , fRadius as single , fLength as single , bRound as byte , sName as string = "M?" )
    'dim as single fVec(2) = {fX_,fY_,fZ_}
    'MultiplyMatrixVector( @fVec(0) )
    '#define FX fVec(0)
    '#define FY fVec(1)
    '#define FZ fVec(2)
-      
-   glPushMatrix()   
-   glLoadCurrentMatrix()
-   glTranslatef( fX , fY-fLength/2.0 , fZ )      
-   glColor3f( 1 , 1 , 0 )
    
-   #if 0
-      glColor4f( 0 , 0 , 0 , .5 )   
-      glLineWidth( 2 )
+   if g_bRenderConnector then
+      glPushMatrix()   
+      glLoadCurrentMatrix()
+      glTranslatef( fX , fY-fLength/2.0 , fZ )      
+      glColor3f( 1 , 1 , 0 )
       
       #if 0
-         dim as single fOX,fOY,fOZ   
-         ndcToWorld( g_fNX , g_fNY , 0 , fOX,fOY,fOZ )
-         g_fNX += .05
+         glColor4f( 0 , 0 , 0 , .5 )   
+         glLineWidth( 2 )
+         
+         #if 0
+            dim as single fOX,fOY,fOZ   
+            ndcToWorld( g_fNX , g_fNY , 0 , fOX,fOY,fOZ )
+            g_fNX += .05
+               
+            glBegin(GL_LINES)
+            glVertex3D(0,0,0)   
+            glVertex3D(fOX,fOY,fOZ)   
+            glEnd()
+         #else
+            dim as single fOX,fOY , fNX,fNY,fNZ
+            worldToNDC( 0,0,0 , fOX , fOY )
             
-         glBegin(GL_LINES)
-         glVertex3D(0,0,0)   
-         glVertex3D(fOX,fOY,fOZ)   
-         glEnd()
-      #else
-         dim as single fOX,fOY , fNX,fNY,fNZ
-         worldToNDC( 0,0,0 , fOX , fOY )
+            glMatrixMode(GL_PROJECTION)
+            glPushMatrix()
+            glLoadIdentity()
+            glOrtho(-1, 1, -1, 1, -1, 1)      
+            glMatrixMode(GL_MODELVIEW)
+            glPushMatrix()
+            glLoadIdentity()      
+            glDisable(GL_DEPTH_TEST)
+            
+            dim as single fA = atan2( fOY , fOX )
+            dim as single fPX, fPY
+            fPX = cos(fA)*8 : fPY = sin(fA)*8
+            glBegin(GL_LINES)
+            glVertex3D(fPX,fPY,0)      
+            glVertex3D(fOX,fOY,0)
+            glEnd()
+            
+            glEnable(GL_DEPTH_TEST)
+            glPopMatrix() ' MODELVIEW
+            glMatrixMode(GL_PROJECTION)
+            glPopMatrix()
+            glMatrixMode(GL_MODELVIEW)
+            
+         #endif
          
-         glMatrixMode(GL_PROJECTION)
-         glPushMatrix()
-         glLoadIdentity()
-         glOrtho(-1, 1, -1, 1, -1, 1)      
-         glMatrixMode(GL_MODELVIEW)
-         glPushMatrix()
-         glLoadIdentity()      
-         glDisable(GL_DEPTH_TEST)
-         
-         dim as single fA = atan2( fOY , fOX )
-         dim as single fPX, fPY
-         fPX = cos(fA)*8 : fPY = sin(fA)*8
-         glBegin(GL_LINES)
-         glVertex3D(fPX,fPY,0)      
-         glVertex3D(fOX,fOY,0)
-         glEnd()
-         
-         glEnable(GL_DEPTH_TEST)
-         glPopMatrix() ' MODELVIEW
-         glMatrixMode(GL_PROJECTION)
-         glPopMatrix()
-         glMatrixMode(GL_MODELVIEW)
-         
-      #endif
+         glLineWidth( 1 )
+      #endif      
+      glDrawText( sName ,0,-fLength,0 , fRadius/len(sName),fRadius , true )
       
-      glLineWidth( 1 )
-   #endif      
-   glDrawText( sName ,0,-fLength,0 , fRadius/len(sName),fRadius , true )
-   
-   glPopMatrix() : exit sub 'ignore display of shape
+      glPopMatrix() 'ignore display of shape
+   end if
+   if g_bRenderShadow=false then exit sub
    
    glEnable( GL_POLYGON_STIPPLE )
    glRotatef( 90 , 1,0,0 )      
@@ -728,19 +739,21 @@ sub DrawFemaleShape( fX as single , fY as single , fZ as single , fRadius as sin
    '#define FY fVec(1)
    '#define FZ fVec(2)   
    
-   glPushMatrix()   
-   
-   glLoadCurrentMatrix()
-   glTranslatef( fX , fY-fLength/2.0 , fZ )   
-   
-   glColor3f( 1 , 0 , 0 )
-   
-   glRotatef( 180 , 1,0,0 )
-   glDrawText( sName ,0,-abs(fLength*.5),0 , fRadius/len(sName) , fRadius , true )
-   glRotatef( 180 , 1,0,0 )
-   
-   glPopMatrix() : exit sub 'ignore display of shape
-   
+   if g_bRenderConnector then
+      glPushMatrix()   
+      
+      glLoadCurrentMatrix()
+      glTranslatef( fX , fY-fLength/2.0 , fZ )   
+      
+      glColor3f( 1 , 0 , 0 )
+      
+      glRotatef( 180 , 1,0,0 )
+      glDrawText( sName ,0,-abs(fLength*.5),0 , fRadius/len(sName) , fRadius , true )
+      glRotatef( 180 , 1,0,0 )
+      
+      glPopMatrix() : exit sub 'ignore display of shape
+   end if
+   if g_bRenderShadow=false then exit sub
    glRotatef( 90 , 1,0,0 )
    glEnable( GL_POLYGON_STIPPLE )
    glPolygonStipple(	cptr(glbyte ptr,@FeMaleStipple(0)) )      
@@ -756,6 +769,24 @@ sub DrawFemaleShape( fX as single , fY as single , fZ as single , fRadius as sin
    glDisable( GL_POLYGON_STIPPLE )
 end sub
 #endif
+
+sub SortSnap( tSnap as PartSnap )
+   #macro SortLogic( _ConnName )
+      do
+         var bDidSort = 0
+         for N as long = 0 to .l##_ConnName##Cnt-2
+            var fW0 = .p##_ConnName[N+0].fPY*(100^3) + .p##_ConnName[N+0].fpZ*(100^2) - .p##_ConnName[N+0].fpX
+            var fW1 = .p##_ConnName[N+1].fPY*(100^3) + .p##_ConnName[N+1].fpZ*(100^2) - .p##_ConnName[N+1].fpX
+            if fW1 > fW0 then swap .p##_ConnName[N],.p##_ConnName[N+1]: bDidSort=1 : continue for
+         next N
+         if bDidSort=0 then exit do
+      loop
+   #endmacro
+   with tSnap
+      SortLogic( stud )
+      SortLogic( clutch )
+   end with
+end sub
 
 #ifdef ShadowCalcMatrix
 sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , bDraw as byte = false , pRoot as DATFile ptr = NULL )   
@@ -1205,8 +1236,11 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , lDrawPart as long = -2
    #ifdef __NoRender
    lDrawPart=-2   
    #endif
-   static as integer iMale=0 , iFemale=0
-   if pRoot = NULL then pRoot = pPart : iMale=0 : iFemale=0 : 'puts("-----------------")
+   static as integer iMale=0 , iFemale=0   
+   if pRoot = NULL then 
+      pRoot = pPart : iMale=0 : iFemale=0 : 'puts("-----------------")
+      memset( @tSnap.lStudCnt , 0 , offsetof(PartSnap,pStud) )
+   end if
    with *pPart
       if .tSize.zMax = .tSize.zMin then
          dim as PartSize tSz : SizeModel( pPart , tSz )
@@ -1424,12 +1458,12 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , lDrawPart as long = -2
                                  bSecs -= 1 'BARHOLE
                                  'puts("Bar" & bSecs)
                               elseif .tSecs(I).wFixRadius = 600 then 'stud
-                                 if lDrawPart=-2 then
+                                 if lDrawPart<>-3 then '=-2
                                     DbgConnect(!"Stud += %i\n",iConCnt)
                                     'var p = pPart
                                     with *pMat
                                        'printf(!"stud ori: %p\n",pMatOri)
-                                       puts("Male: " & iMale)
+                                       'puts("Male: " & iMale)
                                        SnapAddStud( tSnap , iConCnt , type(fPX+.fPosX , fPY+.fPosY , fPZ+.fPosZ) )
                                     end with
                                  end if                                 
@@ -1474,11 +1508,11 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , lDrawPart as long = -2
                                  'if there's an axlehole then it can't be a pinhole, and it can't have dual clutches
                                  bSecs -= 1 : iMaybePins=-999 : bSides = 1
                               case sss_Square   
-                                 if lDrawPart=-2 then
+                                 if lDrawPart<>-3 then '=-2
                                     if bDidClutch=0 then
                                        bDidClutch=1
                                        with *pMat
-                                          puts("Female: " & iFemale)
+                                          ''puts("Female: " & iFemale)
                                           SnapAddClutch( tSnap , iConCnt , type(fPX+.fPosX , fPY+.fPosY , fPZ+.fPosZ) )                                       
                                        end with
                                     end if
@@ -1536,12 +1570,12 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , lDrawPart as long = -2
                                     if bDidBarHole=0 then bDidBarHole = 1 '': tSnap.lBarHoleCnt += iConCnt*bSides 
                                     bSecs -= 1 'bConType = spBarhole : exit for 'BARHOLE
                                  elseif .tSecs(I).wFixRadius = 600 then 'clutch?
-                                    if lDrawPart=-2 then 
+                                    if lDrawPart<>-3 then  '=-2
                                        DbgConnect(!"Clutch += %i (Round)\n",iConCnt)
                                        with *pMat                                       
                                           for iGX as long = 0 to xCnt
                                              for iGZ as long = 0 to zCnt
-                                                puts("Female: " & iFemale)
+                                                ''puts("Female: " & iFemale)
                                                 SnapAddClutch( tSnap , 1 , type(fPX+.fPosX+iGX*pG->xStep , fPY+.fPosY , fPZ+.fPosZ+iGZ*pG->zStep) )
                                              next igZ
                                           next iGX
@@ -1573,9 +1607,9 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , lDrawPart as long = -2
                            '#endif
                         case spClutch  
                            'printf(!"Sides=%i\n",bSides)
-                           if lDrawPart=-2 then
+                           if lDrawPart<>-3 then '=-2
                               with *pMat
-                                 puts("Female: " & iFemale)
+                                 'puts("Female: " & iFemale)
                                  SnapAddClutch( tSnap , iConCnt , type(fPX+.fPosX , fPY+.fPosY , fPZ+.fPosZ) )                                       
                               end with
                               DbgConnect(!"Clutch += %i (Fallback {ignored})\n",iConCnt)
@@ -1666,7 +1700,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , lDrawPart as long = -2
             end if
          end with
       next N
-   end with   
+   end with
 end sub
 #endif
 

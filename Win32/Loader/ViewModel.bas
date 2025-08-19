@@ -1,8 +1,12 @@
 #define __Main "ViewModel.bas"
 '#define __Tester
+
 '#define DebugShadow
+'#define DebugShadowConnectors
+
 '#define ColorizePrimatives
 '#define RenderOptionals
+
 
 '#ifndef __NoRender
 
@@ -219,7 +223,9 @@ scope
    'sFile = sPath+"LDraw\models\pyramid.ldr"
    'sFile = sPath+"\examples\8891-towTruck.mpd"
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\5510.mpd"
-   sFile = "C:\Users\greg\Desktop\LDCAD\examples\cube10x10x10.ldr"
+   'sFile = "C:\Users\greg\Desktop\LDCAD\examples\cube10x10x10.ldr"
+   sFile = "3001.dat" 
+   'sFile = "3958.dat"
 end scope
 scope 
    #if 0
@@ -236,7 +242,7 @@ end scope
 dim as string sModel
 dim as DATFile ptr pModel
 
-#if 1 '1 = Load File , 0 = Load From clipboard
+#if 0 '1 = Load File , 0 = Load From clipboard
    if len(sFile)=0 then sFile=command(1)
    if instr(sFile,"\")=0 andalso instr(sFile,"/")=0 then FindFile(sFile)
    printf(!"Model: '%s'\n",sFile)
@@ -270,14 +276,21 @@ dim as DATFile ptr pModel
                if sModel[N]=13 then sModel[N]=32
             next N
          else 'if there isnt a model in the clipboard, then load this:
-            sModel = _    
-            "1 2 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 4070.dat" EOL _         
+            'sModel = _    
+            '"1 2 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 4070.dat" EOL _
             ' ------------------------------------------------------
-            
             'sModel = _ 'all of lines belo should end with EOL _
             '   "1 4 0 0 0 1 0 0 0 1 0 0 0 1 30068.dat"    EOL _
             '   "1 1 0 -10 0 1 0 0 0 1 0 0 0 1 18654.dat"  EOL _
             ' ------------------------------------------------------
+            'sModel = _
+            '   "1 0 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 3958.dat"       EOL _
+            '   "1 16 -50.000000 -24.000000 50.000000 1 0 0 0 1 0 0 0 1 3005.dat" EOL _
+            ' ------------------------------------------------------
+            sModel = _
+               "1 2 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 3001.dat"      EOL _
+               "1 0 -60.000000 -24.000000 20.000000 1 0 0 0 1 0 0 0 1 3001.dat"  EOL _
+            
          end if
       end if            
    end if
@@ -337,25 +350,25 @@ redim as PartCollisionBox atCollision()
 CheckCollisionModel( pModel , atCollision() )
 printf(!"Parts: %i , Collisions: %i \n",g_PartCount,ubound(atCollision)\2)
 
-#ifdef DebugShadow
-dim as PartSnap tSnap
-SnapModel( pModel , tSnap )
-with tSnap
-   printf(!"Studs=%i Clutchs=%i Aliases=%i Axles=%i Axlehs=%i Bars=%i Barhs=%i Pins=%i Pinhs=%i\n", _
-   .lStudCnt , .lClutchCnt , .lAliasCnt , .lAxleCnt , .lAxleHoleCnt ,.lBarCnt , .lBarHoleCnt , .lPinCnt , .lPinHoleCnt )
-   puts("---------- stud ----------")
-   for N as long = 0 to .lStudCnt-1
-      with .pStud[N]
-         printf(!"#%i %g %g %g\n",N+1,.fPX,.fPY,.fPZ)
-      end with
-   next N
-   puts("--------- clutch ---------")
-   for N as long = 0 to .lClutchCnt-1
-      with .pClutch[N]
-         printf(!"#%i %g %g %g\n",N+1,.fPX,.fPY,.fPZ)
-      end with
-   next N
-end with
+#ifdef DebugShadowConnectors
+   dim as PartSnap tSnap
+   SnapModel( pModel , tSnap )
+   with tSnap
+      printf(!"Studs=%i Clutchs=%i Aliases=%i Axles=%i Axlehs=%i Bars=%i Barhs=%i Pins=%i Pinhs=%i\n", _
+      .lStudCnt , .lClutchCnt , .lAliasCnt , .lAxleCnt , .lAxleHoleCnt ,.lBarCnt , .lBarHoleCnt , .lPinCnt , .lPinHoleCnt )
+      puts("---------- stud ----------")
+      for N as long = 0 to .lStudCnt-1
+         with .pStud[N]
+            printf(!"#%i %g %g %g\n",N+1,.fPX,.fPY,.fPZ)
+         end with
+      next N
+      puts("--------- clutch ---------")
+      for N as long = 0 to .lClutchCnt-1
+         with .pClutch[N]
+            printf(!"#%i %g %g %g\n",N+1,.fPX,.fPY,.fPZ)
+         end with
+      next N
+   end with
 #endif
 
 'do : sleep 50 : flip : loop
@@ -377,37 +390,45 @@ with tSz
    'puts(".yMin=" & .yMin & " .yMax=" & .yMax)
    'puts(".zMin=" & .zMin & " .zMax=" & .zMax)
    
-   fPositionX = ((.xMax-.xMin)\-2) '-.xMin
-   fPositionY = (.yMax-.yMin)\2
+   fPositionX = ((.xMax+.xMin)\-2) '-.xMin
+   fPositionY = (.yMax+.yMin)\2
    'printf(!"\nzmin=%f zmax=%f\n",.zMin,.zMax)
    fPositionZ = (.zMax-.zMin) 'abs(.zMax)-abs(.zMin)
    'fPositionZ = abs(iif(abs(.zMin)>abs(.zMax),.zMin,.zMax))
    fPositionZ = sqr(fPositionZ)*-40
 end with
 
+dim as PartSnap tSnapID
+
 do
-   
    glClear GL_COLOR_BUFFER_BIT OR GL_DEPTH_BUFFER_BIT      
-   glLoadIdentity()
-   
+   glLoadIdentity()   
    glScalef(1/-20, 1.0/-20, 1/20 )
+   
+   static as long OldDraw = -1
+   if g_CurDraw <> -1 andalso OldDraw <> g_CurDraw then
+      SnapModel( pModel , tSnapID , g_CurDraw )
+      SortSnap( tSnapID )
+   end if
       
    '// Set light position (0, 0, 0)
    dim as GLfloat lightPos(...) = {0,0,0, 1.0f}'; // (x, y, z, w), w=1 for positional light
    glLightfv(GL_LIGHT0, GL_POSITION, @lightPos(0))
-   
+         
    'g_zFar
    glTranslatef( -fPositionX , fPositionY , fPositionZ*(fZoom+4) ) '80*fZoom ) '/-5)
-   
+   'glTranslatef( 0 , 0 , -80*(fZoom+4) )
+         
    glRotatef fRotationY , -1.0 , 0.0 , 0
    glRotatef fRotationX , 0   , -1.0 , 0
-   
+         
    glPushMatrix()
    with tSz
       'glTranslatef( (.xMin+.xMax)/-2  , (.yMin+.yMax)/-2 , (.zMin+.zMax)/-2 )
    end with
       
    glDisable( GL_LIGHTING )
+   glEnable( GL_DEPTH_TEST )
    
    g_fNX=-.95 : g_fNY=.95
       
@@ -421,7 +442,7 @@ do
    glEnable( GL_LIGHTING )
    
    #ifdef DebugShadow
-   dim as PartSnap tSnap = any
+   dim as PartSnap tSnap
    static as byte bOnce   
    'if bOnce=0 then
       'SnapModel( pModel , tSnap , 2 )
@@ -494,7 +515,50 @@ do
    end if
    glDepthMask (GL_TRUE)
    
-   'glPopMatrix()
+   glPopMatrix()
+   
+   'glDisable( GL_DEPTH_TEST )
+   
+   #macro DrawConnectorName( _YOff )      
+      var sText = "" & N+1
+      #if 0     
+         glPushMatrix()
+         glTranslatef( .fpX , .fPY , .fPZ )
+         glRotatef fRotationX  , 0   , 1.0 , 0 : glRotatef fRotationY  , 1.0 , 0.0 , 0            
+         glRotatef 90  , 1.0 , 0 , 0 : glRotatef 180  , 0 , 0 , 1.0
+         glDrawText( sText , 0,0,0 , 8/len(sText),8 , true )
+         glPopMatrix()
+      #else
+         glDrawText( sText , .fPX,.fPY+(_YOff),.fPZ , 8/len(sText),8 , true )
+      #endif
+   #endmacro
+
+   if g_CurDraw <> -1 then      
+      with tSnapID         
+         glColor4f(0,1,0,1)         
+         for N as long = 0 to .lStudCnt-1
+            with .pStud[N]
+               DrawConnectorName(-5)
+            end with         
+         next N                  
+         glColor4f(1,0,0,1)
+         for N as long = 0 to .lClutchCnt-1
+            with .pClutch[N]
+               DrawConnectorName(+5)
+            end with
+         next N
+      end with
+      OldDraw = g_CurDraw
+   end if
+   
+   glClear GL_DEPTH_BUFFER_BIT
+               
+   #define DrawMarker( _X , _Y , _Z ) DrawLimitsCube( (_X)-2,(_X)+2 , (_Y)-2,(_Y)+2 , (_Z)-2,(_Z)+2 )      
+   glColor4f(1,.5,.25,.66) : DrawMarker( 0,0,0 )
+         
+   
+   'glColor4f(.25,.5,1,.66) : DrawMarker( -50,0,-50 )
+   
             
    Dim e as fb.EVENT = any
    while (ScreenEvent(@e))

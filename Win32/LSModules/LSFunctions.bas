@@ -178,6 +178,7 @@ function LoadPartModel( byref tPart as PartStructLS ) as long
          pModel->pData = new PartSnap
          var pSnap = cptr(PartSnap ptr,pModel->pData)
          SnapModel( pModel , *pSnap )         
+         SortSnap( *pSnap )
       end if
       'calculate model size
       'SizeModel( pModel , .tSize ) 'Model::SizeModel

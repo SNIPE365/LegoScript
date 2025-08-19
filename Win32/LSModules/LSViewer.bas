@@ -247,8 +247,8 @@ namespace Viewer
                      if bResetAttributes then
                         'fPositionX = 0 '((.xMin + .xMax)\-2)-.xMin
                         'fPositionY = (.yMin + .yMax)\-2
-                        fPositionX = ((.xMax-.xMin)\-2)-.xMin
-                        fPositionY = ((.yMax-.yMin)\2)+.yMin
+                        fPositionX = ((.xMax+.xMin)\-2) '-.xMin
+                        fPositionY = ((.yMax+.yMin)\2) '+.yMin
                         fPositionZ = (.zMax-.zMin) 'abs(.zMax)-abs(.zMin)
                         fPositionZ = sqr(fPositionZ)*-40
                      end if
@@ -294,7 +294,9 @@ namespace Viewer
          glTranslatef( -fPositionX , fPositionY , fPositionZ*(fZoom+4) )      
          glRotatef fRotationY , -1.0 , 0.0 , 0
          glRotatef fRotationX , 0   , -1.0 , 0      
+         
          'glPushMatrix()
+         
          glDisable( GL_LIGHTING )
          
          Try()
@@ -302,7 +304,7 @@ namespace Viewer
                glCallList(	iModel )   
             else
                RenderModel( pModel , false , , g_CurDraw )
-               dim as PartSnap tSnap = any
+               dim as PartSnap tSnap' = any
                SnapModel( pModel , tSnap , g_CurDraw )      
             end if
             glCallList(	iBorders-(g_CurDraw>=0) )
@@ -316,7 +318,7 @@ namespace Viewer
          #ifdef DebugShadow
             dim as PartSnap tSnap = any
             static as byte bOnce         
-            SnapModel( pModel , tSnap , true )      
+            SnapModel( pModel , tSnap , true )
          #endif
       
          #if 0
