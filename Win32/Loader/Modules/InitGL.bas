@@ -66,12 +66,17 @@ sub checkGLError(message as string="")
     wend
 end sub
 sub glDrawText( sText as string , fPX as single = 0 , fPY as single = 0 , fPZ as single , fWid as single = 1.0 , fHei as single = 1.0 , bCenter as boolean = false )
-   
+      
    glEnable (GL_ALPHA_TEST)
    glDisable(GL_BLEND)
    glDisable(GL_LIGHTING)
 
    glBindTexture(GL_TEXTURE_2D, g_FontUI)
+   
+   if fPY > 0 then fHei = -fHei 'fWid = -fWid 
+   
+   'if fPX > 0 then fWid = -fWid   
+   'if fPZ > 0 then fHei = -fHei
    
    if bCenter then fPX -= len(sText)*fWid*.5 : fPZ -= fHei*.5
    dim as single fPXO = fPX

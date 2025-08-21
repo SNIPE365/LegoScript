@@ -220,11 +220,11 @@ scope
    
    'crashing due to fallback additions
    '#include "CrashTest.bi"
-   'sFile = sPath+"LDraw\models\pyramid.ldr"
+   sFile = sPath+"LDraw\models\pyramid.ldr"
    'sFile = sPath+"\examples\8891-towTruck.mpd"
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\5510.mpd"
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\cube10x10x10.ldr"
-   sFile = "3001.dat" 
+   'sFile = "3001.dat" 
    'sFile = "3958.dat"
 end scope
 scope 
@@ -242,7 +242,7 @@ end scope
 dim as string sModel
 dim as DATFile ptr pModel
 
-#if 0 '1 = Load File , 0 = Load From clipboard
+#if 1 '1 = Load File , 0 = Load From clipboard
    if len(sFile)=0 then sFile=command(1)
    if instr(sFile,"\")=0 andalso instr(sFile,"/")=0 then FindFile(sFile)
    printf(!"Model: '%s'\n",sFile)
@@ -285,11 +285,16 @@ dim as DATFile ptr pModel
             ' ------------------------------------------------------
             'sModel = _
             '   "1 0 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 3958.dat"       EOL _
-            '   "1 16 -50.000000 -24.000000 50.000000 1 0 0 0 1 0 0 0 1 3005.dat" EOL _
+            '   "1 16 -50.000000 -24.000000 50.000000 1 0 0 0 1 0 0 0 1 3005.dat"
             ' ------------------------------------------------------
             sModel = _
                "1 2 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 3001.dat"      EOL _
-               "1 0 -60.000000 -24.000000 20.000000 1 0 0 0 1 0 0 0 1 3001.dat"  EOL _
+               "1 0 -60.000000 -24.000000 20.000000 1 0 0 0 1 0 0 0 1 3002.dat"
+            ' ------------------------------------------------------
+            'sModel = _
+            '   "1 0 0.000000 0.000000 0.000000 1 0 0 0 -1 -8.74228e-008 0 8.74228e-008 -1 3001.dat" EOL _
+            '   "1 22 -60.000000 24.000002 -19.999998 1 0 0 0 -1 -0 0 0 -1 3001.dat"
+
             
          end if
       end if            
@@ -351,24 +356,30 @@ CheckCollisionModel( pModel , atCollision() )
 printf(!"Parts: %i , Collisions: %i \n",g_PartCount,ubound(atCollision)\2)
 
 #ifdef DebugShadowConnectors
-   dim as PartSnap tSnap
-   SnapModel( pModel , tSnap )
-   with tSnap
-      printf(!"Studs=%i Clutchs=%i Aliases=%i Axles=%i Axlehs=%i Bars=%i Barhs=%i Pins=%i Pinhs=%i\n", _
-      .lStudCnt , .lClutchCnt , .lAliasCnt , .lAxleCnt , .lAxleHoleCnt ,.lBarCnt , .lBarHoleCnt , .lPinCnt , .lPinHoleCnt )
-      puts("---------- stud ----------")
-      for N as long = 0 to .lStudCnt-1
-         with .pStud[N]
-            printf(!"#%i %g %g %g\n",N+1,.fPX,.fPY,.fPZ)
+   scope
+      dim as PartSnap tSnap
+      for I as long = 0 to g_PartCount-1      
+         puts("#" & I)
+         SnapModel( pModel , tSnap , I )
+         with tSnap
+            printf(!"Studs=%i Clutchs=%i Aliases=%i Axles=%i Axlehs=%i Bars=%i Barhs=%i Pins=%i Pinhs=%i\n", _            
+            .lStudCnt , .lClutchCnt , .lAliasCnt , .lAxleCnt , .lAxleHoleCnt ,.lBarCnt , .lBarHoleCnt , .lPinCnt , .lPinHoleCnt )
+            SortSnap( tSnap )
+            puts("---------- stud ----------")
+            for N as long = 0 to .lStudCnt-1
+               with .pStud[N]
+                  printf(!"#%i %g %g %g\n",N+1,.fPX,.fPY,.fPZ)
+               end with
+            next N
+            puts("--------- clutch ---------")
+            for N as long = 0 to .lClutchCnt-1
+               with .pClutch[N]
+                  printf(!"#%i %g %g %g\n",N+1,.fPX,.fPY,.fPZ)
+               end with
+            next N
          end with
-      next N
-      puts("--------- clutch ---------")
-      for N as long = 0 to .lClutchCnt-1
-         with .pClutch[N]
-            printf(!"#%i %g %g %g\n",N+1,.fPX,.fPY,.fPZ)
-         end with
-      next N
-   end with
+      next I
+   end scope
 #endif
 
 'do : sleep 50 : flip : loop
@@ -406,8 +417,9 @@ do
    glScalef(1/-20, 1.0/-20, 1/20 )
    
    static as long OldDraw = -1
-   if g_CurDraw <> -1 andalso OldDraw <> g_CurDraw then
-      SnapModel( pModel , tSnapID , g_CurDraw )
+   if g_CurDraw <> -1 andalso OldDraw <> g_CurDraw then                        
+      var pSubPart = g_tModels( pModel->tParts(g_CurDraw)._1.lModelIndex ).pModel                  
+      SnapModel( pSubPart , tSnapID )      
       SortSnap( tSnapID )
    end if
       
@@ -442,14 +454,14 @@ do
    glEnable( GL_LIGHTING )
    
    #ifdef DebugShadow
-   dim as PartSnap tSnap
-   static as byte bOnce   
-   'if bOnce=0 then
-      'SnapModel( pModel , tSnap , 2 )
-      'bOnce=1
-   'else
-      SnapModel( pModel , tSnap , true )
-   'end if
+      dim as PartSnap tSnap
+      static as byte bOnce   
+      'if bOnce=0 then
+         'SnapModel( pModel , tSnap , 2 )
+         'bOnce=1
+      'else
+         SnapModel( pModel , tSnap , true )
+      'end if
    #endif
 
    #if 0
@@ -487,6 +499,8 @@ do
       glDisable( GL_POLYGON_STIPPLE )
    #endif
    
+   glPopMatrix()
+   
    glDepthMask (GL_FALSE)
    if bBoundingBox then
       glColor4f(0,1,0,.25)
@@ -514,9 +528,7 @@ do
       glDisable( GL_POLYGON_STIPPLE )      
    end if
    glDepthMask (GL_TRUE)
-   
-   glPopMatrix()
-   
+         
    'glDisable( GL_DEPTH_TEST )
    
    #macro DrawConnectorName( _YOff )      
@@ -534,10 +546,19 @@ do
    #endmacro
 
    if g_CurDraw <> -1 then      
+      glPushMatrix()
+      with pModel->tParts(g_CurDraw)._1
+         dim as single fMatrix(15) = { _
+            .fA , .fD , .fG , 0 , _ 'X scale ,    0?   ,   0?    , 0 
+            .fB , .fE , .fH , 0 , _ '  0?    , Y Scale ,   0?    , 0 
+            .fC , .fF , .fI , 0 , _ '  0?    ,    0?   , Z Scale , 0 
+            .fX , .fY , .fZ , 1 }   ' X Pos  ,  Y Pos  ,  Z Pos  , 1 
+         glMultMatrixf( @fMatrix(0) )
+      end with
       with tSnapID         
          glColor4f(0,1,0,1)         
          for N as long = 0 to .lStudCnt-1
-            with .pStud[N]
+            with .pStud[N]               
                DrawConnectorName(-5)
             end with         
          next N                  
@@ -549,6 +570,7 @@ do
          next N
       end with
       OldDraw = g_CurDraw
+      glPopMatrix()
    end if
    
    glClear GL_DEPTH_BUFFER_BIT
@@ -600,7 +622,11 @@ do
                SizeModel( pModel , tSzTemp , g_CurPart )
                tSz = tSzTemp
             else
-               g_CurDraw = ((g_CurDraw+2) mod (g_DrawCount+1))-1
+               var iOrg = g_CurDraw
+               do
+                  g_CurDraw = ((g_CurDraw+2) mod (g_DrawCount+1))-1
+                  if g_CurDraw=-1 orelse pModel->tParts(g_CurDraw).bType = 1 orelse g_CurDraw = iOrg then exit do
+               loop
                printf(!"g_CurDraw = %i    \r",g_CurDraw)
             end if
          case asc("-"),asc("_")
@@ -611,7 +637,11 @@ do
                SizeModel( pModel , tSzTemp , g_CurPart )
                tSz = tSzTemp
             else
-               g_CurDraw = ((g_CurDraw+g_DrawCount+1) mod (g_DrawCount+1))-1
+               var iOrg = g_CurDraw
+               do
+                  g_CurDraw = ((g_CurDraw+g_DrawCount+1) mod (g_DrawCount+1))-1
+                  if g_CurDraw=-1 orelse pModel->tParts(g_CurDraw).bType = 1 orelse g_CurDraw = iOrg then exit do
+               loop
                printf(!"g_CurDraw = %i    \r",g_CurDraw)
             end if               
          end select
