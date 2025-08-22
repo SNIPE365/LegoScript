@@ -304,8 +304,49 @@ namespace Viewer
                glCallList(	iModel )   
             else
                RenderModel( pModel , false , , g_CurDraw )
-               dim as PartSnap tSnap' = any
-               SnapModel( pModel , tSnap , g_CurDraw )      
+               
+               scope 'Render Snap IDs
+                  static as PartSnap tSnapID
+                  static as long OldDraw = -1
+                  if g_CurDraw <> -1 andalso OldDraw <> g_CurDraw then                        
+                     var pSubPart = g_tModels( pModel->tParts(g_CurDraw)._1.lModelIndex ).pModel                  
+                     SnapModel( pSubPart , tSnapID )      
+                     SortSnap( tSnapID )
+                  end if
+                  #macro DrawConnectorName( _YOff )      
+                     var sText = "" & N+1      
+                     glDrawText( sText , .fPX,.fPY+(_YOff),.fPZ , 8/len(sText),8 , true )               
+                  #endmacro
+                  if g_CurDraw <> -1 then      
+                     glPushMatrix()                  
+                     with pModel->tParts(g_CurDraw)._1
+                        dim as single fMatrix(15) = { _
+                           .fA , .fD , .fG , 0 , _ 'X scale ,    0?   ,   0?    , 0 
+                           .fB , .fE , .fH , 0 , _ '  0?    , Y Scale ,   0?    , 0 
+                           .fC , .fF , .fI , 0 , _ '  0?    ,    0?   , Z Scale , 0 
+                           .fX , .fY , .fZ , 1 }   ' X Pos  ,  Y Pos  ,  Z Pos  , 1 
+                        glMultMatrixf( @fMatrix(0) )
+                     end with
+                     with tSnapID         
+                        glColor4f(0,1,0,1)         
+                        for N as long = 0 to .lStudCnt-1
+                           with .pStud[N]               
+                              DrawConnectorName(-5)
+                           end with         
+                        next N                  
+                        glColor4f(1,0,0,1)
+                        for N as long = 0 to .lClutchCnt-1
+                           with .pClutch[N]
+                              DrawConnectorName(+2)
+                           end with
+                        next N
+                     end with
+                     OldDraw = g_CurDraw
+                     glPopMatrix()
+                  end if
+               end scope
+               
+               'SnapModel( pModel , tSnap , g_CurDraw )      
             end if
             glCallList(	iBorders-(g_CurDraw>=0) )
             Catch()

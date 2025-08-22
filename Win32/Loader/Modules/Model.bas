@@ -1379,12 +1379,16 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                                  'end if                                 
                                  'if lDrawPart <> -2 then 
                                     iMale += 1
-                                    DrawMaleShape( __Position__ , p->wFixRadius/100 , p->bLength , bRound , "" & iMale )
+                                    #ifndef __NoRender
+                                       DrawMaleShape( __Position__ , p->wFixRadius/100 , p->bLength , bRound , "" & iMale )
+                                    #endif
                                  'end if
                               else
                                  'if lDrawPart <> -2 then 
                                     iFemale += 1
-                                    DrawFemaleShape( __Position__ , p->wFixRadius/100 , p->bLength , bRound , "" & iFemale ) '*(pMat->fScaleY)
+                                    #ifndef __NoRender
+                                       DrawFemaleShape( __Position__ , p->wFixRadius/100 , p->bLength , bRound , "" & iFemale ) '*(pMat->fScaleY)
+                                    #endif
                                  'end if
                               end if
                               

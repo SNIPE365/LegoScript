@@ -711,7 +711,7 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                   DbgCrash()
                   
                   dbg_printf(!"Left <%g %g %g>\n",pLeft->fPX,pLeft->fPY,pLeft->fPZ)
-                  MatrixTranslate( .tMatrix , pLeft->fPX , -pLeft->fPY , pLeft->fpZ )
+                  MatrixTranslate( .tMatrix , pLeft->fPX , pLeft->fPY , pLeft->fpZ )
                   
                   #if 0
                      ''dbg_puts("pLeft:" & pLeft & " // pRight:" & pRight)
@@ -745,9 +745,9 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                   'MatrixTranslate( .tMatrix , .tLocation.fPX , -.tLocation.fPY , .tLocation.fpZ )
                   
                   MatrixTranslate( .tMatrix , _ 
-                    pRight->fPX+.tLocation.fPX , _ 
-                    -(pRight->fPY+.tLocation.fPY) , _
-                    pRight->fpZ+.tLocation.fPZ )
+                    -pRight->fPX+.tLocation.fPX , _ 
+                    (-pRight->fPY-.tLocation.fPY) , _
+                    -pRight->fpZ+.tLocation.fPZ )
                                                             
                   ''_fPX = ptLocation->fPX - (_fPX + tVec3R(0)) + .tLocation.fPX '.fPX
                   ''_fPY = ptLocation->fPY + (_fPY - tVec3R(1)) + .tLocation.fPY '.fPY
@@ -855,126 +855,125 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
 end function
 
 #ifdef __Standalone
-var isTerm = _isatty( _fileno(stdout) )
-dim as string sText,sScript
-var sCmd = command(), iDump=0
-if len(sCmd) then
-   var f = freefile() : iDump=1
-   if open(sCmd for binary access read as #f) then
-      Errorf(!"Failed to open '%s'\n",sCmd)
-      GiveUp(2)
+   var isTerm = _isatty( _fileno(stdout) )
+   dim as string sText,sScript
+   var sCmd = command(), iDump=0
+   if len(sCmd) then
+      var f = freefile() : iDump=1
+      if open(sCmd for binary access read as #f) then
+         Errorf(!"Failed to open '%s'\n",sCmd)
+         GiveUp(2)
+      end if
+      sScript = space(lof(f))
+      get #f,,sScript : close #f
+   else   
+      if IsTerm=0 then
+         Errorf(!"SYNTAX: ls2dlr file.ls >output.ldr")
+         GiveUp(1)
+      end if
+      print ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> in memory script <<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
+      #if 0
+         sScript = _
+            !"// part 3024 B1 is of type 'Plate' but was referenced as 'Brick' without a cast.\r\n;" _
+            !"3001 /*Comment*/ B1;" _
+            !"B1 #2 s7 = 3001 B2 c1;    ;" _
+            !"B2 s7=3001 B3 c1;" _
+            !"B3 #3 s1 = 3001 B4 c3;" _
+            !"B3 s8 = 3002 B5 c3;"
+      #endif      
+      #if 0
+         sScript = _
+           !"3865 BP10 #7 s69 = 3001p11 B1 y90 c1;" _ '4070 (side stud) (87087 have shadow problems)
+           !"B1 s1 = 3001p11 B2 #2 c5;" _
+           !"B2 s1 = 3001p11 B3 #3 c6;" _
+           !"B3 c5 = 3001p11 B4 #4 s1;" _ '71752 '3021
+           !"B4 c1 = 4070 B5 #5 s2;"    'collision
+           '!"003238a P1 #2 c1 = 003238b P2 #4 s1;"
+      #endif   
+      #if 0
+         'sScript = _ 
+         '   !"87087 B1 s1 = 87087 B2 #2 x-90 c1;"
+         sScript = _
+            !"3865 BP10 #7 s69 = 3001p11 B1 c1; \n" _
+            !"B1 s1 = 3001p11 B2 #2 c5; \n " _
+            !"B2 s1 = 3001p11 B3 #3 c6; \n" _
+            !"B3 c5 = 3001p11 B4 #4 s1; \n" _
+            !"B4 c1 = 4070 B5 #5 s22; \n" 
+      #endif   
+      #if 0
+         sScript = _
+            "3002 B2 #7 s1 = 3001p11 B1 xo12 c1;" !"\n" '_
+            '"3001 B3 #2 s2 = B1 c1;"         !"\n"
+      #endif   
+      #if 0
+         sScript = _
+         "3023 P1 #1 c1 = 3023 P2 #2 s2;" !"\n" _
+         "3001 P3 #4 c1 = P2 s1;"         !"\n"
+      #endif
+      #if 0
+         sScript = _
+            "3001 B1 #2 y90 xo100 c1 = 3001 B2 #3 s1;" !"\n" _
+            "3002 B3 #4 c1 = 3002 B4 #5 s1;"           !"\n" _
+      #endif
+      #if 1
+         '"3958 B1 #black s1 = 3005 B2 c1;"
+         sScript = _         
+            "3001 B1 #black s1 = 3001 B2 c1;"
+      #endif
+   
+        
    end if
-   sScript = space(lof(f))
-   get #f,,sScript : close #f
-else   
-   if IsTerm=0 then
-      Errorf(!"SYNTAX: ls2dlr file.ls >output.ldr")
-      GiveUp(1)
+   var sModel = LegoScriptToLDraw(sScript)
+   if len(sModel) andalso iDump then
+      var sFile = trim( sScript , any !"\r\n" )+".ldr"
+      for N as long = 0 to len(sFile)-1
+         select case sFile[N]
+         case asc("*"),asc(""""),asc("/"),asc("\"),asc("<"),asc(">"),asc(":"),asc("|"),asc("?")
+           sFile[N] = asc("-")
+         case is <32 , is > 127
+            sFile[N] = asc("_")
+         end select
+      next N
+      var f = freefile()
+      open sFile for output as #f
+      print #f,sModel
+      close #f
    end if
-   print ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> in memory script <<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
-   #if 0
-      sScript = _
-         !"// part 3024 B1 is of type 'Plate' but was referenced as 'Brick' without a cast.\r\n;" _
-         !"3001 /*Comment*/ B1;" _
-         !"B1 #2 s7 = 3001 B2 c1;    ;" _
-         !"B2 s7=3001 B3 c1;" _
-         !"B3 #3 s1 = 3001 B4 c3;" _
-         !"B3 s8 = 3002 B5 c3;"
-   #endif
+   
+   if len(sModel) andalso isTerm then   
+      var sParms = """"+sModel+""""
+      puts("-----------------")
+      print sModel
+      exec(exepath()+"\Loader\ViewModel.exe",sParms)
+      'sleep
+      puts("-----------------")
+      end 0
+   else
+      if iDump=0 andalso IsTerm then sleep
+      end 0
+   end if
    
    #if 0
-      sScript = _
-        !"3865 BP10 #7 s69 = 3001p11 B1 y90 c1;" _ '4070 (side stud) (87087 have shadow problems)
-        !"B1 s1 = 3001p11 B2 #2 c5;" _
-        !"B2 s1 = 3001p11 B3 #3 c6;" _
-        !"B3 c5 = 3001p11 B4 #4 s1;" _ '71752 '3021
-        !"B4 c1 = 4070 B5 #5 s2;"    'collision
-        '!"003238a P1 #2 c1 = 003238b P2 #4 s1;"
-   #endif   
-   #if 0
-      'sScript = _ 
-      '   !"87087 B1 s1 = 87087 B2 #2 x-90 c1;"
-      sScript = _
-         !"3865 BP10 #7 s69 = 3001p11 B1 c1; \n" _
-         !"B1 s1 = 3001p11 B2 #2 c5; \n " _
-         !"B2 s1 = 3001p11 B3 #3 c6; \n" _
-         !"B3 c5 = 3001p11 B4 #4 s1; \n" _
-         !"B4 c1 = 4070 B5 #5 s22; \n" 
-   #endif   
-   #if 0
-      sScript = _
-         "3002 B2 #7 s1 = 3001p11 B1 xo12 c1;" !"\n" '_
-         '"3001 B3 #2 s2 = B1 c1;"         !"\n"
-   #endif   
-   #if 0
-      sScript = _
-      "3023 P1 #1 c1 = 3023 P2 #2 s2;" !"\n" _
-      "3001 P3 #4 c1 = P2 s1;"         !"\n"
+      print AddPartName( "B3" , "30001" )
+      print AddPartName( "B3" , "3001" )
+      print AddPartName( "B4" , "3002" )
+      print AddPartName( "B5" , "3001" )
+      print FindName("B3")
+      print FindName("B4")
+      print FindName("B5")
+      'with g_tPart( FindName("B3") )
+      '   print .pModel ,
+      'end with
+      
+      print "------------------"
+      
+      print g_tPart( FindName("B3") ).iModelIndex
+      print g_tPart( FindName("B4") ).iModelIndex
+      print g_tPart( FindName("B5") ).iModelIndex
+      print FindModelIndex("3001")
    #endif
-   #if 0
-      sScript = _
-         "3001 B1 #2 y90 xo100 c1 = 3001 B2 #3 s1;" !"\n" _
-         "3002 B3 #4 c1 = 3002 B4 #5 s1;"           !"\n" _
-   #endif
-   #if 1
-      '"3958 B1 #black s1 = 3005 B2 c1;"
-      sScript = _         
-         "3001 B1 #black s1 = 3001 B2 c1;"
-   #endif
-
-     
-end if
-var sModel = LegoScriptToLDraw(sScript)
-if len(sModel) andalso iDump then
-   var sFile = trim( sScript , any !"\r\n" )+".ldr"
-   for N as long = 0 to len(sFile)-1
-      select case sFile[N]
-      case asc("*"),asc(""""),asc("/"),asc("\"),asc("<"),asc(">"),asc(":"),asc("|"),asc("?")
-        sFile[N] = asc("-")
-      case is <32 , is > 127
-         sFile[N] = asc("_")
-      end select
-   next N
-   var f = freefile()
-   open sFile for output as #f
-   print #f,sModel
-   close #f
-end if
-
-if len(sModel) andalso isTerm then   
-   var sParms = """"+sModel+""""
-   puts("-----------------")
-   print sModel
-   exec(exepath()+"\Loader\ViewModel.exe",sParms)
-   'sleep
-   puts("-----------------")
-   end 0
-else
-   if iDump=0 andalso IsTerm then sleep
-   end 0
-end if
-
-#if 0
-   print AddPartName( "B3" , "30001" )
-   print AddPartName( "B3" , "3001" )
-   print AddPartName( "B4" , "3002" )
-   print AddPartName( "B5" , "3001" )
-   print FindName("B3")
-   print FindName("B4")
-   print FindName("B5")
-   'with g_tPart( FindName("B3") )
-   '   print .pModel ,
-   'end with
    
-   print "------------------"
-   
-   print g_tPart( FindName("B3") ).iModelIndex
-   print g_tPart( FindName("B4") ).iModelIndex
-   print g_tPart( FindName("B5") ).iModelIndex
-   print FindModelIndex("3001")
-#endif
-
-'for N as long = 0 to ubound(g_tModels)       
-'   print strptr(g_sFilenames)[g_tModels(N).iFilenameOffset+9]
-'next N
+   'for N as long = 0 to ubound(g_tModels)       
+   '   print strptr(g_sFilenames)[g_tModels(N).iFilenameOffset+9]
+   'next N
 #endif

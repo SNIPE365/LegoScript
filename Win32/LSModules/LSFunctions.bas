@@ -179,6 +179,24 @@ function LoadPartModel( byref tPart as PartStructLS ) as long
          var pSnap = cptr(PartSnap ptr,pModel->pData)
          SnapModel( pModel , *pSnap )         
          SortSnap( *pSnap )
+         #if 1 'snap debug            
+            with *pSnap
+               printf(!"Studs=%i Clutchs=%i Aliases=%i Axles=%i Axlehs=%i Bars=%i Barhs=%i Pins=%i Pinhs=%i\n", _            
+               .lStudCnt , .lClutchCnt , .lAliasCnt , .lAxleCnt , .lAxleHoleCnt ,.lBarCnt , .lBarHoleCnt , .lPinCnt , .lPinHoleCnt )
+               puts("---------- stud ----------")
+               for N as long = 0 to .lStudCnt-1
+                  with .pStud[N]
+                     printf(!"#%i %g %g %g\n",N+1,.fPX,.fPY,.fPZ)
+                  end with
+               next N
+               puts("--------- clutch ---------")
+               for N as long = 0 to .lClutchCnt-1
+                  with .pClutch[N]
+                     printf(!"#%i %g %g %g\n",N+1,.fPX,.fPY,.fPZ)
+                  end with
+               next N
+            end with
+         #endif
       end if
       'calculate model size
       'SizeModel( pModel , .tSize ) 'Model::SizeModel

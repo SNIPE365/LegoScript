@@ -220,12 +220,12 @@ scope
    
    'crashing due to fallback additions
    '#include "CrashTest.bi"
-   sFile = sPath+"LDraw\models\pyramid.ldr"
+   'sFile = sPath+"LDraw\models\pyramid.ldr"
    'sFile = sPath+"\examples\8891-towTruck.mpd"
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\5510.mpd"
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\cube10x10x10.ldr"
    'sFile = "3001.dat" 
-   'sFile = "3958.dat"
+   sFile = "3958.dat"
 end scope
 scope 
    #if 0
@@ -241,8 +241,9 @@ end scope
 
 dim as string sModel
 dim as DATFile ptr pModel
+dim as boolean bEditMode
 
-#if 1 '1 = Load File , 0 = Load From clipboard
+#if 0 '1 = Load File , 0 = Load From clipboard
    if len(sFile)=0 then sFile=command(1)
    if instr(sFile,"\")=0 andalso instr(sFile,"/")=0 then FindFile(sFile)
    printf(!"Model: '%s'\n",sFile)
@@ -251,11 +252,12 @@ dim as DATFile ptr pModel
       sleep : system
    end if
    pModel = LoadModel( strptr(sModel) , sFile )
+   var sEndsExt = lcase(right(sFile,4))
 #else
    sModel = command(1)
    var sEndsExt = lcase(right(sModel,4))
    var IsFilename = (instr(sModel,chr(10))=0) andalso ((sEndsExt=".dat") orelse (sEndsExt=".ldr"))
-   if IsFilename then
+   if IsFilename then      
       print "loading from '"+sModel+"'"
       if FileExists(sModel)=0 then FindFile(sModel)      
       if LoadFile( sModel , sModel ) = 0 then
@@ -289,7 +291,7 @@ dim as DATFile ptr pModel
             ' ------------------------------------------------------
             sModel = _
                "1 2 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 3001.dat"      EOL _
-               "1 0 -60.000000 -24.000000 20.000000 1 0 0 0 1 0 0 0 1 3002.dat"
+               "1 0 -60.000000 -24.000000 20.000000 1 0 0 0 1 0 0 0 1 3001.dat"
             ' ------------------------------------------------------
             'sModel = _
             '   "1 0 0.000000 0.000000 0.000000 1 0 0 0 -1 -8.74228e-008 0 8.74228e-008 -1 3001.dat" EOL _
@@ -302,6 +304,8 @@ dim as DATFile ptr pModel
    pModel = LoadModel( strptr(sModel) , "CopyPaste.ldr" )
    
 #endif
+
+if sEndsExt=".dat" then bEditMode = true
 
 InitOpenGL()
 
@@ -356,11 +360,13 @@ CheckCollisionModel( pModel , atCollision() )
 printf(!"Parts: %i , Collisions: %i \n",g_PartCount,ubound(atCollision)\2)
 
 #ifdef DebugShadowConnectors
-   scope
+   scope      
       dim as PartSnap tSnap
-      for I as long = 0 to g_PartCount-1      
-         puts("#" & I)
-         SnapModel( pModel , tSnap , I )
+      for I as long = 0 to g_PartCount-1               
+         if pModel->tParts(I).bType <> 1 then continue for
+         puts("=========== Part " & I & " ===========")
+         var pSubPart = g_tModels( pModel->tParts(I)._1.lModelIndex ).pModel                  
+         SnapModel( pSubPart , tSnap )
          with tSnap
             printf(!"Studs=%i Clutchs=%i Aliases=%i Axles=%i Axlehs=%i Bars=%i Barhs=%i Pins=%i Pinhs=%i\n", _            
             .lStudCnt , .lClutchCnt , .lAliasCnt , .lAxleCnt , .lAxleHoleCnt ,.lBarCnt , .lBarHoleCnt , .lPinCnt , .lPinHoleCnt )
@@ -416,11 +422,18 @@ do
    glLoadIdentity()   
    glScalef(1/-20, 1.0/-20, 1/20 )
    
-   static as long OldDraw = -1
-   if g_CurDraw <> -1 andalso OldDraw <> g_CurDraw then                        
-      var pSubPart = g_tModels( pModel->tParts(g_CurDraw)._1.lModelIndex ).pModel                  
-      SnapModel( pSubPart , tSnapID )      
-      SortSnap( tSnapID )
+   static as long OldDraw = -2
+   if g_CurDraw <> -1 then
+      if OldDraw <> g_CurDraw then                        
+         var pSubPart = g_tModels( pModel->tParts(g_CurDraw)._1.lModelIndex ).pModel                  
+         SnapModel( pSubPart , tSnapID )      
+         SortSnap( tSnapID )
+      end if
+   elseif bEditMode then      
+      if OldDraw <> g_CurDraw then
+         SnapModel( pModel , tSnapID )      
+         SortSnap( tSnapID )
+      end if
    end if
       
    '// Set light position (0, 0, 0)
@@ -509,24 +522,26 @@ do
       end with
    end if
    
-   var iCollisions = ubound(atCollision)
-   if iCollisions andalso instr(sFile,".dat")=0 then
-      glEnable( GL_POLYGON_STIPPLE )      
-      static as ulong aStipple(32-1)
-      dim as long iMove = (timer*8) and 7
-      for iY as long = 0 to 31         
-         var iN = iif(iY and 1,&h1414141414141414ll,&h4141414141414141ll)         
-         aStipple(iY) = iN shr ((iY+iMove) and 7)
-      next iY
-      glPolygonStipple(	cptr(glbyte ptr,@aStipple(0)) )
-      if (iMove and 2) then glColor4f(1,0,0,1) else glColor4f(0,0,0,1)
-      for I as long = 0 to iCollisions-1   
-         with atCollision(I)
-            DrawLimitsCube( .xMin-1,.xMax+1 , .yMin-1,.yMax+1 , .zMin-1,.zMax+1 )
-         end with
-      next I
-      glDisable( GL_POLYGON_STIPPLE )      
-   end if
+   #if 0
+      var iCollisions = ubound(atCollision)
+      if iCollisions andalso instr(sFile,".dat")=0 then
+         glEnable( GL_POLYGON_STIPPLE )      
+         static as ulong aStipple(32-1)
+         dim as long iMove = (timer*8) and 7
+         for iY as long = 0 to 31         
+            var iN = iif(iY and 1,&h1414141414141414ll,&h4141414141414141ll)         
+            aStipple(iY) = iN shr ((iY+iMove) and 7)
+         next iY
+         glPolygonStipple(	cptr(glbyte ptr,@aStipple(0)) )
+         if (iMove and 2) then glColor4f(1,0,0,1) else glColor4f(0,0,0,1)
+         for I as long = 0 to iCollisions-1   
+            with atCollision(I)
+               DrawLimitsCube( .xMin-1,.xMax+1 , .yMin-1,.yMax+1 , .zMin-1,.zMax+1 )
+            end with
+         next I
+         glDisable( GL_POLYGON_STIPPLE )      
+      end if
+   #endif
    glDepthMask (GL_TRUE)
          
    'glDisable( GL_DEPTH_TEST )
@@ -545,16 +560,18 @@ do
       #endif
    #endmacro
 
-   if g_CurDraw <> -1 then      
+   if g_CurDraw <> -1 orelse bEditMode then      
       glPushMatrix()
-      with pModel->tParts(g_CurDraw)._1
-         dim as single fMatrix(15) = { _
-            .fA , .fD , .fG , 0 , _ 'X scale ,    0?   ,   0?    , 0 
-            .fB , .fE , .fH , 0 , _ '  0?    , Y Scale ,   0?    , 0 
-            .fC , .fF , .fI , 0 , _ '  0?    ,    0?   , Z Scale , 0 
-            .fX , .fY , .fZ , 1 }   ' X Pos  ,  Y Pos  ,  Z Pos  , 1 
-         glMultMatrixf( @fMatrix(0) )
-      end with
+      if g_CurDraw <> -1 then
+         with pModel->tParts(g_CurDraw)._1
+            dim as single fMatrix(15) = { _
+               .fA , .fD , .fG , 0 , _ 'X scale ,    0?   ,   0?    , 0 
+               .fB , .fE , .fH , 0 , _ '  0?    , Y Scale ,   0?    , 0 
+               .fC , .fF , .fI , 0 , _ '  0?    ,    0?   , Z Scale , 0 
+               .fX , .fY , .fZ , 1 }   ' X Pos  ,  Y Pos  ,  Z Pos  , 1 
+            glMultMatrixf( @fMatrix(0) )
+         end with
+      end if
       with tSnapID         
          glColor4f(0,1,0,1)         
          for N as long = 0 to .lStudCnt-1
@@ -565,7 +582,7 @@ do
          glColor4f(1,0,0,1)
          for N as long = 0 to .lClutchCnt-1
             with .pClutch[N]
-               DrawConnectorName(+5)
+               DrawConnectorName(+2)
             end with
          next N
       end with
