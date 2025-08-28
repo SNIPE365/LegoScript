@@ -32,8 +32,8 @@ static shared as Matrix4x4 g_tIdentityMatrix '= ( _
 '     0, 0, 1, 0,  _
 '     0, 0, 0, 1 } _
 ')
-g_tIdentityMatrix.m(0)=1  : g_tIdentityMatrix.m(5)=1
-g_tIdentityMatrix.m(10)=1 : g_tIdentityMatrix.m(15)=1
+g_tIdentityMatrix.fScaleX=1  : g_tIdentityMatrix.fScaleY=1
+g_tIdentityMatrix.fScaleZ=1  : g_tIdentityMatrix.m(15)=1
 
 dim shared as Matrix4x4 g_tBlankMatrix
 tMatrixStack( 0 ) = g_tIdentityMatrix
@@ -129,7 +129,27 @@ sub MultMatrix4x4WithVector3x3( tmOut as Matrix4x4 , tmIn as Matrix4x4 , pIn as 
    next row
    
 end sub
-#define MultMatrix4x4( _Out , _In , _pMul ) MultMatrix4x4WithVector3x3( _Out , _In , cptr(const single ptr,(_pMul)) )
+'#define MultMatrix4x4( _Out , _In , _pMul ) MultMatrix4x4WithVector3x3( _Out , _In , cptr(const single ptr,(_pMul)) )
+' A safe and correct function for row-major 4x4 matrix multiplication.
+sub MultMatrix4x4(byref result as Matrix4x4, byref a as Matrix4x4, byref b as Matrix4x4)
+    dim as integer i, j, k
+    dim as Matrix4x4 tempResult ' Use a temporary matrix to prevent conflicts
+
+    for i = 0 to 3 ' Loop through the rows of the result matrix
+        for j = 0 to 3 ' Loop through the columns of the result matrix
+            ' Initialize the current element of the result to zero
+            tempResult.m(i * 4 + j) = 0.0
+            
+            ' Perform the dot product of row i of matrix 'a' and column j of matrix 'b'
+            for k = 0 to 3
+                tempResult.m(i * 4 + j) += a.m(i * 4 + k) * b.m(k * 4 + j)
+            next k
+        next j
+    next i
+    
+    ' Copy the final, correct result to the output matrix
+    result = tempResult
+end sub
 
 sub MatrixRotateX( tmOut as Matrix4x4 , tmIn as Matrix4x4 , fAngle as single )      
    dim as single sMat(15) = { _
@@ -138,7 +158,7 @@ sub MatrixRotateX( tmOut as Matrix4x4 , tmIn as Matrix4x4 , fAngle as single )
       0 , -sin(fAngle) , cos(fAngle) , 0 , _
       0 ,      0       ,      0      , 1 _
    }   
-   MultMatrix4x4WithVector3x3( tmOut , tmIn , @sMat(0) )
+   MultMatrix4x4( tmOut , tmIn , *cptr(Matrix4x4 ptr,@sMat(0)) ) 'MultMatrix4x4WithVector3x3( tmOut , tmIn , @sMat(0) )
 end sub
 sub MatrixRotateY( tmOut as Matrix4x4 , tmIn as Matrix4x4 , fAngle as single )      
    dim as single sMat(15) = { _
@@ -147,7 +167,8 @@ sub MatrixRotateY( tmOut as Matrix4x4 , tmIn as Matrix4x4 , fAngle as single )
       sin(fAngle) , 0 ,  cos(fAngle) , 0 , _
          0        , 0 ,     0        , 1 _
    }
-   MultMatrix4x4WithVector3x3( tmOut , tmIn , @sMat(0) )
+   'MultMatrix4x4WithVector3x3( tmOut , tmIn , @sMat(0) )
+   MultMatrix4x4( tmOut , tmIn , *cptr(Matrix4x4 ptr,@sMat(0)) )
 end sub
 sub MatrixRotateZ( tmOut as Matrix4x4 , tmIn as Matrix4x4 , fAngle as single )      
    dim as single sMat(15) = { _
@@ -156,12 +177,13 @@ sub MatrixRotateZ( tmOut as Matrix4x4 , tmIn as Matrix4x4 , fAngle as single )
           0       ,      0       , 1 , 0 , _
           0       ,      0       , 0 , 1 _
    }   
-   MultMatrix4x4WithVector3x3( tmOut , tmIn , @sMat(0) )
+   'MultMatrix4x4WithVector3x3( tmOut , tmIn , @sMat(0) )
+   MultMatrix4x4( tmOut , tmIn , *cptr(Matrix4x4 ptr,@sMat(0)) )
 end sub
 sub MatrixTranslate( tmInOut as Matrix4x4 , fDX as single , fDY as single , fDZ as single )
    var tMat = g_tIdentityMatrix
    tMat.fPosX = fDX : tMat.fPosY = fDY : tMat.fPosZ = fDZ
-   MultMatrix4x4( tmInOut , tmInOut , @tMat )
+   MultMatrix4x4( tmInOut , tmInOut , tMat )
 end sub   
 
 sub PrintCurrentMatrix()

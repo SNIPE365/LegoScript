@@ -605,15 +605,17 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                            'print .sName , .sPrimative , .iColor
                            var iColor = iif( .iColor<0 , 16 , .iColor ) , psPrimative = @.sPrimative
                            .bConnected = true 'this part now have a position
-                           _fPX = .tLocation.fPX : _fPY = .tLocation.fPY : _fPZ = .tLocation.fPZ         
                            .tMatrix = g_tIdentityMatrix
+                           _fPX = .tLocation.fPX : _fPY = .tLocation.fPY : _fPZ = .tLocation.fPZ                           
+                           ''printf(!"~~- %f %f %f\n",_fPX,_fPY,_fPZ)
                            if .tLocation.fAX then MatrixRotateX( .tMatrix , .tMatrix , .tLocation.fAX )
                            if .tLocation.fAY then MatrixRotateY( .tMatrix , .tMatrix , .tLocation.fAY )
-                           if .tLocation.fAZ then MatrixRotateZ( .tMatrix , .tMatrix , .tLocation.fAZ )                                    
+                           if .tLocation.fAZ then MatrixRotateZ( .tMatrix , .tMatrix , .tLocation.fAZ )
                            with .tMatrix
                               sprintf(zTemp,!"1 %i %f %f %f %g %g %g %g %g %g %g %g %g %s\r\n",iColor,.fPosX,.fPosY,.fPosZ, _
                                  .m(0),.m(1),.m(2),.m(4),.m(5),.m(6),.m(8),.m(9),.m(10) , *psPrimative )
                            end with
+                           ''printf(!"~~+ %f %f %f\n",_fPX,_fPY,_fPZ)
                            sResult += zTemp 
                            #ifdef __Standalone
                            'errorf("(first) %s",zTemp)
@@ -710,9 +712,12 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                   
                   DbgCrash()
                   
-                  dbg_printf(!"Left <%g %g %g>\n",pLeft->fPX,pLeft->fPY,pLeft->fPZ)
+                  dbg_printf(!"Left <%g %g %g>\n",pLeft->fPX,pLeft->fPY,pLeft->fPZ)              
+                  'dbg_printf(!"LeftT <%g %g %g>\n",ptLocation->fPX,ptLocation->fPY,ptLocation->fpZ)
                   MatrixTranslate( .tMatrix , pLeft->fPX , pLeft->fPY , pLeft->fpZ )
-                  
+                  'MatrixTranslate( .tMatrix , pLeft->fPX , 0 , 0 )
+                  'MatrixTranslate( .tMatrix , 0 , 0 , pLeft->fpZ )
+                                    
                   #if 0
                      ''dbg_puts("pLeft:" & pLeft & " // pRight:" & pRight)
                      if pLeft->pMatOrg then 
@@ -917,8 +922,10 @@ end function
       #endif
       #if 1
          '"3958 B1 #black s1 = 3005 B2 c1;"
+         '"3001 B1 #black s1 = 3001 B2 c1;"
          sScript = _         
-            "3001 B1 #black s1 = 3001 B2 c1;"
+            "2356 B2 #black #yo50 s1 = 3005 P2 #black c1;" !"\n" _
+            "2356 B1 #y10 s1 = 3005 P1 #2 c1;"
       #endif
    
         

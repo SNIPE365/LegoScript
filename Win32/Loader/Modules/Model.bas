@@ -526,7 +526,7 @@ end sub
 type SnapPV
    as float fPX,fPY,fPZ 'position
    as float fAX,fAY,fAZ 'direction vector
-   as Matrix4x4 ptr pMatOrg
+   'as Matrix4x4 ptr pMatOrg
    as Matrix4x4 tOriMat 
 end type
 type PartSnap
@@ -585,7 +585,7 @@ sub SnapAddStud( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) )
         .lStudCnt += 1
         .pStud = reallocate(.pStud,sizeof(tPV)*.lStudCnt)
         .pStud[.lStudCnt-1] = tPV
-        .pStud[.lStudCnt-1].pMatOrg = 0
+        '.pStud[.lStudCnt-1].pMatOrg = 0
         .pStud[.lStudCnt-1].tOriMat = tMatrixStack( g_CurrentMatrix )
       next N
    end with
@@ -596,7 +596,7 @@ sub SnapAddClutch( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) 
         .lClutchCnt += 1
         .pClutch = reallocate(.pClutch,sizeof(tPV)*.lClutchCnt)
         .pClutch[.lClutchCnt-1] = tPV
-        .pClutch[.lClutchCnt-1].pMatOrg = 0
+        '.pClutch[.lClutchCnt-1].pMatOrg = 0
         .pClutch[.lClutchCnt-1].tOriMat = tMatrixStack( g_CurrentMatrix )
       next N
    end with
