@@ -315,7 +315,7 @@ namespace Viewer
                   end if
                   #macro DrawConnectorName( _YOff )      
                      var sText = "" & N+1      
-                     glDrawText( sText , .fPX,.fPY+(_YOff),.fPZ , 8/len(sText),8 , true )               
+                     glDrawText( sText , .tPos.X,.tPos.Y+(_YOff),.tPos.Z , 8/len(sText),8 , true )               
                   #endmacro
                   if g_CurDraw <> -1 then      
                      glPushMatrix()                  

@@ -613,7 +613,7 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
          dim as Matrix4x4 tMat
          tMat = g_tIdentityMatrix
          static as double dBeg : if dBeg = 0 then dBeg = timer
-         MatrixRotateX( tMat , tMat , timer-dBeg )
+         Matrix4x4RotateX( tMat , tMat , timer-dBeg )
          dim as zstring*256 zOutput = any
          with tMat
             sprintf(zOutput,!"1 %i %f %f %f %g %g %g %g %g %g %g %g %g %s\r\n",16,.fPosX,.fPosY,.fPosZ, _

@@ -186,13 +186,13 @@ function LoadPartModel( byref tPart as PartStructLS ) as long
                puts("---------- stud ----------")
                for N as long = 0 to .lStudCnt-1
                   with .pStud[N]
-                     printf(!"#%i %g %g %g\n",N+1,.fPX,.fPY,.fPZ)
+                     printf(!"#%i %g %g %g\n",N+1,.tPos.X,.tPos.Y,.tPos.Z)
                   end with
                next N
                puts("--------- clutch ---------")
                for N as long = 0 to .lClutchCnt-1
                   with .pClutch[N]
-                     printf(!"#%i %g %g %g\n",N+1,.fPX,.fPY,.fPZ)
+                     printf(!"#%i %g %g %g\n",N+1,.tPos.X,.tPos.Y,.tPos.Z)
                   end with
                next N
             end with

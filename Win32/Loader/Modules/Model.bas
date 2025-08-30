@@ -523,11 +523,17 @@ end sub
    #define DbgConnect printf
 #endif
 
+#ifndef Vector3
+type Vector3
+    as single x, y, z
+end type
+#endif
+
+
 type SnapPV
-   as float fPX,fPY,fPZ 'position
-   as float fAX,fAY,fAZ 'direction vector
-   'as Matrix4x4 ptr pMatOrg
-   as Matrix4x4 tOriMat 
+   as Vector3 tPos 'position
+   'as float fAX,fAY,fAZ 'direction vector
+   'as Matrix3x3 tOriMat
 end type
 type PartSnap
    lStudCnt     as long
@@ -586,7 +592,7 @@ sub SnapAddStud( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) )
         .pStud = reallocate(.pStud,sizeof(tPV)*.lStudCnt)
         .pStud[.lStudCnt-1] = tPV
         '.pStud[.lStudCnt-1].pMatOrg = 0
-        .pStud[.lStudCnt-1].tOriMat = tMatrixStack( g_CurrentMatrix )
+        '.pStud[.lStudCnt-1].tOriMat = tMatrixStack( g_CurrentMatrix )
       next N
    end with
 end sub
@@ -597,7 +603,7 @@ sub SnapAddClutch( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) 
         .pClutch = reallocate(.pClutch,sizeof(tPV)*.lClutchCnt)
         .pClutch[.lClutchCnt-1] = tPV
         '.pClutch[.lClutchCnt-1].pMatOrg = 0
-        .pClutch[.lClutchCnt-1].tOriMat = tMatrixStack( g_CurrentMatrix )
+        '.pClutch[.lClutchCnt-1].tOriMat = tMatrixStack( g_CurrentMatrix )
       next N
    end with
 end sub 
@@ -775,8 +781,8 @@ sub SortSnap( tSnap as PartSnap )
       do
          var bDidSort = 0
          for N as long = 0 to .l##_ConnName##Cnt-2
-            var fW0 = .p##_ConnName[N+0].fPY*(100^3) + .p##_ConnName[N+0].fpZ*(100^2) - .p##_ConnName[N+0].fpX
-            var fW1 = .p##_ConnName[N+1].fPY*(100^3) + .p##_ConnName[N+1].fpZ*(100^2) - .p##_ConnName[N+1].fpX
+            var fW0 = .p##_ConnName[N+0].tPos.Y*(100^3) + .p##_ConnName[N+0].tPos.Z*(100^2) - .p##_ConnName[N+0].tPos.X
+            var fW1 = .p##_ConnName[N+1].tPos.Y*(100^3) + .p##_ConnName[N+1].tPos.Z*(100^2) - .p##_ConnName[N+1].tPos.X
             if fW1 > fW0 then swap .p##_ConnName[N],.p##_ConnName[N+1]: bDidSort=1 : continue for
          next N
          if bDidSort=0 then exit do
