@@ -118,7 +118,7 @@ namespace Viewer
                      g_CurDraw = ((g_CurDraw+g_DrawCount+1) mod (g_DrawCount+1))-1
                      printf(!"g_CurDraw = %i    \r",g_CurDraw)
                   end if               
-               case asc("S")-asc("@") 'shadow
+               case asc("S")-asc("@") 'ctrl+S 'shadow
                   if g_CurDraw >=0 then
                      'FindFile(
                      'FindShadowFile(
@@ -133,7 +133,7 @@ namespace Viewer
                         end if
                      end with
                   end if
-               case asc("M")-asc("@") 'Model
+               case asc("M")-asc("@") 'ctrl+M 'Model
                   if g_CurDraw >=0 then                     
                      with pModel->tParts(g_CurDraw)
                         if .bType=1 then                              
@@ -299,23 +299,39 @@ namespace Viewer
          
          glDisable( GL_LIGHTING )
          
+         static as long OldDraw = -1
          Try()
             if g_CurDraw < 0 then
-               glCallList(	iModel )   
+               glCallList(	iModel ) : OldDraw = -1
             else
                RenderModel( pModel , false , , g_CurDraw )
                
                scope 'Render Snap IDs
                   static as PartSnap tSnapID
-                  static as long OldDraw = -1
                   if g_CurDraw <> -1 andalso OldDraw <> g_CurDraw then                        
                      var pSubPart = g_tModels( pModel->tParts(g_CurDraw)._1.lModelIndex ).pModel                  
                      SnapModel( pSubPart , tSnapID )      
                      SortSnap( tSnapID )
                   end if
                   #macro DrawConnectorName( _YOff )      
-                     var sText = "" & N+1      
-                     glDrawText( sText , .tPos.X,.tPos.Y+(_YOff),.tPos.Z , 8/len(sText),8 , true )               
+                     var sText = "" & N+1
+                     if .tOriMat.fScaleX then
+                        glPushMatrix()
+                        var fPX = .tPos.X , fPY = .tPos.Y , fPZ = .tPos.Z
+                        with .tOriMat
+                           dim as single fMatrix(15) = { _
+                              .m(0) , .m(3) , .m(6) , 0 , _ 'X scale ,    0?   ,   0?    , 0 
+                              .m(1) , .m(4) , .m(7) , 0 , _ '  0?    , Y Scale ,   0?    , 0 
+                              .m(2) , .m(5) , .m(8) , 0 , _ '  0?    ,    0?   , Z Scale , 0 
+                               fpX  ,  fPY  ,  fpZ  , 1  }  ' X Pos  ,  Y Pos  ,  Z Pos  , 1 
+                           glMultMatrixf( @fMatrix(0) )
+                           glTranslateF(0,_YOff,0)
+                        end with
+                        glDrawText( sText , 0,0,0 , 8/len(sText),8 , true )
+                        glPopMatrix()
+                     else
+                        glDrawText( sText , .tPos.X,.tPos.Y+(_YOff),.tPos.Z , 8/len(sText),8 , true )
+                     end if
                   #endmacro
                   if g_CurDraw <> -1 then      
                      glPushMatrix()                  
@@ -337,7 +353,7 @@ namespace Viewer
                         glColor4f(1,0,0,1)
                         for N as long = 0 to .lClutchCnt-1
                            with .pClutch[N]
-                              DrawConnectorName(+2)
+                              DrawConnectorName(0)
                            end with
                         next N
                      end with

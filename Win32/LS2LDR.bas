@@ -67,7 +67,7 @@ enum SeparatorType
    stOperator = 2
 end enum
 enum ErrorCodes
-   ecNotFound       = -999
+   ecNotFound       = &h80000000
    ecFailedToLoad
    ecFailedToParse
    ecNumberOverflow
@@ -104,7 +104,7 @@ redim shared as PartStructLS g_tPart(_cPartMin)
 redim shared as PartConnLS   g_tConn(_cConnMin)
 static shared as long g_iPartCount=1 , g_iConnCount = 0
 static shared as SnapPV g_NullSnap
-'g_NullSnap.pMatOrg = @g_tIdentityMatrix
+g_NullSnap.tOriMat = g_tIdentityMatrix3x3
 
 #include "LSModules\DictionaryTree.bas"
 #include once "Loader\Include\Colours.bas"
@@ -330,7 +330,7 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
       '=======================================================================
       '============================= Parse Tokens ============================
       '=======================================================================
-      dim as long iCurToken=0
+      dim as long iCurToken=0, lError
       dim as PartConnLS tConn 'expects 0's
       tConn.iLeftPart = ecNotFound : tConn.iRightPart = ecNotFound      
       #define tLeft(_N)  tConn.iLeft##_N
@@ -409,9 +409,15 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                   continue do
                end if      
                if sThisToken[0] = asc("#") then 'it's an attribute modifier
+                  'lowercase first two chars of the name as they can be attribute|modifier
                   if sThisToken[1] >= asc("A") andalso sThisToken[1] <= asc("Z") then
                      sThisToken[1] += 32 'lowercase
                   end if
+                  if sThisToken[2] >= asc("A") andalso sThisToken[2] <= asc("Z") then
+                     sThisToken[2] += 32 'lowercase
+                  end if
+                  
+                  'if it's an hex digit then it's a color (this makes A-F unusable for attribute names)
                   if (sThisToken[1] >= asc("0") andalso sThisToken[1] <= asc("9")) orelse (sThisToken[1] >= asc("a") andalso sThisToken[1] <= asc("f")) then
                      'color token #nn #RGB #RRGGBB
                      if .bConnected then 
@@ -423,40 +429,52 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                         ParserError("Invalid color format '"+sThisToken+"'")
                      end if
                      .iColor = iColor
-                  else 'attribute token
+                  else 'x y z xo yo zo = attribute tokens
                      select case sThisToken[1] 'which attribute it is?
                      case asc("x"): 'X angle or position for this piece
                         if .bConnected then ParserError("Can't define attributes for existing parts (redefined X offset or rotation)")
                         select case sThisToken[2]
                         case asc("o") 
-                           if bDefinedXOff then ParserError("Defined X offset twice")
-                           .tOffPos.X += ReadTokenNumber( sThisToken , 3 , true ) : bDefinedXOff = 1
-                        case else
+                           if bDefinedXOff then ParserError("Defined X offset twice")                                                      
+                           .tOffPos.X += ReadTokenNumber( sThisToken , 3 , true , lError ) : bDefinedXOff = 1
+                           if lError then ParserError("Invalid number at attribute '"+sThisToken+"'")
+                        case asc("-"),asc("0") to asc("9") 'must be a number to be a rotation
                            if bDefinedXRot then ParserError("Defined X rotation twice")
-                           .tOffRot.X  = ReadTokenNumber( sThisToken , 2-(sThisToken[2]=asc("r")) , true )*(PI/180) : bDefinedXrot = 1
+                           .tOffRot.X  = ReadTokenNumber( sThisToken , 2-(sThisToken[2]=asc("r")) , true , lError )*(PI/180) : bDefinedXrot = 1
+                           if lError then ParserError("Invalid number at attribute '"+sThisToken+"'")
+                        case else
+                           ParserError("Invalid attribute '"+sThisToken+"'")
                         end select
                      case asc("y"): 'Y angle or position for this piece
                         if .bConnected then ParserError("Can't define attributes for existing parts (redefined Y offset or rotation)")
                         select case sThisToken[2]
-                        case asc("o") 
+                        case asc("o") 'it's an offset instead of rotation
                            if bDefinedYOff then ParserError("Defined Y offset twice")
-                           .tOffPos.Y += ReadTokenNumber( sThisToken , 3 , true ) : bDefinedYOff = 1
-                        case else
+                           .tOffPos.Y += ReadTokenNumber( sThisToken , 3 , true , lError ) : bDefinedYOff = 1
+                           if lError then ParserError("Invalid number at attribute '"+sThisToken+"'")
+                        case asc("-"),asc("0") to asc("9") 'must be a number to be a rotation
                            if bDefinedYRot then ParserError("Defined Y rotation twice")
-                           .tOffRot.Y  = ReadTokenNumber( sThisToken , 2-(sThisToken[2]=asc("r")) , true )*(PI/180) : bDefinedYrot = 1                        
+                           .tOffRot.Y  = ReadTokenNumber( sThisToken , 2-(sThisToken[2]=asc("r")) , true , lError )*(PI/180) : bDefinedYrot = 1                        
+                           if lError then ParserError("Invalid number at attribute '"+sThisToken+"'")
+                        case else
+                           ParserError("Invalid attribute '"+sThisToken+"'")
                         end select
                      case asc("z"): 'Z angle or position for this piece
                         if .bConnected then ParserError("Can't define attributes for existing parts (redefined Z offset or rotation)")
                         select case sThisToken[2]
-                        case asc("o") 
+                        case asc("o") 'it's an offset instead of rotation
                            if bDefinedZOff then ParserError("Defined Z offset twice")
-                           .tOffPos.Z += ReadTokenNumber( sThisToken , 3 , true ) : bDefinedZOff = 1
-                        case else
+                           .tOffPos.Z += ReadTokenNumber( sThisToken , 3 , true , lError ) : bDefinedZOff = 1
+                           if lError then ParserError("Invalid number at attribute '"+sThisToken+"'")
+                        case asc("-"),asc("0") to asc("9") 'must be a number to be a rotation
                            if bDefinedZRot then ParserError("Defined Z rotation twice")
-                           .tOffRot.Z  = ReadTokenNumber( sThisToken , 2-(sThisToken[2]=asc("r")) , true )*(PI/180) : bDefinedZrot = 1
+                           .tOffRot.Z  = ReadTokenNumber( sThisToken , 2-(sThisToken[2]=asc("r")) , true , lError )*(PI/180) : bDefinedZrot = 1
+                           if lError then ParserError("Invalid number at attribute '"+sThisToken+"'")
+                        case else
+                           ParserError("Invalid attribute '"+sThisToken+"'")
                         end select
                      case else                        
-                        ParserError("Unknown attribute '"+sThisToken+"'")                     
+                        ParserError("Invalid attribute '"+sThisToken+"'")
                      end select
                   end if
                else 'is a connector or what?
@@ -713,17 +731,23 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                   DbgCrash()
                   
                   'todo: FIND THE RIGHT COMBINATION for POST rotation
-                                                      
-                  if .tOffRot.X then Matrix3x3RotateX( .tMatrix , .tMatrix , .tOffRot.X )
-                  if .tOffRot.Y then Matrix3x3RotateY( .tMatrix , .tMatrix , .tOffRot.Y )
-                  if .tOffRot.Z then Matrix3x3RotateZ( .tMatrix , .tMatrix , .tOffRot.Z )
-                  
+                                    
                   DbgCrash()
                   
                   dbg_printf(!"Left Snap <%g %g %g>\n",pLeftSnap->tPos.X,pLeftSnap->tPos.Y,pLeftSnap->tPos.Z)
                                     
-                  var tPos = Vector3_Transform( Vector3_AddEx(.tOffPos , pLeftSnap->tPos) , .tMatrix )
-                  Vector3_Add( .tPositionQ , tPos )                  
+                  'Vector3_AddEx(.tOffPos , 
+                  var tPos = Vector3_Transform( pLeftSnap->tPos , .tMatrix )
+                  if .tOffRot.X then Matrix3x3RotateX( .tMatrix , .tMatrix , .tOffRot.X )
+                  if .tOffRot.Y then Matrix3x3RotateY( .tMatrix , .tMatrix , .tOffRot.Y )
+                  if .tOffRot.Z then Matrix3x3RotateZ( .tMatrix , .tMatrix , .tOffRot.Z )
+                  
+                  MultMatrix3x3( .tMatrix , .tMatrix , pLeftSnap->tOriMat )
+                  
+                  Vector3_Add( .tPositionQ , tPos )
+                  tPos = Vector3_Transform( .tOffPos , .tMatrix )
+                  Vector3_Add( .tPositionQ , tPos )
+                  
                   
                   #if 0
                      ''dbg_puts("pLeft:" & pLeft & " // pRight:" & pRight)
@@ -929,7 +953,7 @@ end function
          '"3958 B1 #black s1 = 3005 B2 c1;"
          '"3001 B1 #black s1 = 3001 B2 c1;"
          sScript = _
-            "2356 B1 #y0 s1 = 3001 P1 #y90 #2 c1; " !"\n" _
+            "2356 B1 #y0 s1 = 3001 P1 #y90 #xo20 #2 c1; " !"\n" _
             "P1 s8 = 3005 B2 #3 c1;"
          'sScript = _         
          '   "2356 B2 #black #yo50 s1 = 3005 P2 #black c1;" !"\n" _

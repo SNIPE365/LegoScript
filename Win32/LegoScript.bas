@@ -21,9 +21,9 @@
 ' !!! some pieces have unmatched studs vs clutch (and i suspect that's their design problem) !!!
 ' !!! because when using ldraw it does not matter the order, so they never enforced that     !!!
 
+'TODO (02/09/25): fix piece declaration + forward reference (RotatePivot.ls)
 'TODO (30/06/25): continue fixing/improving the row counter
 'TODO (13/06/25): fix LS2LDR showing wrong error line numbers with #defines
-'TODO (04/06/25): show debug of connectors when viewing a single part
 'TODO (19/05/25): fix LS2LDR parsing bugs (prevent part that is connected from moving)
 'TODO (17/05/25): investigate crash when building before opening graphics window
 'TODO (16/05/25): clutches [slide=true] are real clutches??
@@ -126,6 +126,8 @@ declare sub ChangeToTabByFile( sFullPath as string , iLine as long = -1 )
 #include "Loader\Modules\Normals.bas"
 #include "Loader\Modules\Matrix.bas"
 #include "Loader\Modules\Model.bas"
+'#include "Loader\Modules\modelA.bas"
+'#include "Loader\Modules\modelB.bas"
 #include "LS2LDR.bas"
 #include "ComboBox.bas"
 #include once "LSModules\CommandLine.bas"
@@ -875,6 +877,7 @@ sub WinMain ()
    ShowWindow( hWnd , SW_SHOW )
    UpdateWindow( hWnd )
      
+     
    dim as HWND hOldFocus = cast(HWND,-1)
    while( GetMessage( @tMsg, NULL, 0, 0 ) <> FALSE )    
       if TranslateAccelerator( hWnd , hAcceleratos , @tMsg ) then continue while      
@@ -884,6 +887,8 @@ sub WinMain ()
       ProcessMessage( tMsg )
       var hFocus = GetFocus()
       if hFocus <> hOldFocus then
+         static as long iOnce = 0
+         if hOldFocus=cast(HWND,-1) then SetForegroundWindow( hWnd )
          hOldFocus = hFocus
          if g_hContainer andalso g_hSearch then
             if hFocus=NULL orelse (hFocus <> g_hSearch andalso hFocus <> g_hContainer andalso hFocus <> CTL(wcEdit)) then
@@ -943,6 +948,8 @@ if g_ViewerThread then ThreadWait( g_ViewerThread )
 'TerminateProcess( GetCurrentProcess , 0 )
 
 #if 0
+   
+
    3865 BP10 #7 s69 = 3001p11 B1 y90 c1;
    B1 s1 = 3001p11 B2 #2 c5;
    B2 s1 = 3001p11 B3 #3 c6;

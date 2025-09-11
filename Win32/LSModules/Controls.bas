@@ -125,10 +125,12 @@ const cStatStyle = cStyle or SBARS_SIZEGRIP
 
 const cBrd = WS_EX_CLIENTEDGE
 const cTrn = WS_EX_TRANSPARENT
+const cLay = WS_EX_TRANSPARENT
 
-#define AddButtonA(_ID , _X , _Y , _W , _H , _T , _S...) ControlA( _ID , null , "button"    , _T , cButtonStyle, _X , _Y , _W , _H , _S )
+': SetLayeredWindowAttributes( pCtx->hCTL(_ID).hWnd , 0,254,LWA_ALPHA )
+#define AddButtonA(_ID , _X , _Y , _W , _H , _T , _S...) ControlA( _ID , cLay , "button"    , _T , cButtonStyle, _X , _Y , _W , _H , _S )
 #define AddButtonAT(_ID , _X , _Y , _W , _H , _T , _S...) ControlA( _ID , cTrn , "button"    , _T , cButtonStyle, _X , _Y , _W , _H , _S )
-#define AddButtonW(_ID , _X , _Y , _W , _H , _T , _S...) ControlW( _ID , null , "button"    , _T , cButtonStyle, _X , _Y , _W , _H , _S )
+#define AddButtonW(_ID , _X , _Y , _W , _H , _T , _S...) ControlW( _ID , cLay , "button"    , _T , cButtonStyle, _X , _Y , _W , _H , _S )
 #define AddButtonWT(_ID , _X , _Y , _W , _H , _T , _S...) ControlW( _ID , cTrn , "button"    , _T , cButtonStyle, _X , _Y , _W , _H , _S )
 #define AddBtChkA( _ID , _X , _Y , _W , _H , _T , _S...) ControlA( _ID , null , "button"    , _T , cBtnChkStyle, _X , _Y , _W , _H , _S )
 #define AddBtChkW( _ID , _X , _Y , _W , _H , _T , _S...) ControlW( _ID , null , "button"    , _T , cBtnChkStyle, _X , _Y , _W , _H , _S )

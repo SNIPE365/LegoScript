@@ -531,9 +531,8 @@ end type
 
 
 type SnapPV
-   as Vector3 tPos 'position
-   'as float fAX,fAY,fAZ 'direction vector
-   'as Matrix3x3 tOriMat
+   as Vector3 tPos      'position
+   as Matrix3x3 tOriMat '.fScaleX=0 means matrix is ignored
 end type
 type PartSnap
    lStudCnt     as long
@@ -548,51 +547,12 @@ type PartSnap
    as SnapPV ptr pStud,pClutch
 end type
 
-'#define ShadowCalcMatrix
-
-#ifdef ShadowCalcMatrix
-sub SnapAddStud( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) )
-   with tSnap
-      for N as long = 0 to iCnt-1
-        .lStudCnt += 1
-        .pStud = reallocate(.pStud,sizeof(tPV)*.lStudCnt)
-         'PrintCurrentMatrix()
-         if IsMatrixIdentity() then            
-            'puts("identity stud")
-            tPV.pMatOrg = 0            
-         else
-            'puts("origin stud")
-            tPV.pMatOrg = allocate( sizeof(Matrix4x4) )
-            *tPV.pMatOrg = tMatrixStack( g_CurrentMatrix )
-         end if
-         .pStud[.lStudCnt-1] = tPV        
-      next N
-   end with
-end sub
-sub SnapAddClutch( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) )
-   with tSnap
-      for N as long = 0 to iCnt-1
-         .lClutchCnt += 1
-         .pClutch = reallocate(.pClutch,sizeof(tPV)*.lClutchCnt)
-         if IsMatrixIdentity() then            
-            tPV.pMatOrg = 0
-         else
-            tPV.pMatOrg = allocate( sizeof(Matrix4x4) )
-            *tPV.pMatOrg = tMatrixStack( g_CurrentMatrix )
-         end if
-         .pClutch[.lClutchCnt-1] = tPV
-      next N
-   end with
-end sub
-#else
 sub SnapAddStud( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) )   
    with tSnap      
       for N as long = 0 to iCnt-1
         .lStudCnt += 1
         .pStud = reallocate(.pStud,sizeof(tPV)*.lStudCnt)
-        .pStud[.lStudCnt-1] = tPV
-        '.pStud[.lStudCnt-1].pMatOrg = 0
-        '.pStud[.lStudCnt-1].tOriMat = tMatrixStack( g_CurrentMatrix )
+        .pStud[.lStudCnt-1] = tPV        
       next N
    end with
 end sub
@@ -601,13 +561,10 @@ sub SnapAddClutch( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) 
       for N as long = 0 to iCnt-1
         .lClutchCnt += 1
         .pClutch = reallocate(.pClutch,sizeof(tPV)*.lClutchCnt)
-        .pClutch[.lClutchCnt-1] = tPV
-        '.pClutch[.lClutchCnt-1].pMatOrg = 0
-        '.pClutch[.lClutchCnt-1].tOriMat = tMatrixStack( g_CurrentMatrix )
+        .pClutch[.lClutchCnt-1] = tPV        
       next N
    end with
 end sub 
-#endif
 
 #ifndef __NoRender
 static shared as ulong MaleStipple(32-1), FemaleStipple(32-1)
@@ -1313,30 +1270,41 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                   static as zstring ptr pzCaps(...)={@"none",@"one",@"two",@"A",@"B"}
                   if iPrevRec>.bRecurse then iIdent -= 2
                   iPrevRec=.bRecurse '4
-                  
-                  dim as single ptr pMatOri = NULL
-                  #if 0
-                     if .bFlagOriMat then 
-                        pMatOri = @.fOri(0)
-                        puts("with origin")
-                     else
-                        puts("without origin")
-                     end if
-                  #endif                                    
-                  
+
+                  dim as Matrix3x3 tMatOri = any
+                                    
                   scope
+                     
+                     'with tMatrixStack(g_CurrentMatrix)
                      if .bFlagOriMat then
+                        
+                        'tMatOri = *cptr(Matrix3x3 ptr,@.fOri(0))
+                        
+                        '#define _M(_I) tMatOri.M(_I)
+                        '_M(0) = .fOri(0) : _M(1) = .fOri(3) : _M(2) = .fOri(6)
+                        '_M(3) = .fOri(1) : _M(4) = .fOri(4) : _M(5) = .fOri(7)
+                        '_M(6) = .fOri(2) : _M(7) = .fOri(5) : _M(8) = .fOri(8)
+                        
                         dim as single fMatrix(15) = { _                           
-                          .fOri(0) , .fOri(3) , .fOri(6) , 0 , _ 'X scale ,    0?   ,   0?    , 0 
-                          .fOri(1) , .fOri(4),  .fOri(7) , 0 , _ '  0?    , Y Scale ,   0?    , 0 
-                          .fOri(2) , .fOri(5) , .fOri(8) , 0 , _ '  0?    ,    0?   , Z Scale , 0 
+                          .fOri(0) , .fOri(1) , .fOri(2) , 0 , _ 'X scale ,    0?   ,   0?    , 0 
+                          .fOri(3) , .fOri(4),  .fOri(5) , 0 , _ '  0?    , Y Scale ,   0?    , 0 
+                          .fOri(6) , .fOri(7) , .fOri(8) , 0 , _ '  0?    ,    0?   , Z Scale , 0 
                             0      ,    0    ,    0     , 1 }
                           '-.fPosX  ,  -.fPosY , -.fPosZ  , 1 }   ' X Pos  ,  Y Pos  ,  Z Pos  , 1 
                         PushAndMultMatrix( @fMatrix(0) )
                         '#ifndef __Tester
-                        puts("Origin!")
+                        'puts("Origin!")
                         '#endif
+                     'else
+                     '   tMatOri = g_tIdentityMatrix3x3 '.fScaleX = 0
                      end if
+                     
+                     with tMatOri
+                        #define _m(_N) tMatrixStack(g_CurrentMatrix).m(_N)
+                        .m(0) = _m(0) : .m(3) = _m(1) : .m(6) = _m( 2)
+                        .m(1) = _m(4) : .m(4) = _m(5) : .m(7) = _m( 6)
+                        .m(2) = _m(8) : .m(5) = _m(9) : .m(8) = _m(10)
+                     end with
                      
                      'var pMat = @tMatrixStack(g_CurrentMatrix)
                      'var fYScale = (pMat->fScaleY) , YScale = cint(fYScale)
@@ -1490,7 +1458,8 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                                  with *pMat
                                     'printf(!"stud ori: %p\n",pMatOri)
                                     'puts("Male: " & iMale)
-                                    SnapAddStud( tSnap , iConCnt , type(fPX+.fPosX , fPY+.fPosY , fPZ+.fPosZ) )
+                                    dim as SnapPV tPV = type(fPX+.fPosX , fPY+.fPosY , fPZ+.fPosZ) : tPV.tOriMat = tMatori
+                                    SnapAddStud( tSnap , iConCnt , tPV )
                                  end with                                 
                                  bSecs -= 1 'stud
                               else
@@ -1535,7 +1504,8 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                                     bDidClutch=1
                                     with *pMat
                                        ''puts("Female: " & iFemale)
-                                       SnapAddClutch( tSnap , iConCnt , type(fPX+.fPosX , fPY+.fPosY , fPZ+.fPosZ) )                                       
+                                       dim as SnapPV tPV = type(fPX+.fPosX , fPY+.fPosY , fPZ+.fPosZ) : tPV.tOriMat = tMatori
+                                       SnapAddClutch( tSnap , iConCnt , tPV )
                                     end with
                                  end if
                                  DbgConnect(!"Clutch += %i (Square slide)\n",iConCnt)
@@ -1588,7 +1558,8 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                                        for iGX as long = 0 to xCnt
                                           for iGZ as long = 0 to zCnt
                                              ''puts("Female: " & iFemale)
-                                             SnapAddClutch( tSnap , 1 , type(fPX+.fPosX+iGX*pG->xStep , fPY+.fPosY , fPZ+.fPosZ+iGZ*pG->zStep) )
+                                             dim as SnapPV tPV = type(fPX+.fPosX+iGX*pG->xStep , fPY+.fPosY , fPZ+.fPosZ+iGZ*pG->zStep) : tPV.tOriMat = tMatori
+                                             SnapAddClutch( tSnap , 1 , tPV )
                                           next igZ
                                        next iGX
                                     end with
@@ -1616,7 +1587,8 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                            'printf(!"Sides=%i\n",bSides)
                            with *pMat
                               'puts("Female: " & iFemale)
-                              SnapAddClutch( tSnap , iConCnt , type(fPX+.fPosX , fPY+.fPosY , fPZ+.fPosZ) )                                       
+                              dim as SnapPV tPV = type(fPX+.fPosX , fPY+.fPosY , fPZ+.fPosZ) : tPV.tOriMat = tMatori
+                              SnapAddClutch( tSnap , iConCnt , tPV )
                            end with
                            DbgConnect(!"Clutch += %i (Fallback {ignored})\n",iConCnt)
                            #ifndef __Tester

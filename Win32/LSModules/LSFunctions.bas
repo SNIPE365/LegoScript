@@ -11,19 +11,19 @@ end scope
 
 #define ErrInfo( _N ) (_N)
 
-function ReadTokenNumber( sToken as string , iStart as long = 0 , bSigned as long = false ) as long
-   dim as long iResult, iSign = 1
+function ReadTokenNumber( sToken as string , iStart as long = 0 , bSigned as long = false , byref lError as long = 0 ) as long
+   dim as long iResult, iSign = 1 
    if bSigned andalso sToken[iStart] = asc("-") then iStart += 1 : iSign = -1
    for N as long = iStart to len(sToken)-1
       select case sToken[N]
       case asc("0") to asc("9")
          iResult = iResult*10+(sToken[N]-asc("0"))
-         if iResult < 0 then return ErrInfo(ecNumberOverflow)
+         if iResult < 0 then lError = ecNumberOverflow : return ErrInfo(ecNumberOverflow)
       case else
-         return ErrInfo(ecNotANumber)
+         lError = ecNotANumber : return ErrInfo(ecNotANumber) 
       end select
    next N
-   return iResult*iSign
+   lError = 0 : return iResult*iSign
 end function
 function IsTokenNumeric( sToken as string , iStart as long = 0 ) as long
    for N as long = iStart to len(sToken)-1

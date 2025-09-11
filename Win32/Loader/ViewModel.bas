@@ -20,7 +20,8 @@
 #include "Modules\Normals.bas"
 #include "Modules\Matrix.bas"
 #include "Modules\Model.bas"
-
+'#include "Modules\modelA.bas"
+'#include "Modules\modelB.bas"
 
 ' TODO: load extra info from STUDIO.io collision files parse 9 as "special bounding" boxes
 ' TODO: we need now the full polygon collision to detect better if the bounding boxes collide
@@ -224,8 +225,8 @@ scope
    'sFile = sPath+"\examples\8891-towTruck.mpd"
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\5510.mpd"
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\cube10x10x10.ldr"
-   'sFile = "3001.dat" 
-   sFile = "3958.dat"
+   sFile = "3001.dat" 
+   'sFile = "4070.dat" '4070 , 87087 , 26604 , 47905 , 4733 , 30414
 end scope
 scope 
    #if 0
@@ -290,8 +291,8 @@ dim as boolean bEditMode
             '   "1 16 -50.000000 -24.000000 50.000000 1 0 0 0 1 0 0 0 1 3005.dat"
             ' ------------------------------------------------------
             sModel = _
-               "1 2 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 3001.dat"      EOL _
-               "1 0 -60.000000 -24.000000 20.000000 1 0 0 0 1 0 0 0 1 3001.dat"
+               "1 2 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 4070.dat"     ' EOL _
+               '"1 0 -60.000000 -24.000000 20.000000 1 0 0 0 1 0 0 0 1 3001.dat"
             ' ------------------------------------------------------
             'sModel = _
             '   "1 0 0.000000 0.000000 0.000000 1 0 0 0 -1 -8.74228e-008 0 8.74228e-008 -1 3001.dat" EOL _
@@ -548,16 +549,23 @@ do
    
    #macro DrawConnectorName( _YOff )      
       var sText = "" & N+1
-      #if 0     
+      if .tOriMat.fScaleX then
          glPushMatrix()
-         glTranslatef( .fpX , .fPY , .fPZ )
-         glRotatef fRotationX  , 0   , 1.0 , 0 : glRotatef fRotationY  , 1.0 , 0.0 , 0            
-         glRotatef 90  , 1.0 , 0 , 0 : glRotatef 180  , 0 , 0 , 1.0
+         var fPX = .tPos.X , fPY = .tPos.Y , fPZ = .tPos.Z
+         with .tOriMat
+            dim as single fMatrix(15) = { _
+               .m(0) , .m(3) , .m(6) , 0 , _ 'X scale ,    0?   ,   0?    , 0 
+               .m(1) , .m(4) , .m(7) , 0 , _ '  0?    , Y Scale ,   0?    , 0 
+               .m(2) , .m(5) , .m(8) , 0 , _ '  0?    ,    0?   , Z Scale , 0 
+                fpX  ,  fPY  ,  fpZ  , 1  }  ' X Pos  ,  Y Pos  ,  Z Pos  , 1 
+            glMultMatrixf( @fMatrix(0) )
+            glTranslateF(0,_YOff,0)
+         end with
          glDrawText( sText , 0,0,0 , 8/len(sText),8 , true )
          glPopMatrix()
-      #else
-         glDrawText( sText , .fPX,.fPY+(_YOff),.fPZ , 8/len(sText),8 , true )
-      #endif
+      else
+         'glDrawText( sText , .tPos.X,.tPos.Y+(_YOff),.tPos.Z , 8/len(sText),8 , true )
+      end if
    #endmacro
 
    if g_CurDraw <> -1 orelse bEditMode then      
@@ -582,7 +590,7 @@ do
          glColor4f(1,0,0,1)
          for N as long = 0 to .lClutchCnt-1
             with .pClutch[N]
-               DrawConnectorName(+2)
+               DrawConnectorName(0)
             end with
          next N
       end with
@@ -593,7 +601,7 @@ do
    glClear GL_DEPTH_BUFFER_BIT
                
    #define DrawMarker( _X , _Y , _Z ) DrawLimitsCube( (_X)-2,(_X)+2 , (_Y)-2,(_Y)+2 , (_Z)-2,(_Z)+2 )      
-   glColor4f(1,.5,.25,.66) : DrawMarker( 0,0,0 )
+   'glColor4f(1,.5,.25,.66) : DrawMarker( 0,0,0 )
          
    
    'glColor4f(.25,.5,1,.66) : DrawMarker( -50,0,-50 )

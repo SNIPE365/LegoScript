@@ -29,6 +29,8 @@
    '#include "Loader\Modules\Normals.bas"
    #include once "Loader\Modules\Matrix.bas"
    #include once "Loader\Modules\Model.bas"
+   '#include once "Loader\Modules\modelA.bas"
+   '#include once "Loader\Modules\modelB.bas"
 #endif
 
 'https://img.bricklink.com/ItemImage/PL/30473.png
