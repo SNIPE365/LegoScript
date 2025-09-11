@@ -1,1 +1,0 @@
-1x1DummySlab DS1 c1 = 3024 P1 s1;
