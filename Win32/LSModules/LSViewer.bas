@@ -70,8 +70,8 @@ namespace Viewer
                if bLeftPressed  then fRotationX += e.dx : fRotationY += e.dy
                if bRightPressed then fPositionX += e.dx*g_zFar/100 : fPositionY += e.dy*g_zFar/100
             case fb.EVENT_MOUSE_WHEEL
-               iWheel = e.z-iPrevWheel
-               fZoom = -3+(iWheel/12)
+                 iWheel = e.z-iPrevWheel
+                 fZoom = -3+(-iWheel/12) 'non inverted mouse wheel to zoom
             case fb.EVENT_MOUSE_BUTTON_PRESS
                if e.button = fb.BUTTON_MIDDLE then 
                   iPrevWheel = iWheel : fZoom = -3

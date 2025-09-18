@@ -1,6 +1,6 @@
-#cmdline "res\ls.rc"
-'#cmdline "res\ls.rc  -gen gcc -O 3 -g"
-'#cmdline "res\ls.rc  -gen gcc -O 3"
+#cmdline "res\LS.rc"
+'#cmdline "Res\LS.rc  -gen gcc -O 3 -g"
+'#cmdline "Res\LS.rc  -gen gcc -O 3"
 #define __Main "LegoScript"
 
 #include once "windows.bi"
