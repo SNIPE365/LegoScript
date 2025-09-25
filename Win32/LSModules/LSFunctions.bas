@@ -372,19 +372,24 @@ function LS_GetNextStatement( sScript as string , iStStart as long , Out_sStatem
    dim as long iStNext = instr(iStStart,sScript,";"), bNoEOS = 0
    if iStNext=0 then iStNext = len(sScript)+1 : bNoEOS = 1
    var pzFb = cptr(fbStr ptr,@Out_sStatement)
-   dim as byte bPreSkipTillNextLine = 0
+   dim as byte bPreSkipTillCondition = 0
    with *pzFb
       .pzData = cptr(ubyte ptr,strptr(sScript))+iStStart-1
       .iLen = iStNext-iStStart : iStNext += 1-bNoEOS
-      while .iLen>0 andalso (bPreSkipTillNextLine orelse (g_bSeparators(.pzData[0]) and stToken))
+      while .iLen>0 andalso (bPreSkipTillCondition orelse (g_bSeparators(.pzData[0]) and stToken))
          select case .pzData[0] 'special chars
          'case 0 : exit while
-         case asc("/"): if .pzData[1] = asc("/") then bPreSkipTillNextLine = 1
-         case asc(!"\n"): InOut_iLineNumber += 1 : bPreSkipTillNextLine = 0
+         case asc("*")
+            if .pzData[1] = asc("/") then bPreSkipTillCondition and= (not 2)
+         case asc("/")
+            if .pzData[1] = asc("*") then bPreSkipTillCondition or= 2
+            if .pzData[1] = asc("/") then bPreSkipTillCondition or= 1
+         case asc(!"\n")
+            InOut_iLineNumber += 1 : bPreSkipTillCondition and= (not 1)
          case asc(!"\r")
             if .pzData[1]=asc(!"\n") then 
                .pzData += 1 : .iLen -= 1 : iStStart += 1 
-               InOut_iLineNumber += 1 : bPreSkipTillNextLine = 0               
+               InOut_iLineNumber += 1 : bPreSkipTillCondition and= (not 1)
             end if
          end select
          .pzData += 1 : .iLen -= 1 : iStStart += 1

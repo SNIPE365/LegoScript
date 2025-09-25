@@ -315,7 +315,7 @@ namespace Viewer
                   end if
                   #macro DrawConnectorName( _YOff )      
                      var sText = "" & N+1
-                     if .tOriMat.fScaleX then
+                     if 1 then '.tOriMat.fScaleX then
                         glPushMatrix()
                         var fPX = .tPos.X , fPY = .tPos.Y , fPZ = .tPos.Z
                         with .tOriMat

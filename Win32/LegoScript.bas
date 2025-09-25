@@ -21,6 +21,7 @@
 ' !!! some pieces have unmatched studs vs clutch (and i suspect that's their design problem) !!!
 ' !!! because when using ldraw it does not matter the order, so they never enforced that     !!!
 
+'TODO (19/09/25): study 47905 shadow to see how rotations are being followed there
 'TODO (02/09/25): fix piece declaration + forward reference (RotatePivot.ls)
 'TODO (30/06/25): continue fixing/improving the row counter
 'TODO (13/06/25): fix LS2LDR showing wrong error line numbers with #defines
@@ -30,7 +31,6 @@
 'TODO (13/05/25): Add Menu entries for the Query window/buttons 
 'TODO (16/05/25): TAB structure must keep the selection position
 'TODO (13/05/25): load/save settings for Legoscript main window
-'TODO (25/03/25): re-organize the LS2LDR code, so that it looks better and explain better
 'TODO (06/03/25): check bug regarding wheel positioning and the line numbers
 'TODO (21/04/25): prevent buffer overflow when doing a FIND/REPLACE when the selected text is bigger than 32k
 

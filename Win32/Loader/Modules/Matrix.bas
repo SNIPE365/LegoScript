@@ -268,6 +268,53 @@ sub MultMatrix3x3(byref tmOut as Matrix3x3, byref tmA as Matrix3x3, byref tmB as
     next i
     tmOut = tempMat
 end sub
+function InvertMatrix3x3(byref tmOut as Matrix3x3, byref tmIn as Matrix3x3) as boolean
+
+    dim as single det, invDet
+    dim as Matrix3x3 adj
+
+    ' 1. Calculate the determinant of the 3x3 matrix
+    ' det = a(ei - fh) - b(di - fg) + c(dh - eg)
+    det = tmIn.m(0) * (tmIn.m(4) * tmIn.m(8) - tmIn.m(5) * tmIn.m(7)) - _
+          tmIn.m(1) * (tmIn.m(3) * tmIn.m(8) - tmIn.m(5) * tmIn.m(6)) + _
+          tmIn.m(2) * (tmIn.m(3) * tmIn.m(7) - tmIn.m(4) * tmIn.m(6))
+
+    ' 2. Check if the matrix is invertible
+    if (abs(det) < 0.000001) then ' Use a small tolerance for floating point numbers
+        ' The matrix is singular and cannot be inverted
+        return false
+    end if
+
+    invDet = 1.0 / det
+
+    ' 3. Calculate the adjugate matrix (transpose of the cofactor matrix)
+    adj.m(0) = (tmIn.m(4) * tmIn.m(8) - tmIn.m(5) * tmIn.m(7))
+    adj.m(1) = -(tmIn.m(1) * tmIn.m(8) - tmIn.m(2) * tmIn.m(7))
+    adj.m(2) = (tmIn.m(1) * tmIn.m(5) - tmIn.m(2) * tmIn.m(4))
+    
+    adj.m(3) = -(tmIn.m(3) * tmIn.m(8) - tmIn.m(5) * tmIn.m(6))
+    adj.m(4) = (tmIn.m(0) * tmIn.m(8) - tmIn.m(2) * tmIn.m(6))
+    adj.m(5) = -(tmIn.m(0) * tmIn.m(5) - tmIn.m(2) * tmIn.m(3))
+    
+    adj.m(6) = (tmIn.m(3) * tmIn.m(7) - tmIn.m(4) * tmIn.m(6))
+    adj.m(7) = -(tmIn.m(0) * tmIn.m(7) - tmIn.m(1) * tmIn.m(6))
+    adj.m(8) = (tmIn.m(0) * tmIn.m(4) - tmIn.m(1) * tmIn.m(3))
+
+    ' 4. Multiply the adjugate matrix by the inverse of the determinant
+    tmOut.m(0) = adj.m(0) * invDet
+    tmOut.m(1) = adj.m(1) * invDet
+    tmOut.m(2) = adj.m(2) * invDet
+    tmOut.m(3) = adj.m(3) * invDet
+    tmOut.m(4) = adj.m(4) * invDet
+    tmOut.m(5) = adj.m(5) * invDet
+    tmOut.m(6) = adj.m(6) * invDet
+    tmOut.m(7) = adj.m(7) * invDet
+    tmOut.m(8) = adj.m(8) * invDet
+
+    return true
+
+end function
+
 ' Rotates a matrix around the X-axis
 sub Matrix3x3RotateX(byref tmOut as Matrix3x3, byref tmIn as Matrix3x3, fAngle as single)
     'dim as single radians = fAngle * (3.14159265 / 180.0)

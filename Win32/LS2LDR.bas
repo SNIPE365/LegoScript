@@ -112,7 +112,7 @@ g_NullSnap.tOriMat = g_tIdentityMatrix3x3
 
 'TODO: now check the remainder tokens, clutch/studs
 
-function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainPath as string = "main.ldr" ) as string
+function LegoScriptToLDraw( _sScript as string , sErrWarn as string = "" , sMainPath as string = "main.ldr" ) as string
    
    type FileStruct
       psFilename  as string ptr
@@ -126,8 +126,8 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
       
    dim as string sStatement, sToken(15), sResult
    dim as long iTokenLineNumber=1 , iCurFile = 1 , iStackPos = 0 , iFileCount = 1
-   dim as byte bNullSkip = 1
-   sOutput = "" : g_iPartCount = 1 : g_iConnCount = 0
+   dim as byte bNullSkip = 1 , bHaveErrors = 0 , bHaveWarnings = 0
+   sErrWarn = "" : g_iPartCount = 1 : g_iConnCount = 0
    
    LS_InitDefineList( g_tDefineList )   
                
@@ -154,15 +154,15 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
    #define TokenFilePath(_N) (*(aFile(TokenFileNumber(_N)).psFilepath))
       
    #ifdef __Standalone      
-      #define ParserError( _text ) color 12:errorf(!"Error: %s\r\nat '%s':%i '%s'\n",SafeText(_text),TokenFilename(iCurToken), TokenLineNumber(iCurToken),SafeText(sStatement)) : sResult="" : color 7: exit while
-      #define ParserWarning( _text ) color 14:errorf(!"Warning: %s\r\nat '%s':%i '%s'\n",SafeText(_text),TokenFilename(iCurToken),TokenLineNumber(iCurToken),SafeText(sStatement)):color 7
-      #define LinkerError( _text ) color 12 : errorf(!"Error: %s\n",_text) : sResult="" : color 7
-      #define LinkerWarning( _text ) color 14 : errorf(!Warning: %s\n",_text): color 7
+      #define ParserError( _text ) bHaveErrors=1 : color 12 : errorf(!"Error: %s\r\nat '%s':%i '%s'\n",SafeText(_text),TokenFilename(iCurToken), TokenLineNumber(iCurToken),SafeText(sStatement)) : sResult="" : color 7: exit while
+      #define ParserWarning( _text ) bHaveWarnings=1 : color 14 : errorf(!"Warning: %s\r\nat '%s':%i '%s'\n",SafeText(_text),TokenFilename(iCurToken),TokenLineNumber(iCurToken),SafeText(sStatement)):color 7
+      #define LinkerError( _text ) bHaveErrors=1 : color 12 : errorf(!"Error: %s\n",_text) : sResult="" : color 7
+      #define LinkerWarning( _text ) bHaveWarnings=1: color 14 : errorf(!Warning: %s\n",_text): color 7
    #else
-      #define ParserError( _text ) sOutput += !"\2\12Error: " & SafeText(_text) & !"\r\nat '" & TokenFilename(iCurToken) & "':" & TokenLineNumber(iCurToken) & " '" & SafeText(sStatement) & !"'\r\n" : sResult="" : ChangeToTabByFile( TokenFilePath(iCurTokeN) , TokenLineNumber(iCurToken ) ) : exit while
-      #define ParserWarning( _text ) sOutput += !"\2\14Warning: " & SafeText(_text) & !"\r\nat '" & TokenFilename(iCurToken) & "':" &  TokenLineNumber(iCurToken) & " '" & SafeText(sStatement) & !"'\r\n"
-      #define LinkerError( _text ) sOutput += !"\2\12Error: " & _text & !"\r\n" : sResult=""
-      #define LinkerWarning( _text ) sOutput += !"\2\14Warning: " & _text & !"\r\n" 
+      #define ParserError( _text ) bHaveErrors=1 : sErrWarn += !"\2\12Error: " & SafeText(_text) & !"\r\nat '" & TokenFilename(iCurToken) & "':" & TokenLineNumber(iCurToken) & " '" & SafeText(sStatement) & !"'\r\n" : sResult="" : ChangeToTabByFile( TokenFilePath(iCurTokeN) , TokenLineNumber(iCurToken ) ) : exit while
+      #define ParserWarning( _text ) bHaveWarnings=1 : sErrWarn += !"\2\14Warning: " & SafeText(_text) & !"\r\nat '" & TokenFilename(iCurToken) & "':" &  TokenLineNumber(iCurToken) & " '" & SafeText(sStatement) & !"'\r\n"
+      #define LinkerError( _text ) bHaveErrors=1 : sErrWarn += !"\2\12Error: " & _text & !"\r\n" : sResult=""
+      #define LinkerWarning( _text ) bHaveWarnings=1 : sErrWarn += !"\2\14Warning: " & _text & !"\r\n" 
    #endif
       
    with g_tPart(_NULLPARTNAME)
@@ -621,23 +621,25 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                         '------------------------------------------------------------------------
                         '------------------------ first part positioning ------------------------
                         '------------------------------------------------------------------------
+                        
                         with g_tPart( g_tConn(I).iLeftPart )
                            'print .sName , .sPrimative , .iColor
                            var iColor = iif( .iColor<0 , 16 , .iColor ) , psPrimative = @.sPrimative
                            .bConnected = true 'this part now have a position
-                           .tMatrix = g_tIdentityMatrix3x3
+                           .tMatrix = g_tIdentityMatrix3x3                           
                            _fPX = .tOffPos.X : _fPY = .tOffPos.Y : _fPZ = .tOffPos.Z
                            ''printf(!"~~- %f %f %f\n",_fPX,_fPY,_fPZ)
                            if .tOffRot.X then Matrix3x3RotateX( .tMatrix , .tMatrix , .tOffRot.X )
                            if .tOffRot.Y then Matrix3x3RotateY( .tMatrix , .tMatrix , .tOffRot.Y )
                            if .tOffRot.Z then Matrix3x3RotateZ( .tMatrix , .tMatrix , .tOffRot.Z )
                            var pPos = @.tPositionQ
+                           'MultMatrix3x3( .tMatrix , pLeftSnap->tOriMat , .tMatrix )
                            with .tMatrix
                               sprintf(zTemp,!"1 %i %f %f %f %g %g %g %g %g %g %g %g %g %s\r\n",iColor,pPos->X,pPos->Y,pPos->Z, _
                                  .m(0),.m(1),.m(2),.m(3),.m(4),.m(5),.m(6),.m(7),.m(8) , *psPrimative )
                            end with
                            ''printf(!"~~+ %f %f %f\n",_fPX,_fPY,_fPZ)
-                           sResult += zTemp 
+                           if bHaveErrors=0 then sResult += zTemp 
                            #ifdef __Standalone
                            'errorf("(first) %s",zTemp)
                            dbg_printf("first: %s",zTemp)
@@ -737,32 +739,42 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                   dbg_printf(!"Left Snap <%g %g %g>\n",pLeftSnap->tPos.X,pLeftSnap->tPos.Y,pLeftSnap->tPos.Z)
                                     
                   'Vector3_AddEx(.tOffPos , 
+                  
+                  'MultMatrix3x3( .tMatrix , .tMatrix , pRightSnap->tOriMat )
+                  'MultMatrix3x3_ColumnMajor( .tMatrix , pRightSnap->tOriMat , .tMatrix )
+                  '.tMatrix = g_tIdentityMatrix3x3 'pRightSnap->tOriMat
+                  
                   var tPos = Vector3_Transform( pLeftSnap->tPos , .tMatrix )
                   if .tOffRot.X then Matrix3x3RotateX( .tMatrix , .tMatrix , .tOffRot.X )
                   if .tOffRot.Y then Matrix3x3RotateY( .tMatrix , .tMatrix , .tOffRot.Y )
                   if .tOffRot.Z then Matrix3x3RotateZ( .tMatrix , .tMatrix , .tOffRot.Z )
+                  Vector3_Add( .tPositionQ , tPos )
+                                                      
+                  #if 0 'show orientation matrixes
+                     with pLeftSnap->tOriMat
+                        #define r(_i) (roundf(.m(_i)*100000)/100000)
+                        printf(!"{ {Left =%g %g %g %g %g %g %g %g %g}}\r\n",r(0),r(1),r(2),r(3),r(4),r(5),r(6),r(7),r(8) )
+                     end with
+                     with pRightSnap->tOriMat
+                        #define r(_i) (roundf(.m(_i)*100000)/100000)
+                        printf(!"{{Right =%g %g %g %g %g %g %g %g %g}}\r\n",r(0),r(1),r(2),r(3),r(4),r(5),r(6),r(7),r(8) )
+                     end with
+                  #endif
                   
+                  dim as Matrix3x3 tInvMat = any
+                  if InvertMatrix3x3( tInvMat , pRightSnap->tOriMat ) = 0 then
+                     puts("Failed to invert matrix :(")
+                     sleep : system
+                  end if
+                  
+                  MultMatrix3x3( .tMatrix , .tMatrix , tInvMat )
                   MultMatrix3x3( .tMatrix , .tMatrix , pLeftSnap->tOriMat )
                   
-                  Vector3_Add( .tPositionQ , tPos )
                   tPos = Vector3_Transform( .tOffPos , .tMatrix )
                   Vector3_Add( .tPositionQ , tPos )
-                  
-                  
-                  #if 0
-                     ''dbg_puts("pLeft:" & pLeft & " // pRight:" & pRight)
-                     if pLeft->pMatOrg then 
-                        dbg_puts("Prev rotation")
-                        MultMatrix4x4( .tMatrix , .tMatrix , pLeft->pMatOrg )
-                     end if
-                     if pRight->pMatOrg then 
-                        dbg_puts("Auto Rotating")
-                        MultMatrix4x4( .tMatrix , .tMatrix , pRight->pMatOrg )
-                     end if    
-                  #endif                           
-                                                         
+                                                                           
                   DbgCrash()
-                                                         
+                  
                   ''_fPX = pLeft->fPX : _fPY = pLeft->fPY : _fPZ = pLeft->fPZ
                   ''if pLeft->pMatOrg then MultiplyMatrixVector( @tVec3(0) , pLeft->pMatOrg )
                   ''MultiplyMatrixVector( @tVec3(0) , @pLeftPart->tMatrix )
@@ -775,17 +787,12 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                   ''dim as single tVec3R(2) = { pRight->fPX , pRight->fPY , pRight->fPZ }
                   '''if pRight->pMatOrg then MultiplyMatrixVector( @tVec3R(0) , pRight->pMatOrg )
                   '''MultiplyMatrixVector( @tVec3R(0) , @.tMatrix )
-                  dbg_printf(!"Right Snap <%g %g %g>\n",pRightSnap->tPos.X,pRightSnap->tPos.Y,pRightSnap->tPos.Z)
-                  'MatrixTranslate( .tMatrix , pRight->fPX , -pRight->fPY , pRight->fpZ )
-                  'MatrixTranslate( .tMatrix , .tLocation.fPX , -.tLocation.fPY , .tLocation.fpZ )
-                  
-                  tPos = Vector3_Transform( pRightSnap->tPos , .tMatrix )                                    
+                  dbg_printf(!"Right Snap <%g %g %g>\n",pRightSnap->tPos.X,pRightSnap->tPos.Y,pRightSnap->tPos.Z)                  
+                                                     
+                                    
+                  tPos = Vector3_Transform( pRightSnap->tPos , .tMatrix )
                   Vector3_Sub( .tPositionQ , tPos )
-                                                                              
-                  ''_fPX = ptLocation->fPX - (_fPX + tVec3R(0)) + .tLocation.fPX '.fPX
-                  ''_fPY = ptLocation->fPY + (_fPY - tVec3R(1)) + .tLocation.fPY '.fPY
-                  ''_fPZ = ptLocation->fPZ + (_fpZ + tVec3R(2)) + .tLocation.fPZ '.fPZ
-                  
+                                                      
                   'if .tLocation.fPX = 0 andalso .tLocation.fPY=0 andalso .tLocation.fPZ=0 then
                   '.tLocation.fPX = _fPX : .tLocation.fPY = _fPY : .tLocation.fPZ = _fPZ
                   'elseif abs(.tLocation.fPX-_fPX)>.001 orelse abs(.tLocation.fPY-_fPY)>.001 orelse abs(.tLocation.fPZ-_fPZ)>.001 then
@@ -805,7 +812,7 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                   tPart.yMin = tPart.yMin+.1+.tPositionQ.Y : tPart.yMax = tPart.yMax-.1+.tPositionQ.Y
                   tPart.zMin = tPart.zMin+.1+.tPositionQ.Z : tPart.zMax = tPart.zMax-.1+.tPositionQ.Z               
                                                             
-                  #if 0
+                  #if 0 'collision check
                      for N as long = 0 to g_iPartCount-1
                         if N = iRightPart_ then continue for
                         if .tPositionQ.X = 0 andalso .tPositionQ.Y=0 andalso .tPositionQ.Z=0 then
@@ -837,7 +844,7 @@ function LegoScriptToLDraw( _sScript as string , sOutput as string = "" , sMainP
                      sprintf(zTemp,!"1 %i %f %f %f %g %g %g %g %g %g %g %g %g %s\r\n",iColor,pPos->X,pPos->Y,pPos->Z, _
                         r(0),r(1),r(2),r(3),r(4),r(5),r(6),r(7),r(8) , *psPrimative )
                   end with
-                  sResult += zTemp 
+                  if bHaveErrors=0 then sResult += zTemp
                   #ifdef __Standalone
                   'dbg_printf("<%i>%s",__LINE__,zTemp)
                   dbg_printf("%s",zTemp)
@@ -952,12 +959,16 @@ end function
       #if 1
          '"3958 B1 #black s1 = 3005 B2 c1;"
          '"3001 B1 #black s1 = 3001 B2 c1;"
-         sScript = _
-            "2356 B1 #y0 s1 = 3001 P1 #y90 #xo20 #2 c1; " !"\n" _
-            "P1 s8 = 3005 B2 #3 c1;"
+         'sScript = _
+         '   "2356 B1 #y0 s1 = 3001 P1 #y90 #xo20 #2 c1; " !"\n" _
+         '   "P1 s8 = 3005 B2 #3 c1;"
          'sScript = _         
          '   "2356 B2 #black #yo50 s1 = 3005 P2 #black c1;" !"\n" _
          '   "2356 B1 #y30 s1 = 3001 P1 #2 c1;"
+         sScript = _
+         "3005 B2 #yo-40 c1 = 47905 B1 #10 s1;" !"\n" _
+         "47905 B3 #yo20 #2 s1 = 3005 B4 #purple c1;"
+
       #endif
    
         

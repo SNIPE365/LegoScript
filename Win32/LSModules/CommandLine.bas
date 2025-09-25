@@ -369,6 +369,7 @@ function ParseCmdLine() as long
             sInput = ""
             do
                var iChar = getchar() 
+               if iChar=4 then iChar=10 'hack: alternative EOL to help batch scripts
                if iChar <=0 orelse iChar=26 then exit do
                sScript += chr(iChar)
             loop
@@ -437,14 +438,14 @@ function ParseCmdLine() as long
       end if         
       
       dim as string sModel, sError
-      sModel = LegoScriptToLDraw(sScript, sError, sInput)
+      sModel = LegoScriptToLDraw(sScript, sError, sInput)      
       if len(sError) then 
          if isOutTTY then
             PrintColoredOutput(sError)
          else
             _Errorf("%s",sError)
          end if
-         _GiveUp(1)
+         if len(sModel)=0 then _GiveUp(1)
       end if
       if bDumpToConsole then color 3: print sModel: color 7
       if len(sOutputFile) then
@@ -455,11 +456,11 @@ function ParseCmdLine() as long
          end if
          print #f,sModel
          close #f
-      end if
+      end if      
       if bViewOutput andalso len(sModel)<>0 then   
          var sParms = """"+sModel+""""
-         puts("-----------------")         
-         exec(exepath()+"\Loader\ViewModel.exe",sParms)         
+         puts("-----------------")
+         exec(exepath()+"\Loader\ViewModel.exe",sParms)
          puts("-----------------")
          end 0
       else

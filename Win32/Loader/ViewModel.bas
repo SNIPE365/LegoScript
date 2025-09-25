@@ -225,7 +225,7 @@ scope
    'sFile = sPath+"\examples\8891-towTruck.mpd"
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\5510.mpd"
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\cube10x10x10.ldr"
-   sFile = "3001.dat" 
+   sFile = "47905.dat" 
    'sFile = "4070.dat" '4070 , 87087 , 26604 , 47905 , 4733 , 30414
 end scope
 scope 
@@ -291,7 +291,7 @@ dim as boolean bEditMode
             '   "1 16 -50.000000 -24.000000 50.000000 1 0 0 0 1 0 0 0 1 3005.dat"
             ' ------------------------------------------------------
             sModel = _
-               "1 2 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 4070.dat"     ' EOL _
+               "1 1 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 47905.dat"     ' EOL _
                '"1 0 -60.000000 -24.000000 20.000000 1 0 0 0 1 0 0 0 1 3001.dat"
             ' ------------------------------------------------------
             'sModel = _
@@ -459,9 +459,11 @@ do
    g_fNX=-.95 : g_fNY=.95
       
    if g_CurDraw < 0 then
+      'render whole model
       glCallList(	iModel )   
    else
-      RenderModel( pModel , false , , g_CurDraw )      
+      'render single part
+      RenderModel( pModel , false , , g_CurDraw )
    end if
    glCallList(	iBorders-(g_CurDraw>=0) )   
 
@@ -549,7 +551,7 @@ do
    
    #macro DrawConnectorName( _YOff )      
       var sText = "" & N+1
-      if .tOriMat.fScaleX then
+      if 1 then '.tOriMat.fScaleX then
          glPushMatrix()
          var fPX = .tPos.X , fPY = .tPos.Y , fPZ = .tPos.Z
          with .tOriMat
@@ -563,7 +565,7 @@ do
          end with
          glDrawText( sText , 0,0,0 , 8/len(sText),8 , true )
          glPopMatrix()
-      else
+      else         
          'glDrawText( sText , .tPos.X,.tPos.Y+(_YOff),.tPos.Z , 8/len(sText),8 , true )
       end if
    #endmacro
@@ -581,7 +583,7 @@ do
          end with
       end if
       with tSnapID         
-         glColor4f(0,1,0,1)         
+         glColor4f(0,1,0,1)                  
          for N as long = 0 to .lStudCnt-1
             with .pStud[N]               
                DrawConnectorName(-5)
