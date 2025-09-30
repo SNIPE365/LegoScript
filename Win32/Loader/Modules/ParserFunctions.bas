@@ -197,15 +197,17 @@ function LoadFile( sFile as string , byref sFileContents as string , bAddPathToS
    return true
 end function
 function FindFile( sFile as string ) as long
-   for I as long = 0 to ubound(g_sPathList)               
-      var sFullPathFile = g_sPathList(I)
-      if sFile[0] <> asc("\") then sFullPathFile += "\"
-      sFullPathFile += sFile
-      'print sFullPathFile
-      if FileExists( sFullPathFile ) then
-         sFile = lcase(sFullPathFile) : return TRUE         
-      end if
-   next I
+   for N as long = g_LoadQuality to 3
+      for I as long = ubound(g_sPathList) to 0 step -1
+         if g_bPathQuality(I) > N then continue for
+         var sFullPathFile = g_sPathList(I)
+         if sFile[0] <> asc("\") then sFullPathFile += "\"
+         sFullPathFile += sFile      
+         if FileExists( sFullPathFile ) then
+            sFile = lcase(sFullPathFile) : return TRUE         
+         end if
+      next I
+   next N
    return FALSE
 end function
 function FindShadowFile( sFile as string ) as long

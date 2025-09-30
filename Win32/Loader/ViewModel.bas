@@ -225,7 +225,7 @@ scope
    'sFile = sPath+"\examples\8891-towTruck.mpd"
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\5510.mpd"
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\cube10x10x10.ldr"
-   sFile = "47905.dat" 
+   sFile = "3001.dat" 
    'sFile = "4070.dat" '4070 , 87087 , 26604 , 47905 , 4733 , 30414
 end scope
 scope 
@@ -244,7 +244,7 @@ dim as string sModel
 dim as DATFile ptr pModel
 dim as boolean bEditMode
 
-#if 0 '1 = Load File , 0 = Load From clipboard
+#if 1 '1 = Load File , 0 = Load From clipboard
    if len(sFile)=0 then sFile=command(1)
    if instr(sFile,"\")=0 andalso instr(sFile,"/")=0 then FindFile(sFile)
    printf(!"Model: '%s'\n",sFile)

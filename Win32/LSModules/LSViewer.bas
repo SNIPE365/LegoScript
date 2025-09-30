@@ -3,13 +3,14 @@ namespace Viewer
    dim shared as byte g_LoadFile = 0
    dim shared as string g_sGfxFile , g_sFileName
    dim shared as any ptr g_Mutex
+   dim shared as DATFile ptr g_pLoadedModel
    dim shared as boolean bShowCollision
    
-   function LoadMemory( sContents as string , sName as string = "Unnamed.ls" ) as boolean
-      MutexLock( g_Mutex )
+   function LoadMemory( sContents as string , sName as string = "Unnamed.ls" , bDoLock as boolean = true ) as boolean
+      if bDoLock then MutexLock( g_Mutex )
          g_sGfxFile = sContents : g_sFileName = sName
          g_LoadFile = 1
-      Mutexunlock( g_Mutex )
+      if bDoLock then Mutexunlock( g_Mutex )
       return true
    end function      
    function LoadFile( sFile as string ) as boolean
@@ -44,8 +45,7 @@ namespace Viewer
       if hReadyEvent then SetEvent( hReadyEvent )
       SetEvent( g_hResizeEvent )
                   
-      dim as long iModel=-1,iBorders=-1
-      dim as DATFile ptr  pModel
+      dim as long iModel=-1,iBorders=-1      
       dim as single xMid,yMid,zMid , g_zFar
       dim as PartSize tSz
       dim as long g_PartCount , g_CurPart = -1
@@ -90,7 +90,7 @@ namespace Viewer
                      g_CurPart = -1
                      printf(!"g_CurPart = %i    \r",g_CurPart)
                      dim as PartSize tSzTemp
-                     SizeModel( pModel , tSzTemp , g_CurPart )
+                     SizeModel( g_pLoadedModel , tSzTemp , g_CurPart )
                      tSz = tSzTemp
                   else
                      g_CurDraw = -1
@@ -101,7 +101,7 @@ namespace Viewer
                      g_CurPart = ((g_CurPart+2) mod (g_PartCount+1))-1
                      printf(!"g_CurPart = %i    \r",g_CurPart)
                      dim as PartSize tSzTemp
-                     SizeModel( pModel , tSzTemp , g_CurPart )
+                     SizeModel( g_pLoadedModel , tSzTemp , g_CurPart )
                      tSz = tSzTemp
                   else
                      g_CurDraw = ((g_CurDraw+2) mod (g_DrawCount+1))-1
@@ -112,7 +112,7 @@ namespace Viewer
                      g_CurPart = ((g_CurPart+g_PartCount+1) mod (g_PartCount+1))-1
                      printf(!"g_CurPart = %i    \r",g_CurPart)
                      dim as PartSize tSzTemp
-                     SizeModel( pModel , tSzTemp , g_CurPart )
+                     SizeModel( g_pLoadedModel , tSzTemp , g_CurPart )
                      tSz = tSzTemp
                   else
                      g_CurDraw = ((g_CurDraw+g_DrawCount+1) mod (g_DrawCount+1))-1
@@ -122,7 +122,7 @@ namespace Viewer
                   if g_CurDraw >=0 then
                      'FindFile(
                      'FindShadowFile(
-                     with pModel->tParts(g_CurDraw)
+                     with g_pLoadedModel->tParts(g_CurDraw)
                         if .bType=1 then                              
                            var sFile = GetPartNameByIndex(._1.lModelIndex)
                            if FindShadowFile(sFile) then 
@@ -135,7 +135,7 @@ namespace Viewer
                   end if
                case asc("M")-asc("@") 'ctrl+M 'Model
                   if g_CurDraw >=0 then                     
-                     with pModel->tParts(g_CurDraw)
+                     with g_pLoadedModel->tParts(g_CurDraw)
                         if .bType=1 then                              
                            var sFile = GetPartNameByIndex(._1.lModelIndex)
                            if FindFile(sFile) then 
@@ -189,30 +189,30 @@ namespace Viewer
             sleep 1
          end if    
                   
-         if g_LoadFile then
-            MutexLock( g_Mutex )            
+         MutexLock( g_Mutex )                     
+         if g_LoadFile then            
             Try()
                do            
                   g_LoadFile = 0
-                  if pModel then 'cleanup previous loaded model/lists (leaking shadow?)
-                     FreeModel( pModel )
+                  if g_pLoadedModel then 'cleanup previous loaded model/lists (leaking shadow?)
+                     FreeModel( g_pLoadedModel )
                      if iModel >=0 then glDeleteLists( iModel , 1 ) : iModel = -1
                      if iBorders >=0 then glDeleteLists( iBorders , 2 ) : iBorders = -1
                   end if 
                   g_TotalLines = 0 : g_TotalOptis = 0 : g_TotalTrigs = 0 : g_TotalQuads = 0
                   static as string sPrevFilename                  
-                  pModel = LoadModel( strptr(g_sGfxFile) , g_sFileName )                  
-                  g_sGfxFile = "" : if pModel = NULL then exit do 'failed to load
+                  if len(g_sGfxFile) then g_pLoadedModel = LoadModel( strptr(g_sGfxFile) , g_sFileName )                  
+                  g_sGfxFile = "" : if g_pLoadedModel = NULL then exit do 'failed to load
                   iModel   = glGenLists( 1 )
                   glNewList( iModel ,  GL_COMPILE ) 'GL_COMPILE_AND_EXECUTE
-                  RenderModel( pModel , false )
+                  RenderModel( g_pLoadedModel , false )
                   glEndList()
                   iBorders = glGenLists( 2 )
                   glNewList( iBorders ,  GL_COMPILE )
-                  RenderModel( pModel , true )
+                  RenderModel( g_pLoadedModel , true )
                   glEndList()
                   glNewList( iBorders+1 ,  GL_COMPILE )
-                  RenderModel( pModel , true , , -2 )
+                  RenderModel( g_pLoadedModel , true , , -2 )
                   glEndList()
                                                       
                   var bResetAttributes = sPrevFilename <> g_sFileName
@@ -222,9 +222,9 @@ namespace Viewer
                      sPrevFilename = g_sFileName
                   end if
                   
-                  g_PartCount = 0 : g_DrawCount = pModel->iPartCount
+                  g_PartCount = 0 : g_DrawCount = g_pLoadedModel->iPartCount
                   g_CurPart = -1 : g_CurDraw = -1
-                  SizeModel( pModel , tSz , , g_PartCount )
+                  SizeModel( g_pLoadedModel , tSz , , g_PartCount )
                   with tSz
                      xMid = (.xMin+.xMax)/2
                      yMid = (.yMin+.yMax)/2
@@ -254,7 +254,7 @@ namespace Viewer
                      end if
                   end with
                                  
-                  CheckCollisionModel( pModel , atCollision() )
+                  CheckCollisionModel( g_pLoadedModel , atCollision() )
                   #ifdef ViewerShowInfo
                      printf(!"Parts: %i , Collisions: %i \n",g_PartCount,ubound(atCollision)\2)
                   #endif
@@ -265,10 +265,9 @@ namespace Viewer
             Catch()
                LogError("Viewer.LoadFile crashed!!!")               
             EndCatch()
-            EndTry()
-            MutexUnlock( g_Mutex )
+            EndTry()            
          end if
-         
+         MutexUnlock( g_Mutex )         
          
          're-create base view in case the window got resized
          if WaitForSingleObject( g_hResizeEvent , 0 )=0 then
@@ -284,7 +283,7 @@ namespace Viewer
          glClear GL_COLOR_BUFFER_BIT OR GL_DEPTH_BUFFER_BIT      
          glLoadIdentity()
          
-         if pModel=0 then continue do
+         if g_pLoadedModel=0 then continue do
          
          glScalef(1/-20, 1.0/-20, 1/20 )
             
@@ -304,12 +303,12 @@ namespace Viewer
             if g_CurDraw < 0 then
                glCallList(	iModel ) : OldDraw = -1
             else
-               RenderModel( pModel , false , , g_CurDraw )
+               RenderModel( g_pLoadedModel , false , , g_CurDraw )
                
                scope 'Render Snap IDs
                   static as PartSnap tSnapID
                   if g_CurDraw <> -1 andalso OldDraw <> g_CurDraw then                        
-                     var pSubPart = g_tModels( pModel->tParts(g_CurDraw)._1.lModelIndex ).pModel                  
+                     var pSubPart = g_tModels( g_pLoadedModel->tParts(g_CurDraw)._1.lModelIndex ).pModel                  
                      SnapModel( pSubPart , tSnapID )      
                      SortSnap( tSnapID )
                   end if
@@ -335,7 +334,7 @@ namespace Viewer
                   #endmacro
                   if g_CurDraw <> -1 then      
                      glPushMatrix()                  
-                     with pModel->tParts(g_CurDraw)._1
+                     with g_pLoadedModel->tParts(g_CurDraw)._1
                         dim as single fMatrix(15) = { _
                            .fA , .fD , .fG , 0 , _ 'X scale ,    0?   ,   0?    , 0 
                            .fB , .fE , .fH , 0 , _ '  0?    , Y Scale ,   0?    , 0 
@@ -362,7 +361,7 @@ namespace Viewer
                   end if
                end scope
                
-               'SnapModel( pModel , tSnap , g_CurDraw )      
+               'SnapModel( g_pLoadedModel , tSnap , g_CurDraw )      
             end if
             glCallList(	iBorders-(g_CurDraw>=0) )
             Catch()
@@ -375,13 +374,13 @@ namespace Viewer
          #ifdef DebugShadow
             dim as PartSnap tSnap = any
             static as byte bOnce         
-            SnapModel( pModel , tSnap , true )
+            SnapModel( g_pLoadedModel , tSnap , true )
          #endif
       
          #if 0
             glEnable( GL_POLYGON_STIPPLE )
             
-            'SnapModel( pModel , tSnap )
+            'SnapModel( g_pLoadedModel , tSnap )
             
             #if 0 
                glPushMatrix()

@@ -21,7 +21,6 @@
 ' !!! some pieces have unmatched studs vs clutch (and i suspect that's their design problem) !!!
 ' !!! because when using ldraw it does not matter the order, so they never enforced that     !!!
 
-'TODO (19/09/25): study 47905 shadow to see how rotations are being followed there
 'TODO (02/09/25): fix piece declaration + forward reference (RotatePivot.ls)
 'TODO (30/06/25): continue fixing/improving the row counter
 'TODO (13/06/25): fix LS2LDR showing wrong error line numbers with #defines
@@ -180,6 +179,8 @@ function CreateMainMenu() as HMENU
          #if _Accelerator >= VK_F1 and _Accelerator <= VK_F24
             #define _sKey "F" & (_Accelerator-((VK_F1)-1))
          #elseif _Accelerator >= asc("A") and _Accelerator <= asc("Z")           
+            #define _sKey +chr(_Accelerator)
+         #elseif _Accelerator >= asc("0") and _Accelerator <= asc("9")           
            #define _sKey +chr(_Accelerator)
          #else
             #define _sKey s##_Accelerator

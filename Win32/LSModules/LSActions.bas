@@ -433,7 +433,7 @@ sub SetColoredOutput( sColoredText as string )
    wend
 end sub 
 
-sub Do_Compile()   
+sub Do_Compile( bDoLock as boolean = true )   
    SetWindowText( CTL(wcStatus) , "Building..." )   
    var iMaxLen = GetWindowTextLength( CTL(wcEdit) )
    var sScript = space(iMaxLen)
@@ -448,9 +448,9 @@ sub Do_Compile()
    SetColoredOutput( iif(len(sError)=0,sOutput,sError) )   
    if len(sOutput) orelse len(sError)=0 then
       if lcase(right(g_CurrentFilePath,3)) = ".ls" then
-         Viewer.LoadMemory( sOutput , left(g_CurrentFilePath,len(g_CurrentFilePath)-3)+".ldr" )
+         Viewer.LoadMemory( sOutput , left(g_CurrentFilePath,len(g_CurrentFilePath)-3)+".ldr" , bDoLock )
       else
-         Viewer.LoadMemory( sOutput , g_CurrentFilePath+".ldr" )
+         Viewer.LoadMemory( sOutput , g_CurrentFilePath+".ldr" , bDoLock )
       end if
    end if
    if len(sError) then SendMessage( CTL(wcRadOutput) , BM_CLICK , 0,0 )
@@ -789,6 +789,36 @@ sub View_Toggle()
    Menu.MenuState( g_hCurMenu,g_CurItemID,iToggledState )   
    SendMessage( g_GfxHwnd , WM_KEYDOWN , VK_TAB , 0 )   
    SendMessage( g_GfxHwnd , WM_KEYUP   , VK_TAB , 0 )
+end sub
+
+sub View_GfxQuality()
+   if (g_CurItemState and MFS_CHECKED) then exit sub 'same
+   Menu.MenuState( g_hCurMenu,meView_QualityLow   ,g_CurItemState or ((g_CurItemID=meView_QualityLow)    and MFS_CHECKED) )
+   Menu.MenuState( g_hCurMenu,meView_QualityNormal,g_CurItemState or ((g_CurItemID=meView_QualityNormal) and MFS_CHECKED) )
+   Menu.MenuState( g_hCurMenu,meView_QualityHigh  ,g_CurItemState or ((g_CurItemID=meView_QualityHigh)   and MFS_CHECKED) )
+   select case g_CurItemID
+   case meView_QualityLow   : g_LoadQuality = 1
+   case meView_QualityNormal: g_LoadQuality = 2
+   case meView_QualityHigh  : g_LoadQuality = 3
+   end select     
+   
+   if viewer.g_pLoadedModel then
+      mutexlock(Viewer.g_Mutex)
+      viewer.g_LoadFile = 1
+      mutexunlock(Viewer.g_Mutex)
+      while viewer.g_pLoadedModel
+         SleepEx(1,1)
+      wend 
+   end if
+   
+   mutexlock(Viewer.g_Mutex)
+   for N as long = g_ModelCount-1 to 0 step -1
+      FreeModel( g_tModels(N).pModel )
+   next N
+   g_sFilenames = chr(0) : g_sFilesToLoad = chr(0)   
+   Do_Compile(false)
+   mutexunlock(Viewer.g_Mutex)   
+
 end sub
 
 sub Help_About()
