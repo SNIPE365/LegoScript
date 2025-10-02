@@ -224,8 +224,8 @@ scope
    'sFile = sPath+"\examples\8891-towTruck.mpd"
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\5510.mpd"
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\cube10x10x10.ldr"
-   sFile = "3001.dat" 
-   'sFile = "C:\Users\greg\Desktop\LS\TLG_Map\Build\Blocks\B1\Eldon Square.ldr"
+   'sFile = "3001.dat" 
+   sFile = "C:\Users\greg\Desktop\LS\TLG_Map\Build\Blocks\B1\Eldon Square.ldr"
    'sFile = "4070.dat" '4070 , 87087 , 26604 , 47905 , 4733 , 30414
 end scope
 scope 
@@ -244,7 +244,7 @@ dim as string sModel
 dim as DATFile ptr pModel
 dim as boolean bEditMode
 
-#if 1 '1 = Load File , 0 = Load From clipboard
+#if 0 '1 = Load File , 0 = Load From clipboard
    if len(sFile)=0 then sFile=command(1)
    if instr(sFile,"\")=0 andalso instr(sFile,"/")=0 then FindFile(sFile)
    printf(!"Model: '%s'\n",sFile)
@@ -397,7 +397,7 @@ printf(!"Parts: %i , Collisions: %i \n",g_PartCount,ubound(atCollision)\2)
 'puts("1 0 0 0 0 1 0 0 0 1 0 0 0 1 3001.dat")
 
 dim as double dRot = timer
-dim as boolean bBoundingBox
+dim as boolean bBoundingBox,bViewBorders=true
 dim as boolean bLeftPressed,bRightPressed,bWheelPressed
 dim as long iFps
 
@@ -465,7 +465,7 @@ do
       'render single part
       RenderModel( pModel , false , , g_CurDraw )
    end if
-   glCallList(	iBorders-(g_CurDraw>=0) )
+   if bViewBorders then glCallList(	iBorders-(g_CurDraw>=0) )
    
    glEnable( GL_LIGHTING )
    
@@ -630,6 +630,8 @@ do
          if e.button = fb.BUTTON_RIGHT  then bRightPressed = false      
       case fb.EVENT_KEY_PRESS
          select case e.ascii
+         case 32
+            bViewBorders = not bViewBorders
          case 8
             if bBoundingBox then
                g_CurPart = -1
