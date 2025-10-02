@@ -189,7 +189,7 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    glViewport 0, 0, ScrWid, ScrHei                  '' Reset The Current Viewport
    glMatrixMode GL_PROJECTION                       '' Select The Projection Matrix
    glLoadIdentity                                   '' Reset The Projection Matrix
-   gluPerspective 45.0, ScrWid/ScrHei, 1, 100.0*cScale   '' Calculate The Aspect Ratio Of The Window
+   gluPerspective 45.0, ScrWid/ScrHei, 1, 1000.0*cScale   '' Calculate The Aspect Ratio Of The Window
    glMatrixMode GL_MODELVIEW                        '' Select The Modelview Matrix
    glLoadIdentity                                   '' Reset The Modelview Matrix
    

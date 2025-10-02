@@ -6,7 +6,7 @@
 const NULL = 0
 #endif
 
-dim shared as zstring ptr g_pzPaths(...) = { _
+static shared as zstring ptr g_pzPaths(...) = { _
    NULL            , _   
    @"1:\unoff\p\48"  , _
    @"2:\unoff\p"     , _   
@@ -23,9 +23,12 @@ dim shared as zstring ptr g_pzPaths(...) = { _
    '@"\unoff\parts\s\p", _
 rem ------------------------------   
 
-dim shared as string g_sPathList( ubound(g_pzPaths) )
-dim shared as byte g_bPathQuality( ubound(g_pzPaths) )
-g_bPathQuality( 0 ) = 0
+static shared as long g_iExtraPathCount = 0
+redim shared as string g_sExtraPathList()
+
+static shared as string g_sPathList( ubound(g_pzPaths) )
+static shared as byte g_bPathQuality( ubound(g_pzPaths) )
+g_sPathList(0) = ".\" : g_bPathQuality( 0 ) = 0
 scope
    var sPath = environ("userprofile")+"\Desktop\LDCAD\LDRAW"
    for N as long = 1 to ubound(g_pzPaths)

@@ -7,7 +7,6 @@
 '#define ColorizePrimatives
 '#define RenderOptionals
 
-
 '#ifndef __NoRender
 
 #include "LoadLDR.bas"
@@ -226,6 +225,7 @@ scope
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\5510.mpd"
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\cube10x10x10.ldr"
    sFile = "3001.dat" 
+   'sFile = "C:\Users\greg\Desktop\LS\TLG_Map\Build\Blocks\B1\Eldon Square.ldr"
    'sFile = "4070.dat" '4070 , 87087 , 26604 , 47905 , 4733 , 30414
 end scope
 scope 
@@ -460,13 +460,13 @@ do
       
    if g_CurDraw < 0 then
       'render whole model
-      glCallList(	iModel )   
+      glCallList(	iModel )
    else
       'render single part
       RenderModel( pModel , false , , g_CurDraw )
    end if
-   glCallList(	iBorders-(g_CurDraw>=0) )   
-
+   glCallList(	iBorders-(g_CurDraw>=0) )
+   
    glEnable( GL_LIGHTING )
    
    #ifdef DebugShadow

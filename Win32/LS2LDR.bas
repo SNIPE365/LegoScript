@@ -189,7 +189,7 @@ function LegoScriptToLDraw( _sScript as string , sErrWarn as string = "" , sMain
    
    DbgBuild(!"\r"+string(60,"-"))
    DbgBuild( "!! building '"+sMainFile+"'" )
-   while 1            
+   while 1
       
       DbgCrash()
       

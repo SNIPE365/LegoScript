@@ -122,11 +122,13 @@ sub PrintCurrentMatrix()
 end sub
 
 #ifndef __NoRender
+#if 0
 sub glLoadCurrentMatrix()
    'with tMatrixStack(g_CurrentMatrix)
    'glLoadMatrixf( @tMatrixStack(g_CurrentMatrix).m(0) )
    glMultMatrixf( @tMatrixStack(g_CurrentMatrix).m(0) )   
 end sub
+#endif
 #endif
 
 sub MultMatrix4x4WithVector3x3( tmOut as Matrix4x4 , tmIn as Matrix4x4 , pIn as const single ptr )
@@ -169,6 +171,7 @@ sub MultMatrix4x4(byref result as Matrix4x4, byref a as Matrix4x4, byref b as Ma
     ' Copy the final, correct result to the output matrix
     result = tempResult
 end sub
+#if 0
 sub MultMatrix4x4_RowMajor(byref result as Matrix4x4, byref a as Matrix4x4, byref b as Matrix4x4)
     dim as integer i, j, k
     dim as Matrix4x4 tempResult
@@ -196,6 +199,7 @@ sub MultMatrix4x4_ColumnMajor(byref result as Matrix4x4, byref a as Matrix4x4, b
     next j
     result = tempResult
 end sub
+#endif
 sub Matrix4x4RotateX( tmOut as Matrix4x4 , tmIn as Matrix4x4 , fAngle as single )      
    dim as single sMat(15) = { _
       1 ,      0       ,      0      , 0 , _

@@ -165,6 +165,15 @@ function LoadFile( sFile as string , byref sFileContents as string , bAddPathToS
       if iPathLen2 > iPathLen then iPathLen = iPathLen2
       if iPathLen then
          g_sPathList(0) = left(sFile,iPathLen-1)
+         dim as long N = any
+         for N = 0 to g_iExtraPathCount-1
+            if g_sExtraPathList(N) = g_sPathList(0) then exit for
+         next N
+         if N = g_iExtraPathCount then
+            redim preserve g_sExtraPathList(g_iExtraPathCount)
+            g_sExtraPathList(g_iExtraPathCount) = g_sPathList(0)
+            g_iExtraPathCount += 1
+         end if         
       else
          g_sPathList(0) = ""
       end if
@@ -197,16 +206,29 @@ function LoadFile( sFile as string , byref sFileContents as string , bAddPathToS
    return true
 end function
 function FindFile( sFile as string ) as long
+   const cPathLastIndex = ubound(g_sPathList)
+   dim as byte bTried( cPathLastIndex )
    for N as long = g_LoadQuality to 3
-      for I as long = ubound(g_sPathList) to 0 step -1
+      for I as long = cPathLastIndex to 0 step -1
          if g_bPathQuality(I) > N then continue for
+         if bTried(I) then continue for else bTried(I)=1
          var sFullPathFile = g_sPathList(I)
          if sFile[0] <> asc("\") then sFullPathFile += "\"
-         sFullPathFile += sFile      
+         sFullPathFile += sFile
+         'puts("#" & I & ": " & sFullPathFile)
          if FileExists( sFullPathFile ) then
             sFile = lcase(sFullPathFile) : return TRUE         
          end if
       next I
+   next N
+   for N as long = 0 to g_iExtraPathCount-1      
+      var sFullPathFile = g_sExtraPathList(N)
+      if sFile[0] <> asc("\") then sFullPathFile += "\"
+      sFullPathFile += sFile
+      'puts("#" & I & ": " & sFullPathFile)
+      if FileExists( sFullPathFile ) then
+         sFile = lcase(sFullPathFile) : return TRUE         
+      end if
    next N
    return FALSE
 end function
