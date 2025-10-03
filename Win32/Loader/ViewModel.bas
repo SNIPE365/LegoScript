@@ -7,6 +7,8 @@
 '#define ColorizePrimatives
 '#define RenderOptionals
 
+#define UseVBO
+
 '#ifndef __NoRender
 
 #include "LoadLDR.bas"
@@ -221,11 +223,11 @@ scope
    'crashing due to fallback additions
    '#include "CrashTest.bi"
    'sFile = sPath+"LDraw\models\pyramid.ldr"
-   'sFile = sPath+"\examples\8891-towTruck.mpd"
+   sFile = sPath+"\examples\8891-towTruck.mpd"
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\5510.mpd"
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\cube10x10x10.ldr"
    'sFile = "3001.dat" 
-   sFile = "C:\Users\greg\Desktop\LS\TLG_Map\Build\Blocks\B1\Eldon Square.ldr"
+   'sFile = "C:\Users\greg\Desktop\LS\TLG_Map\Build\Blocks\B1\Eldon Square.ldr"
    'sFile = "4070.dat" '4070 , 87087 , 26604 , 47905 , 4733 , 30414
 end scope
 scope 
@@ -317,18 +319,39 @@ dim as single fPositionX , fPositionY , fPositionZ , fZoom = -3
 dim as long iWheel , iPrevWheel
 dim as long g_DrawCount = pModel->iPartCount , g_CurDraw = -1
 
-var iModel   = glGenLists( 1 )
-glNewList( iModel ,  GL_COMPILE ) 'GL_COMPILE_AND_EXECUTE
-RenderModel( pModel , false )
-glEndList()
-var iBorders = glGenLists( 2 )
-glNewList( iBorders ,  GL_COMPILE )
-RenderModel( pModel , true )
-glEndList()
-glNewList( iBorders+1 ,  GL_COMPILE )
-RenderModel( pModel , true , , -2 )
-glEndList()
-
+#ifdef UseVBO
+   redim as VertexStruct atModelTrigs() , atModelVtxLines1() , atModelVtxLines2()
+   flip
+   GenArrayModel( pModel , atModelTrigs()     , false )
+   flip
+   GenArrayModel( pModel , atModelVtxLines1() , true )
+   flip
+   GenArrayModel( pModel , atModelVtxLines2() , true , , -2 )
+   flip
+   
+   dim as long iTrianglesCount = ubound(atModelTrigs)+1
+   dim as long iBorderCount(1) = { ubound(atModelVtxLines1)+1 , ubound(atModelVtxLines2)+1 }         
+   dim as GLuint iModelVBO, iBorderVBO(1)
+   glGenBuffers(1, @iModelVBO) : glGenBuffers(2, @iBorderVBO(0))   
+   glBindBuffer(GL_ARRAY_BUFFER, iModelVBO)
+   glBufferData(GL_ARRAY_BUFFER, iTrianglesCount*sizeof(VertexStruct), @atModelTrigs(0)     , GL_STATIC_DRAW)
+   glBindBuffer(GL_ARRAY_BUFFER, iBorderVBO(0))
+   glBufferData(GL_ARRAY_BUFFER, iBorderCount(0)*sizeof(VertexStruct), @atModelVtxLines1(0) , GL_STATIC_DRAW)
+   glBindBuffer(GL_ARRAY_BUFFER, iBorderVBO(1))
+   glBufferData(GL_ARRAY_BUFFER, iBorderCount(1)*sizeof(VertexStruct), @atModelVtxLines2(0) , GL_STATIC_DRAW)   
+#else
+   var iModel   = glGenLists( 1 )
+   var iBorders = glGenLists( 2 )
+   glNewList( iModel ,  GL_COMPILE ) 'GL_COMPILE_AND_EXECUTE
+   RenderModel( pModel , false )
+   glEndList()   
+   glNewList( iBorders ,  GL_COMPILE )
+   RenderModel( pModel , true )
+   glEndList()
+   glNewList( iBorders+1 ,  GL_COMPILE )
+   RenderModel( pModel , true , , -2 )
+   glEndList()
+#endif 
 
 dim as single xMid,yMid,zMid , g_zFar
 dim as PartSize tSz
@@ -453,19 +476,43 @@ do
       'glTranslatef( (.xMin+.xMax)/-2  , (.yMin+.yMax)/-2 , (.zMin+.zMax)/-2 )
    end with
       
-   glDisable( GL_LIGHTING )
+   'glDisable( GL_LIGHTING )
    glEnable( GL_DEPTH_TEST )
    
    g_fNX=-.95 : g_fNY=.95
-      
+   
+   #macro DrawVBO( _vbo , _type , _count )
+      glBindBuffer(GL_ARRAY_BUFFER, _vbo )          
+      glEnableClientState(GL_VERTEX_ARRAY)
+      glEnableClientState(GL_NORMAL_ARRAY)
+      glEnableClientState(GL_COLOR_ARRAY)         
+      glVertexPointer(3, GL_FLOAT, sizeof(VertexStruct), cast(any ptr,offsetof(VertexStruct,tPos   )) )
+      glNormalPointer(   GL_FLOAT, sizeof(VertexStruct), cast(any ptr,offsetof(VertexStruct,tNormal)) )
+      glColorPointer (4, GL_FLOAT, sizeof(VertexStruct), cast(any ptr,offsetof(VertexStruct,tColor )) )
+      glDrawArrays(_type, 0, _count )
+      glDisableClientState(GL_COLOR_ARRAY)
+      glDisableClientState(GL_NORMAL_ARRAY)
+      glDisableClientState(GL_VERTEX_ARRAY)
+   #endmacro
+   
    if g_CurDraw < 0 then
       'render whole model
-      glCallList(	iModel )
+      #ifdef UseVBO
+         DrawVBO( iModelVBO , GL_TRIANGLES , iTrianglesCount )
+      #else
+         glCallList(	iModel )
+      #endif
    else
       'render single part
       RenderModel( pModel , false , , g_CurDraw )
    end if
-   if bViewBorders then glCallList(	iBorders-(g_CurDraw>=0) )
+   if bViewBorders then 
+      #ifdef UseVBO         
+         DrawVBO( iBorderVBO(iif(g_CurDraw>=0,1,0)) , GL_LINES , iBorderCount(iif(g_CurDraw>=0,1,0)) )         
+      #else
+         glCallList(	iBorders-(g_CurDraw>=0) )
+      #endif
+   end if
    
    glEnable( GL_LIGHTING )
    

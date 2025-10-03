@@ -40,6 +40,16 @@
 
 'const ScrWid=640,ScrHei=480
 
+#macro ForEachExtensionGL(_do)
+   _do( glGenBuffers )
+   _do( glBindBuffer )
+   _do( glBufferData )
+#endmacro
+
+#define DeclareExtension(_NAME) static shared as PFN##_NAME##PROC _NAME
+ForEachExtensionGL( DeclareExtension )
+#undef DeclareExtension
+
 static shared as GLuint g_FontUI
 const cUIFontWid=16 , cUIFontHei=16
 sub checkGLError(message as string="")
@@ -177,6 +187,17 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    Gfx.Resize(ScrWid,ScrHei)
    dim as HWND hwndGFX
    screencontrol fb.GET_WINDOW_HANDLE , *cptr(uinteger ptr,@hwndGFX)   
+   
+   #macro _InitExtension(_NAME) 
+      _NAME = cast(any ptr, wglGetProcAddress(#_NAME))
+      if _NAME = 0 then
+         printf("%s%s%s","ERROR: required extension '",#_NAME,!"' was not found\n")
+         getchar : system()
+      end if
+   #endmacro
+   ForEachExtensionGL( _InitExtension )
+   #undef _InitExtension
+
          
    'var lCurStyle = GetWindowLong(hwndGFX,GWL_STYLE) and (not (WS_MINIMIZEBOX or WS_MAXIMIZEBOX))   
    var lCurStyle = GetWindowLong(hwndGFX,GWL_STYLE) or WS_MAXIMIZEBOX

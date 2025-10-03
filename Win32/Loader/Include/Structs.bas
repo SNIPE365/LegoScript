@@ -185,4 +185,14 @@ type fbStr
    iLen   as long
    iSize  as long
 end type
-   
+
+type Vertex3   
+   as single fX,fY,fZ   
+end type
+type Color4   
+   as single fB,fG,fR,fA
+end type
+type VertexStruct
+   as Vertex3 tPos,tNormal
+   as Color4 tColor   
+end type

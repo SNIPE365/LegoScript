@@ -2,7 +2,7 @@
   #error " Don't compile this one"
 #endif  
 
-sub SetLineNormal( byref tLine as LineType2Struct )
+sub SetLineNormal( byref tLine as LineType2Struct , ptNormal as Vertex3 ptr = NULL )
    with tLine
       '// Compute direction vector of the line
       dim as single direction(3-1)=any
@@ -22,14 +22,19 @@ sub SetLineNormal( byref tLine as LineType2Struct )
       
       '// Scale the normal for visibility
       const normalScale = 0.5f
-      normal(0) *= normalScale
-      normal(1) *= normalScale
-      normal(2) *= normalScale
-       
-      glNormal3fv( @normal(0) )
+      if ptNormal then
+         ptNormal->fX = (normal(0) * normalScale)
+         ptNormal->fY = (normal(1) * normalScale)
+         ptNormal->fZ = (normal(2) * normalScale)
+      else
+         normal(0) *= normalScale
+         normal(1) *= normalScale
+         normal(2) *= normalScale
+         glNormal3fv( @normal(0) )
+      end if
    end with
 end sub
-sub SetTrigNormal( byref tTrig as LineType3Struct )
+sub SetTrigNormal( byref tTrig as LineType3Struct , ptNormal as Vertex3 ptr = NULL )
    with tTrig
       'normalize triangle
       dim as single edge1(3-1) = any, edge2(3-1) = any, normal(3-1) = any
@@ -48,13 +53,19 @@ sub SetTrigNormal( byref tTrig as LineType3Struct )
    
       '// Normalize the normal vector
       normalize(@normal(0))
+      
+      if ptNormal then
+         ptNormal->fX = normal(0)
+         ptNormal->fY = normal(1)
+         ptNormal->fZ = normal(2)
+      else         
+         glNormal3fv( @normal(0) )
+      end if
    
-      '// Set normal for the triangle
-      'glNormal3f(normal(0), normal(1), normal(2));
-      glNormal3fv( @normal(0) )
+      
    end with
 end sub   
-sub SetQuadNormal( byRef tQuad as LineType4Struct )
+sub SetQuadNormal( byRef tQuad as LineType4Struct , ptNormal as Vertex3 ptr = NULL )
    with tQuad
       dim as single  edge1(3-1)=any, edge2(3-1)=any, normal(3-1)=any, cc(3-1)=any
       
@@ -86,12 +97,18 @@ sub SetQuadNormal( byRef tQuad as LineType4Struct )
       if dot < 0 then
        'if it's CCW (we're checking for CW, but it's inverted) means it was not inverted
        'so then calculate the normal the same way as for a triangle
-       SetTrigNormal( *cptr(LineType3Struct ptr,@tQuad) )
+       SetTrigNormal( *cptr(LineType3Struct ptr,@tQuad) , ptNormal )
        exit sub
       end if        
       
-      '// Set normal for the quad
-      glNormal3fv( @normal(0) )
+      if ptNormal then
+         ptNormal->fX = normal(0)
+         ptNormal->fY = normal(1)
+         ptNormal->fZ = normal(2)
+      else
+         '// Set normal for the quad
+         glNormal3fv( @normal(0) )
+      end if      
       
    end with
 end sub
