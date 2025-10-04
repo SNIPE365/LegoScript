@@ -660,11 +660,11 @@ do
    while (ScreenEvent(@e))
       Select Case e.type
       Case fb.EVENT_MOUSE_MOVE
-         if bLeftPressed  then fRotationX += e.dx : fRotationY += e.dy
-         if bRightPressed then fPositionX += e.dx*g_zFar/100 : fPositionY += e.dy*g_zFar/100
+         if bLeftPressed  then fRotationX += e.dx / 2 : fRotationY += e.dy / 2
+         if bRightPressed then fPositionX += e.dx / 2 * g_zFar/100 : fPositionY += e.dy / 2 * g_zFar/100
       case fb.EVENT_MOUSE_WHEEL
          iWheel = e.z-iPrevWheel
-         fZoom = -3+(-iWheel/3)
+         fZoom = -3+(-iWheel/64)
       case fb.EVENT_MOUSE_BUTTON_PRESS
          if e.button = fb.BUTTON_MIDDLE then 
             iPrevWheel = iWheel
