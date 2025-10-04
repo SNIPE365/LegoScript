@@ -217,6 +217,13 @@ function NewTab( sNewFile as string , iLinked as long = -1 , iReplaceTab as long
 end function
 sub LoadScript( sFile as string )   
    var sFileL = lcase(sFile)
+   
+   if right(sFileL,4)=".ldr" then
+      if g_Show3D=0 then Menu.Trigger( meView_ToggleGW )
+      Viewer.LoadFile(sFile)
+      exit sub
+   end if
+   
    for N as long = 0 to g_iTabCount-1
       with g_tTabs(N)
          'puts "'"+lcase(.sFileName)+"' = '"+sFileL
@@ -271,10 +278,11 @@ sub File_Open()
          .lStructSize = sizeof(tOpen)
          .hwndOwner = CTL(wcMain)
          .lpstrFilter = @ _
+            !"Supported Files (LS LDR)\0*.ls;*.ldr\0" _
             !"LegoScript Files\0*.ls\0" _
             !"LDraw Files\0*.ldr\0" _
             !"All Files\0*.*\0\0"
-         .nFilterIndex = 0 '.ls
+         .nFilterIndex = 0 'Supported 
          .nFileExtension = 0
          .lpstrFile = pzFile
          .nMaxFile = 65536
@@ -287,11 +295,11 @@ sub File_Open()
             var sPath = *.lpstrFile+"\", pzFile = .lpstrFile+.nFileOffset
             do
                var sFile = *pzFile : pzFile += len(sFile)+1
-               if len(sFile)=0 then exit do
+               if len(sFile)=0 then exit do               
                LoadScript(sPath+sFile)
             loop            
-         else
-            LoadScript(*.lpstrFile)
+         else            
+            LoadScript(*.lpstrFile)            
          end if
          exit do
       end with

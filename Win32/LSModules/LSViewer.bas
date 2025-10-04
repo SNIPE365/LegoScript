@@ -67,11 +67,11 @@ namespace Viewer
          while (ScreenEvent(@e))
             Select Case e.type
             Case fb.EVENT_MOUSE_MOVE
-               if bLeftPressed  then fRotationX += e.dx : fRotationY += e.dy
-               if bRightPressed then fPositionX += e.dx*g_zFar/100 : fPositionY += e.dy*g_zFar/100
+               if bLeftPressed  then fRotationX += e.dx / 2 : fRotationY += e.dy / 2
+               if bRightPressed then fPositionX += e.dx / 2 * g_zFar/100 : fPositionY += e.dy / 2 * g_zFar/100
             case fb.EVENT_MOUSE_WHEEL
-                 iWheel = e.z-iPrevWheel
-                 fZoom = -3+(-iWheel/12) 'non inverted mouse wheel to zoom
+               iWheel = e.z-iPrevWheel
+               fZoom = -3+(-iWheel/64)            
             case fb.EVENT_MOUSE_BUTTON_PRESS
                if e.button = fb.BUTTON_MIDDLE then 
                   iPrevWheel = iWheel : fZoom = -3
@@ -186,7 +186,7 @@ namespace Viewer
             dFps = timer
             WindowTitle("Fps: " & iFps): iFps = 0         
          else
-            sleep 1
+            sleep 1,1
          end if    
                   
          MutexLock( g_Mutex )                     
@@ -203,6 +203,7 @@ namespace Viewer
                   static as string sPrevFilename                  
                   if len(g_sGfxFile) then g_pLoadedModel = LoadModel( strptr(g_sGfxFile) , g_sFileName )                  
                   g_sGfxFile = "" : if g_pLoadedModel = NULL then exit do 'failed to load
+                  
                   iModel   = glGenLists( 1 )
                   glNewList( iModel ,  GL_COMPILE ) 'GL_COMPILE_AND_EXECUTE
                   RenderModel( g_pLoadedModel , false )
@@ -276,7 +277,7 @@ namespace Viewer
             glViewport 0, 0, gfx.g_iCliWid, gfx.g_iCliHei                  '' Reset The Current Viewport
             glMatrixMode GL_PROJECTION                       '' Select The Projection Matrix
             glLoadIdentity                                   '' Reset The Projection Matrix
-            gluPerspective 45.0, gfx.g_iCliWid/gfx.g_iCliHei, 1, 100.0*cScale   '' Calculate The Aspect Ratio Of The Window
+            gluPerspective 45.0, gfx.g_iCliWid/gfx.g_iCliHei, 1, 1000.0*cScale   '' Calculate The Aspect Ratio Of The Window
             glMatrixMode GL_MODELVIEW                        '' Select The Modelview Matrix
          end if
          
