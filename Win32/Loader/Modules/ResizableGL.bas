@@ -39,6 +39,10 @@ namespace gfx
         return iResu
       end if
     case WM_SIZING       
+       with *cptr(RECT ptr,lParam)
+          if (.right-.left) < 64 then .right = .left+64
+          if (.bottom-.top) < 48 then .bottom = .top+48
+       end with
        return DefWindowProc(hwnd,imsg,wparam,lparam)      
     case WM_SIZE
       if (lScreenFlags and fb.GFX_OPENGL) then

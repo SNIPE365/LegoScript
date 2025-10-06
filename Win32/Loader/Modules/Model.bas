@@ -259,8 +259,14 @@ end sub
 function GenArrayModel( pPart as DATFile ptr , aVertex() as VertexStruct , iBorders as long , uCurrentColor as ulong = &h70605040 , lDrawPart as long = -1 , byref lCurPos as long = -1 , uCurrentEdge as ulong = 0 DebugPrimParm ) as ulong
    if uCurrentColor = &h70605040 then uCurrentColor = g_Colours(c_Blue) : uCurrentEdge = g_EdgeColours(c_Blue)
    
+   const cBlockCnt = 1 shl 21
+   
    dim as boolean bMain = false
-   if lCurPos < 0 then redim aVertex( 4095 ) : lCurPos = 0 : bMain = true
+   if lCurPos < 0 then 
+      redim aVertex( cBlockCnt-1 ) : lCurPos = 0 : bMain = true
+      'puts("Sz: " & (ubound(aVertex)*sizeof(aVertex(0))\1024))
+   end if
+   
    
    var uEdge = uCurrentEdge
    static as integer iOnce   
@@ -270,7 +276,10 @@ function GenArrayModel( pPart as DATFile ptr , aVertex() as VertexStruct , iBord
       for N as long = 0 to .iPartCount-1
          
          'puts( lCurPos & " , " & ubound(aVertex) )
-         if (lCurPos+6) >= ubound(aVertex) then redim preserve aVertex(ubound(aVertex)+4096)
+         if (lCurPos+6) >= ubound(aVertex) then 
+            puts("Resize...")
+            redim preserve aVertex(ubound(aVertex)+cBlockCnt)
+         end if
          
          dim as byte bDoDraw = (lDrawPart<0 orelse lDrawPart=N)
          dim as ulong uColor = any', uEdge = any
@@ -1965,6 +1974,21 @@ sub DrawLimitsCube( xMin as single , xMax as single , yMin as single , yMax as s
 
     glEnd()
 end sub
+
+#macro DrawVBO( _vbo , _type , _count )
+   glBindBuffer(GL_ARRAY_BUFFER, _vbo )          
+   glEnableClientState(GL_VERTEX_ARRAY)
+   glEnableClientState(GL_NORMAL_ARRAY)
+   glEnableClientState(GL_COLOR_ARRAY)         
+   glVertexPointer(3, GL_FLOAT, sizeof(VertexStruct), cast(any ptr,offsetof(VertexStruct,tPos   )) )
+   glNormalPointer(   GL_FLOAT, sizeof(VertexStruct), cast(any ptr,offsetof(VertexStruct,tNormal)) )
+   glColorPointer (4, GL_FLOAT, sizeof(VertexStruct), cast(any ptr,offsetof(VertexStruct,tColor )) )
+   glDrawArrays(_type, 0, _count )
+   glDisableClientState(GL_COLOR_ARRAY)
+   glDisableClientState(GL_NORMAL_ARRAY)
+   glDisableClientState(GL_VERTEX_ARRAY)
+#endmacro
+
 #endif
 
 function DetectPartCathegory( pPart as DATFile ptr ) as byte   

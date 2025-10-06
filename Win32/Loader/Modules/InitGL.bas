@@ -178,13 +178,22 @@ sub glInitFont()
   
 end sub
 
+sub ResizeOpengGL( ScrWid as long , ScrHei as long )
+   glViewport 0, 0, ScrWid, ScrHei                  '' Reset The Current Viewport
+   glMatrixMode GL_PROJECTION                       '' Select The Projection Matrix
+   glLoadIdentity                                   '' Reset The Projection Matrix
+   gluPerspective 45.0, ScrWid/ScrHei, 1, 1000.0*cScale   '' Calculate The Aspect Ratio Of The Window
+   glMatrixMode GL_MODELVIEW                        '' Select The Modelview Matrix
+end sub
 function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    
    'screencontrol( fb.SET_GL_NUM_SAMPLES , 4 )
    'screencontrol( fb.SET_GL_DEPTH_BITS , 24 )
    'screencontrol( fb.SET_GL_COLOR_BITS , 32 )
-   screenres ScrWid,ScrHei,32,,fb.GFX_OPENGL' or fb.GFX_MULTISAMPLE      
+   
+   screenres 1,8192,32,,fb.GFX_OPENGL' or fb.GFX_MULTISAMPLE      
    Gfx.Resize(ScrWid,ScrHei)
+   flip
    dim as HWND hwndGFX
    screencontrol fb.GET_WINDOW_HANDLE , *cptr(uinteger ptr,@hwndGFX)   
    
@@ -207,11 +216,7 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    SetWindowPos( hwndGFX , NULL , 0,0 , 0,0 , SWP_NOMOVE or SWP_NOSIZE or SWP_NOZORDER or SWP_FRAMECHANGED )
    
    '' ReSizeGLScene
-   glViewport 0, 0, ScrWid, ScrHei                  '' Reset The Current Viewport
-   glMatrixMode GL_PROJECTION                       '' Select The Projection Matrix
-   glLoadIdentity                                   '' Reset The Projection Matrix
-   gluPerspective 45.0, ScrWid/ScrHei, 1, 1000.0*cScale   '' Calculate The Aspect Ratio Of The Window
-   glMatrixMode GL_MODELVIEW                        '' Select The Modelview Matrix
+   ResizeOpengGL( ScrWid , ScrHei )   
    glLoadIdentity                                   '' Reset The Modelview Matrix
    
    '' All Setup For OpenGL Goes Here

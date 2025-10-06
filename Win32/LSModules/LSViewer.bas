@@ -1,10 +1,19 @@
 '******************************************************************
 namespace Viewer
+
+   #define UseVBO
+
    dim shared as byte g_LoadFile = 0
    dim shared as string g_sGfxFile , g_sFileName
    dim shared as any ptr g_Mutex
    dim shared as DATFile ptr g_pLoadedModel
    dim shared as boolean bShowCollision
+   
+   sub ReloadFile()
+      MutexLock( g_Mutex )
+      g_LoadFile = abs(g_LoadFile)
+      Mutexunlock( g_Mutex )
+   end sub
    
    function LoadMemory( sContents as string , sName as string = "Unnamed.ls" , bDoLock as boolean = true ) as boolean
       if bDoLock then MutexLock( g_Mutex )
@@ -20,7 +29,7 @@ namespace Viewer
          g_LoadFile = 0  
          if .LoadFile( sFile , g_sGfxFile )=0 then exit do
          bLoadResult = TRUE : g_sFileName = sFile
-         g_LoadFile = 1 : exit do                 
+         g_LoadFile = 2 : exit do                 
       loop
       Mutexunlock( g_Mutex )
       return bLoadResult
@@ -45,7 +54,18 @@ namespace Viewer
       if hReadyEvent then SetEvent( hReadyEvent )
       SetEvent( g_hResizeEvent )
                   
-      dim as long iModel=-1,iBorders=-1      
+      #ifdef UseVBO
+         redim as VertexStruct atModelTrigs() , atModelVtxLines1() , atModelVtxLines2()   
+         dim as GLuint iModelVBO, iBorderVBO(1)
+         dim as long iTrianglesCount, iBorderCount(1)
+         glGenBuffers(1, @iModelVBO) : glGenBuffers(2, @iBorderVBO(0))
+      #else
+         dim as GLuint iModel=-1,iBorders=-1      
+         iModel   = glGenLists( 1 )
+         iBorders = glGenLists( 2 )
+      #endif
+      
+      
       dim as single xMid,yMid,zMid , g_zFar
       dim as PartSize tSz
       dim as long g_PartCount , g_CurPart = -1
@@ -66,9 +86,11 @@ namespace Viewer
          Dim e as fb.EVENT = any
          while (ScreenEvent(@e))
             Select Case e.type
-            Case fb.EVENT_MOUSE_MOVE
-               if bLeftPressed  then fRotationX += e.dx / 2 : fRotationY += e.dy / 2
-               if bRightPressed then fPositionX += e.dx / 2 * g_zFar/100 : fPositionY += e.dy / 2 * g_zFar/100
+            Case fb.EVENT_MOUSE_MOVE         
+               var fX = iif( fZoom<0 , e.dx/((fZoom*fZoom)+1) , e.dx*((fZoom*fzoom)+1) )
+               var fY = iif( fZoom<0 , e.dy/((fZoom*fZoom)+1) , e.dy*((fZoom*fZoom)+1) )
+               if bLeftPressed  then fRotationX += (e.dx/2) : fRotationY += (e.dy/2)
+               if bRightPressed then fPositionX += (fX) * g_zFar/100 : fPositionY += (fY) * g_zFar/100         
             case fb.EVENT_MOUSE_WHEEL
                iWheel = e.z-iPrevWheel
                fZoom = -3+(-iWheel/64)            
@@ -148,6 +170,7 @@ namespace Viewer
                   end if
                end select
                select case e.scancode
+               case fb.SC_F5     : if g_LoadFile = -2 then LoadFile( g_sFileName )
                case fb.SC_LSHIFT : bShiftPressed or= 1
                case fb.SC_RSHIFT : bShiftPressed or= 2
                case fb.SC_TAB    : bBoundingBox = not bBoundingBox
@@ -184,37 +207,52 @@ namespace Viewer
          static as double dFps : iFps += 1   
          if abs(timer-dFps)>1 then
             dFps = timer
-            WindowTitle("Fps: " & iFps): iFps = 0         
+            WindowTitle(g_sFileName & " - Fps: " & iFps): iFps = 0         
          else
             sleep 1,1
          end if    
                   
          MutexLock( g_Mutex )                     
-         if g_LoadFile then            
+         if g_LoadFile > 0 then            
             Try()
                do            
-                  g_LoadFile = 0
+                  g_LoadFile = -g_LoadFile
                   if g_pLoadedModel then 'cleanup previous loaded model/lists (leaking shadow?)
                      FreeModel( g_pLoadedModel )
-                     if iModel >=0 then glDeleteLists( iModel , 1 ) : iModel = -1
-                     if iBorders >=0 then glDeleteLists( iBorders , 2 ) : iBorders = -1
+                     '#ifndef UseVBO
+                     '   if iModel >=0 then glDeleteLists( iModel , 1 ) : iModel = -1
+                     '   if iBorders >=0 then glDeleteLists( iBorders , 2 ) : iBorders = -1
+                     '#endif
                   end if 
                   g_TotalLines = 0 : g_TotalOptis = 0 : g_TotalTrigs = 0 : g_TotalQuads = 0
                   static as string sPrevFilename                  
                   if len(g_sGfxFile) then g_pLoadedModel = LoadModel( strptr(g_sGfxFile) , g_sFileName )                  
-                  g_sGfxFile = "" : if g_pLoadedModel = NULL then exit do 'failed to load
+                  if g_pLoadedModel = NULL then exit do 'failed to load
                   
-                  iModel   = glGenLists( 1 )
-                  glNewList( iModel ,  GL_COMPILE ) 'GL_COMPILE_AND_EXECUTE
-                  RenderModel( g_pLoadedModel , false )
-                  glEndList()
-                  iBorders = glGenLists( 2 )
-                  glNewList( iBorders ,  GL_COMPILE )
-                  RenderModel( g_pLoadedModel , true )
-                  glEndList()
-                  glNewList( iBorders+1 ,  GL_COMPILE )
-                  RenderModel( g_pLoadedModel , true , , -2 )
-                  glEndList()
+                  #ifdef UseVBO
+                     GenArrayModel( g_pLoadedModel , atModelTrigs()     , false )
+                     GenArrayModel( g_pLoadedModel , atModelVtxLines1() , true )
+                     GenArrayModel( g_pLoadedModel , atModelVtxLines2() , true , , -2 )                     
+                     iTrianglesCount = ubound(atModelTrigs)+1
+                     iBorderCount(0) = ubound(atModelVtxLines1)+1 
+                     iBorderCount(1) = ubound(atModelVtxLines2)+1
+                     glBindBuffer(GL_ARRAY_BUFFER, iModelVBO)
+                     glBufferData(GL_ARRAY_BUFFER, iTrianglesCount*sizeof(VertexStruct), @atModelTrigs(0)     , GL_STATIC_DRAW)
+                     glBindBuffer(GL_ARRAY_BUFFER, iBorderVBO(0))
+                     glBufferData(GL_ARRAY_BUFFER, iBorderCount(0)*sizeof(VertexStruct), @atModelVtxLines1(0) , GL_STATIC_DRAW)
+                     glBindBuffer(GL_ARRAY_BUFFER, iBorderVBO(1))
+                     glBufferData(GL_ARRAY_BUFFER, iBorderCount(1)*sizeof(VertexStruct), @atModelVtxLines2(0) , GL_STATIC_DRAW)   
+                  #else                     
+                     glNewList( iModel ,  GL_COMPILE ) 'GL_COMPILE_AND_EXECUTE
+                     RenderModel( g_pLoadedModel , false )
+                     glEndList()                     
+                     glNewList( iBorders ,  GL_COMPILE )
+                     RenderModel( g_pLoadedModel , true )
+                     glEndList()
+                     glNewList( iBorders+1 ,  GL_COMPILE )
+                     RenderModel( g_pLoadedModel , true , , -2 )
+                     glEndList()
+                  #endif
                                                       
                   var bResetAttributes = sPrevFilename <> g_sFileName
                   if bResetAttributes then
@@ -273,12 +311,8 @@ namespace Viewer
          're-create base view in case the window got resized
          if WaitForSingleObject( g_hResizeEvent , 0 )=0 then
             dim as RECT tRc : GetClientRect(g_GfxHwnd,@tRc)
-            var g_iCliWid = tRc.right , g_iCliHei = tRc.bottom        
-            glViewport 0, 0, gfx.g_iCliWid, gfx.g_iCliHei                  '' Reset The Current Viewport
-            glMatrixMode GL_PROJECTION                       '' Select The Projection Matrix
-            glLoadIdentity                                   '' Reset The Projection Matrix
-            gluPerspective 45.0, gfx.g_iCliWid/gfx.g_iCliHei, 1, 1000.0*cScale   '' Calculate The Aspect Ratio Of The Window
-            glMatrixMode GL_MODELVIEW                        '' Select The Modelview Matrix
+            var g_iCliWid = tRc.right , g_iCliHei = tRc.bottom
+            ResizeOpengGL( gfx.g_iCliWid, gfx.g_iCliHei )
          end if
          
          glClear GL_COLOR_BUFFER_BIT OR GL_DEPTH_BUFFER_BIT      
@@ -297,12 +331,17 @@ namespace Viewer
          
          'glPushMatrix()
          
-         glDisable( GL_LIGHTING )
+         'glDisable( GL_LIGHTING )
          
          static as long OldDraw = -1
          Try()
             if g_CurDraw < 0 then
-               glCallList(	iModel ) : OldDraw = -1
+               #ifdef UseVBO
+                  DrawVBO( iModelVBO , GL_TRIANGLES , iTrianglesCount )
+               #else
+                  glCallList(	iModel )
+               #endif
+               OldDraw = -1
             else
                RenderModel( g_pLoadedModel , false , , g_CurDraw )
                
@@ -364,7 +403,13 @@ namespace Viewer
                
                'SnapModel( g_pLoadedModel , tSnap , g_CurDraw )      
             end if
-            glCallList(	iBorders-(g_CurDraw>=0) )
+            'glCallList(	iBorders-(g_CurDraw>=0) )
+            #ifdef UseVBO         
+               DrawVBO( iBorderVBO(iif(g_CurDraw>=0,1,0)) , GL_LINES , iBorderCount(iif(g_CurDraw>=0,1,0)) )         
+            #else
+               glCallList(	iBorders-(g_CurDraw>=0) )
+            #endif
+            
             Catch()
                LogError("Crashed at rendering!!!")
             EndCatch()

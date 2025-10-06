@@ -223,11 +223,11 @@ scope
    'crashing due to fallback additions
    '#include "CrashTest.bi"
    'sFile = sPath+"LDraw\models\pyramid.ldr"
-   sFile = sPath+"\examples\8891-towTruck.mpd"
+   'sFile = sPath+"\examples\8891-towTruck.mpd"
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\5510.mpd"
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\cube10x10x10.ldr"
    'sFile = "3001.dat" 
-   'sFile = "C:\Users\greg\Desktop\LS\TLG_Map\Build\Blocks\B1\Eldon Square.ldr"
+   sFile = "C:\Users\greg\Desktop\LS\TLG_Map\Build\Blocks\B1\Eldon Square.ldr"
    'sFile = "4070.dat" '4070 , 87087 , 26604 , 47905 , 4733 , 30414
 end scope
 scope 
@@ -246,7 +246,9 @@ dim as string sModel
 dim as DATFile ptr pModel
 dim as boolean bEditMode
 
-#if 0 '1 = Load File , 0 = Load From clipboard
+dim as double dLoadTime = timer
+
+#if 1 '1 = Load File , 0 = Load From clipboard
    if len(sFile)=0 then sFile=command(1)
    if instr(sFile,"\")=0 andalso instr(sFile,"/")=0 then FindFile(sFile)
    printf(!"Model: '%s'\n",sFile)
@@ -308,9 +310,11 @@ dim as boolean bEditMode
    
 #endif
 
+puts("Load Model Time: " & timer-dLoadTIme)
+
 if sEndsExt=".dat" then bEditMode = true
 
-InitOpenGL()
+var hGfxWnd = InitOpenGL()
 
 'glPolygonMode( GL_FRONT_AND_BACK, GL_LINE )
 
@@ -319,15 +323,12 @@ dim as single fPositionX , fPositionY , fPositionZ , fZoom = -3
 dim as long iWheel , iPrevWheel
 dim as long g_DrawCount = pModel->iPartCount , g_CurDraw = -1
 
-#ifdef UseVBO
+dLoadTIme = timer
+#ifdef UseVBO   
    redim as VertexStruct atModelTrigs() , atModelVtxLines1() , atModelVtxLines2()
-   flip
    GenArrayModel( pModel , atModelTrigs()     , false )
-   flip
    GenArrayModel( pModel , atModelVtxLines1() , true )
-   flip
    GenArrayModel( pModel , atModelVtxLines2() , true , , -2 )
-   flip
    
    dim as long iTrianglesCount = ubound(atModelTrigs)+1
    dim as long iBorderCount(1) = { ubound(atModelVtxLines1)+1 , ubound(atModelVtxLines2)+1 }         
@@ -352,6 +353,7 @@ dim as long g_DrawCount = pModel->iPartCount , g_CurDraw = -1
    RenderModel( pModel , true , , -2 )
    glEndList()
 #endif 
+puts("Load Time: " & timer-dLoadTIme)
 
 dim as single xMid,yMid,zMid , g_zFar
 dim as PartSize tSz
@@ -441,7 +443,22 @@ end with
 
 dim as PartSnap tSnapID
 
+dim as long iOldCliWid , iOldCliHei
+
 do
+   
+   'resize if window size change   
+   if IsIconic( hGfxWnd )=0 then
+      dim as RECT tRc : GetClientRect(hGfxWnd,@tRc)
+      var iCliWid = tRc.right , iCliHei = tRc.bottom      
+      if iCliWid < 64 then iCliWid = 64
+      if iCliHei < 48 then iCliHei = 48
+      if iOldCliWid <> iCliWid orelse iOldCliHei <> iCliHei then         
+         iOldCliWid = iCliWid : iOldCliHei = iCliHei         
+         ResizeOpengGL( iCliWid, iCliHei )         
+      end if
+   end if
+
    glClear GL_COLOR_BUFFER_BIT OR GL_DEPTH_BUFFER_BIT      
    glLoadIdentity()   
    glScalef(1/-20, 1.0/-20, 1/20 )
@@ -480,21 +497,7 @@ do
    glEnable( GL_DEPTH_TEST )
    
    g_fNX=-.95 : g_fNY=.95
-   
-   #macro DrawVBO( _vbo , _type , _count )
-      glBindBuffer(GL_ARRAY_BUFFER, _vbo )          
-      glEnableClientState(GL_VERTEX_ARRAY)
-      glEnableClientState(GL_NORMAL_ARRAY)
-      glEnableClientState(GL_COLOR_ARRAY)         
-      glVertexPointer(3, GL_FLOAT, sizeof(VertexStruct), cast(any ptr,offsetof(VertexStruct,tPos   )) )
-      glNormalPointer(   GL_FLOAT, sizeof(VertexStruct), cast(any ptr,offsetof(VertexStruct,tNormal)) )
-      glColorPointer (4, GL_FLOAT, sizeof(VertexStruct), cast(any ptr,offsetof(VertexStruct,tColor )) )
-      glDrawArrays(_type, 0, _count )
-      glDisableClientState(GL_COLOR_ARRAY)
-      glDisableClientState(GL_NORMAL_ARRAY)
-      glDisableClientState(GL_VERTEX_ARRAY)
-   #endmacro
-   
+         
    if g_CurDraw < 0 then
       'render whole model
       #ifdef UseVBO
@@ -659,12 +662,15 @@ do
    Dim e as fb.EVENT = any
    while (ScreenEvent(@e))
       Select Case e.type
-      Case fb.EVENT_MOUSE_MOVE
-         if bLeftPressed  then fRotationX += e.dx / 2 : fRotationY += e.dy / 2
-         if bRightPressed then fPositionX += e.dx / 2 * g_zFar/100 : fPositionY += e.dy / 2 * g_zFar/100
+      Case fb.EVENT_MOUSE_MOVE         
+         var fX = iif( fZoom<0 , e.dx/((fZoom*fZoom)+1) , e.dx*((fZoom*fzoom)+1) )
+         var fY = iif( fZoom<0 , e.dy/((fZoom*fZoom)+1) , e.dy*((fZoom*fZoom)+1) )
+         if bLeftPressed  then fRotationX += (e.dx/2) : fRotationY += (e.dy/2)
+         if bRightPressed then fPositionX += (fX) * g_zFar/100 : fPositionY += (fY) * g_zFar/100         
       case fb.EVENT_MOUSE_WHEEL
          iWheel = e.z-iPrevWheel
          fZoom = -3+(-iWheel/64)
+         puts("" & fZoom)
       case fb.EVENT_MOUSE_BUTTON_PRESS
          if e.button = fb.BUTTON_MIDDLE then 
             iPrevWheel = iWheel

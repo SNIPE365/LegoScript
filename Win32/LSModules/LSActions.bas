@@ -455,11 +455,14 @@ sub Do_Compile( bDoLock as boolean = true )
    sOutput = LegoScriptToLDraw( sScript , sError , sFilePath )   
    SetColoredOutput( iif(len(sError)=0,sOutput,sError) )   
    if len(sOutput) orelse len(sError)=0 then
-      if lcase(right(g_CurrentFilePath,3)) = ".ls" then
-         Viewer.LoadMemory( sOutput , left(g_CurrentFilePath,len(g_CurrentFilePath)-3)+".ldr" , bDoLock )
-      else
-         Viewer.LoadMemory( sOutput , g_CurrentFilePath+".ldr" , bDoLock )
-      end if
+      Viewer.LoadMemory( sOutput , GetTabName( g_iCurTab ) , bDoLock )
+      #if 0
+         if lcase(right(g_CurrentFilePath,3)) = ".ls" then
+            Viewer.LoadMemory( sOutput , left(g_CurrentFilePath,len(g_CurrentFilePath)-3)+".ldr" , bDoLock )
+         else
+            Viewer.LoadMemory( sOutput , g_CurrentFilePath+".ldr" , bDoLock )
+         end if
+      #endif
    end if
    if len(sError) then SendMessage( CTL(wcRadOutput) , BM_CLICK , 0,0 )
    SetWindowText( CTL(wcStatus) , iif(len(sOutput),"Ready.",iif(len(sError),"Script error.","No output generated!")))
@@ -812,20 +815,17 @@ sub View_GfxQuality()
    
    if viewer.g_pLoadedModel then
       mutexlock(Viewer.g_Mutex)
-      viewer.g_LoadFile = 1
+      for N as long = g_ModelCount-1 to 0 step -1
+         FreeModel( g_tModels(N).pModel )
+      next N
+      g_sFilenames = chr(0) : g_sFilesToLoad = chr(0)   
+      viewer.g_pLoadedModel = NULL
+      viewer.g_LoadFile = abs(viewer.g_LoadFile)
       mutexunlock(Viewer.g_Mutex)
-      while viewer.g_pLoadedModel
-         SleepEx(1,1)
-      wend 
+      'while viewer.g_pLoadedModel
+      '   SleepEx(1,1)
+      'wend 
    end if
-   
-   mutexlock(Viewer.g_Mutex)
-   for N as long = g_ModelCount-1 to 0 step -1
-      FreeModel( g_tModels(N).pModel )
-   next N
-   g_sFilenames = chr(0) : g_sFilesToLoad = chr(0)   
-   Do_Compile(false)
-   mutexunlock(Viewer.g_Mutex)   
 
 end sub
 
