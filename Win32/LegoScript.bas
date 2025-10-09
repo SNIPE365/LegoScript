@@ -1,6 +1,8 @@
 #cmdline "res\LS.rc"
 '#cmdline "Res\LS.rc  -gen gcc -O 3 -g"
-'#cmdline "Res\LS.rc  -gen gcc -O 3"
+'#cmdline "Res\LS.rc  -gen gcc -O 3  -Wl '--large-address-aware' "
+#cmdline "-Wl '--large-address-aware'"
+
 #define __Main "LegoScript"
 
 #include once "windows.bi"

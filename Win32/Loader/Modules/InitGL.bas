@@ -221,11 +221,11 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    
    '' All Setup For OpenGL Goes Here
    glShadeModel GL_SMOOTH                           '' Enable Smooth Shading
-   glClearColor 115/255, 140/255, 191/255, 0.5      '' Background color
+   glClearColor 115/255, 140/255, 191/255, 1        '' Background color
    glClearDepth 1.0                                 '' Depth Buffer Setup
    glEnable GL_DEPTH_TEST                           '' Enables Depth Testing
    'glDisable GL_DEPTH_TEST                         '' Enables Depth Testing
-   glDepthFunc GL_LEQUAL                            '' The Type Of Depth Testing To Do
+   glDepthFunc GL_LESS                              '' The Type Of Depth Testing To Do
    glHint GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST '' Really Nice Perspective Calculations
    glEnable GL_BLEND
    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
@@ -248,7 +248,7 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    'glFrontFace( GL_CW ): glCullFace( GL_FRONT )
    
    glEnable(GL_POLYGON_OFFSET_FILL)
-   glPolygonOffset(1.0, 1/-20)
+   glPolygonOffset(1.0, 1/-40)   
    
    '============== light initialization ==============
     glEnable(GL_LIGHTING)

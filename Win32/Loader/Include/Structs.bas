@@ -194,5 +194,6 @@ type Color4
 end type
 type VertexStruct
    as Vertex3 tPos,tNormal
-   as Color4 tColor   
+   as ulong uColor 'Color4 tColor   
 end type
+

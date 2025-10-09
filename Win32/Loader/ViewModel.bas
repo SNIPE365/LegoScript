@@ -1,4 +1,6 @@
 #define __Main "ViewModel.bas"
+#cmdline "-Wl '--large-address-aware'"
+
 '#define __Tester
 
 '#define DebugShadow
@@ -325,21 +327,23 @@ dim as long g_DrawCount = pModel->iPartCount , g_CurDraw = -1
 
 dLoadTIme = timer
 #ifdef UseVBO   
-   redim as VertexStruct atModelTrigs() , atModelVtxLines1() , atModelVtxLines2()
-   GenArrayModel( pModel , atModelTrigs()     , false )
-   GenArrayModel( pModel , atModelVtxLines1() , true )
-   GenArrayModel( pModel , atModelVtxLines2() , true , , -2 )
+   redim as VertexStruct atModelTrigs() , atModelVtxLines()
+   dim as long iTrianglesCount,iBorderCount
+   dim as GLuint iModelVBO, iBorderVBO
+   glGenBuffers(1, @iModelVBO) : glGenBuffers(1, @iBorderVBO)   
    
-   dim as long iTrianglesCount = ubound(atModelTrigs)+1
-   dim as long iBorderCount(1) = { ubound(atModelVtxLines1)+1 , ubound(atModelVtxLines2)+1 }         
-   dim as GLuint iModelVBO, iBorderVBO(1)
-   glGenBuffers(1, @iModelVBO) : glGenBuffers(2, @iBorderVBO(0))   
+   GenArrayModel( pModel , atModelTrigs()     , false )
+   iTrianglesCount = ubound(atModelTrigs)+1   
    glBindBuffer(GL_ARRAY_BUFFER, iModelVBO)
    glBufferData(GL_ARRAY_BUFFER, iTrianglesCount*sizeof(VertexStruct), @atModelTrigs(0)     , GL_STATIC_DRAW)
-   glBindBuffer(GL_ARRAY_BUFFER, iBorderVBO(0))
-   glBufferData(GL_ARRAY_BUFFER, iBorderCount(0)*sizeof(VertexStruct), @atModelVtxLines1(0) , GL_STATIC_DRAW)
-   glBindBuffer(GL_ARRAY_BUFFER, iBorderVBO(1))
-   glBufferData(GL_ARRAY_BUFFER, iBorderCount(1)*sizeof(VertexStruct), @atModelVtxLines2(0) , GL_STATIC_DRAW)   
+   erase( atModelTrigs )
+      
+   GenArrayModel( pModel , atModelVtxLines() , true )
+   iBorderCount = ubound(atModelVtxLines)+1
+   glBindBuffer(GL_ARRAY_BUFFER, iBorderVBO)
+   glBufferData(GL_ARRAY_BUFFER, iBorderCount*sizeof(VertexStruct), @atModelVtxLines(0) , GL_STATIC_DRAW)
+   erase( atModelVtxLines )
+         
 #else
    var iModel   = glGenLists( 1 )
    var iBorders = glGenLists( 2 )
@@ -439,12 +443,14 @@ with tSz
    fPositionZ = (.zMax-.zMin) 'abs(.zMax)-abs(.zMin)
    'fPositionZ = abs(iif(abs(.zMin)>abs(.zMax),.zMin,.zMax))
    fPositionZ = sqr(fPositionZ)*-40
+   
 end with
 
 dim as PartSnap tSnapID
 
 dim as long iOldCliWid , iOldCliHei
 
+#if 1
 do
    
    'resize if window size change   
@@ -501,7 +507,7 @@ do
    if g_CurDraw < 0 then
       'render whole model
       #ifdef UseVBO
-         DrawVBO( iModelVBO , GL_TRIANGLES , iTrianglesCount )
+         DrawColorVBO( iModelVBO , GL_TRIANGLES , iTrianglesCount )
       #else
          glCallList(	iModel )
       #endif
@@ -511,7 +517,12 @@ do
    end if
    if bViewBorders then 
       #ifdef UseVBO         
-         DrawVBO( iBorderVBO(iif(g_CurDraw>=0,1,0)) , GL_LINES , iBorderCount(iif(g_CurDraw>=0,1,0)) )         
+         if g_CurDraw<0 then            
+            DrawColorVBO( iBorderVBO , GL_LINES , iBorderCount )
+         else
+            glColor4f(.5,.5,.5,.33)
+            DrawVBO( iBorderVBO , GL_LINES , iBorderCount )
+         end if
       #else
          glCallList(	iBorders-(g_CurDraw>=0) )
       #endif
@@ -665,7 +676,7 @@ do
       Case fb.EVENT_MOUSE_MOVE         
          var fX = iif( fZoom<0 , e.dx/((fZoom*fZoom)+1) , e.dx*((fZoom*fzoom)+1) )
          var fY = iif( fZoom<0 , e.dy/((fZoom*fZoom)+1) , e.dy*((fZoom*fZoom)+1) )
-         if bLeftPressed  then fRotationX += (e.dx/2) : fRotationY += (e.dy/2)
+         if bLeftPressed  then fRotationX += (e.dx/12) : fRotationY += (e.dy/12)
          if bRightPressed then fPositionX += (fX) * g_zFar/100 : fPositionY += (fY) * g_zFar/100         
       case fb.EVENT_MOUSE_WHEEL
          iWheel = e.z-iPrevWheel
@@ -753,6 +764,87 @@ do
    dRot = timer
    
 loop until multikey(fb.SC_ESCAPE)
-sleep
+#else
+glEnable( GL_LIGHTING )
+glEnable( GL_DEPTH_TEST )
+dim as single fCameraX,fCameraY,fCameraZ
+dim as single fAngleX,fAngleZ
+dim as boolean g_bFocus = true
+do
+   
+   'resize if window size change   
+   if IsIconic( hGfxWnd )=0 then
+      dim as RECT tRc : GetClientRect(hGfxWnd,@tRc)
+      var iCliWid = tRc.right , iCliHei = tRc.bottom      
+      if iCliWid < 64 then iCliWid = 64
+      if iCliHei < 48 then iCliHei = 48
+      if iOldCliWid <> iCliWid orelse iOldCliHei <> iCliHei then         
+         iOldCliWid = iCliWid : iOldCliHei = iCliHei         
+         ResizeOpengGL( iCliWid, iCliHei )         
+      end if
+   end if
+
+   glClear GL_COLOR_BUFFER_BIT OR GL_DEPTH_BUFFER_BIT      
+   glLoadIdentity()   
+   glScalef(1/-20, 1.0/-20, 1/20 )
+            
+   '// Set light position (0, 0, 0)
+   dim as GLfloat lightPos(...) = {0,0,0, 1.0f}'; // (x, y, z, w), w=1 for positional light
+   glLightfv(GL_LIGHT0, GL_POSITION, @lightPos(0))
+   
+   glTranslatef( -fCameraX , fCameraY , fCameraZ )
+         
+   'glRotatef fRotationY , -1.0 , 0.0 , 0
+   'glRotatef fRotationX , 0   , -1.0 , 0
+         
+   'glDisable( GL_LIGHTING )
+   
+   #ifdef UseVBO
+      DrawColorVBO( iModelVBO , GL_TRIANGLES , iTrianglesCount )
+      if bViewBorders then DrawColorVBO( iBorderVBO , GL_LINES , iBorderCount )
+   #else
+      glCallList(	iModel )
+      if bViewBorders then glCallList(	iBorders-(g_CurDraw>=0) )      
+   #endif
+            
+   Dim e as fb.EVENT = any
+   dim as boolean bSkipMouse = not g_bFocus
+   while (ScreenEvent(@e))
+      Select Case e.type
+      Case fb.EVENT_MOUSE_MOVE
+         if bSkipMouse=false then
+            if e.x <> (iOldCliWid\2) orelse e.y <> (iOldCliHei\2) then
+               setmouse( (iOldCliWid\2) , (iOldCliHei\2) )
+               printf(!"%i , %i\n",e.dx,e.dy)
+            end if         
+         end if
+      Case fb.EVENT_WINDOW_GOT_FOCUS
+         g_bFocus = true : bSkipMouse = 1
+         setmouse( (iOldCliWid\2) , (iOldCliHei\2) )         
+      Case fb.EVENT_WINDOW_LOST_FOCUS
+         g_bFocus = false : bSkipMouse = 1
+      case fb.EVENT_WINDOW_CLOSE
+         exit do
+      end select
+   wend
+               
+   flip   
+   static as double dFps : iFps += 1   
+   if abs(timer-dFps)>1 then
+      dFps = timer      
+      'WindowTitle("Fps: " & cint(1/(timer-dRot)))
+      WindowTitle("Fps: " & iFps): iFps = 0
+      'if dFps=0 then dFps = (timer-dRot) else dFps = (dFps+(timer-dRot))/2
+   else
+      sleep 1
+   end if
+   
+   'WindowTitle("Fps: " & cint(1/(timer-dRot)))
+   
+   'fRotation -= (timer-dRot)*30
+   dRot = timer
+   
+loop until multikey(fb.SC_ESCAPE)
+#endif
 
 

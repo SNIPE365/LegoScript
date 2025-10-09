@@ -256,6 +256,42 @@ sub RenderModel( pPart as DATFile ptr , iBorders as long , uCurrentColor as ulon
    end with   
 end sub
 
+function GetModelVertexCount( pPart as DATFile ptr , iBorders as long , lDrawPart as long = -1 , byref lCurPos as long = 0 ) as ulong
+                    
+   with *pPart
+      for N as long = 0 to .iPartCount-1                           
+         dim as byte bDoDraw = (lDrawPart<0 orelse lDrawPart=N)         
+         with .tParts(N)            
+            select case .bType
+            case 1               
+               var T1 = ._1
+               with T1
+                  if bDoDraw then
+                     var pSubPart = g_tModels(.lModelIndex).pModel                     
+                     GetModelVertexCount( pSubPart , iBorders , iif(lDrawPart=-2,-2,-1) , lCurPos )
+                  end if                  
+               end with               
+            case 2               
+               if iBorders=0 andalso lDrawPart <> N then continue for               
+               lCurPos += 2               
+            case 3
+               if iBorders orelse bDoDraw=0 then continue for                                 
+               lCurPos += 3
+            case 4               
+               if iBorders orelse bDoDraw=0 then continue for
+               lCurPos += 6
+            case 5               
+               if iBorders=0 orelse bDoDraw=0 then continue for               
+               lCurPos += 2
+            end select
+         end with
+      next N                  
+   end with
+      
+   return lCurPos
+   
+end function
+
 function GenArrayModel( pPart as DATFile ptr , aVertex() as VertexStruct , iBorders as long , uCurrentColor as ulong = &h70605040 , lDrawPart as long = -1 , byref lCurPos as long = -1 , uCurrentEdge as ulong = 0 DebugPrimParm ) as ulong
    if uCurrentColor = &h70605040 then uCurrentColor = g_Colours(c_Blue) : uCurrentEdge = g_EdgeColours(c_Blue)
    
@@ -263,8 +299,14 @@ function GenArrayModel( pPart as DATFile ptr , aVertex() as VertexStruct , iBord
    
    dim as boolean bMain = false
    if lCurPos < 0 then 
-      redim aVertex( cBlockCnt-1 ) : lCurPos = 0 : bMain = true
-      'puts("Sz: " & (ubound(aVertex)*sizeof(aVertex(0))\1024))
+      var uVtx = GetModelVertexCount( pPart , iBorders )
+      redim aVertex( uVtx-1 ) : lCurPos = 0 : bMain = true
+      var iSz = ((uVtx*sizeof(aVertex(0)))\1024)
+      if iSz > 2047 then
+         puts("Sz: " & (iSz+1023)\1024 & "mb")
+      else
+         puts("Sz: " & iSz & "kb")
+      end if
    end if
    
    
@@ -274,13 +316,7 @@ function GenArrayModel( pPart as DATFile ptr , aVertex() as VertexStruct , iBord
    with *pPart      
       'for M as long = 0 to 1
       for N as long = 0 to .iPartCount-1
-         
-         'puts( lCurPos & " , " & ubound(aVertex) )
-         if (lCurPos+6) >= ubound(aVertex) then 
-            puts("Resize...")
-            redim preserve aVertex(ubound(aVertex)+cBlockCnt)
-         end if
-         
+                           
          dim as byte bDoDraw = (lDrawPart<0 orelse lDrawPart=N)
          dim as ulong uColor = any', uEdge = any
          with .tParts(N)
@@ -318,16 +354,13 @@ function GenArrayModel( pPart as DATFile ptr , aVertex() as VertexStruct , iBord
                with T1
                   if bDoDraw then
                      var pSubPart = g_tModels(.lModelIndex).pModel
-                     var sName = *cptr(zstring ptr,strptr(g_sFilenames)+g_tModels(.lModelIndex).iFilenameOffset+6)
-                                          
-                     '1 16 0 0 0 1 0 0 0 8 0 0 0 1 axlehole.dat
-   
                      #ifdef DebugPrimitive
-                     Puts _
-                        " fX:" & .fX & " fY:" & .fY & " fZ:" & .fZ & _
-                        " fA:" & .fA & " fB:" & .fB & " fC:" & .fC & _
-                        " fD:" & .fD & " fE:" & .fE & " fF:" & .fF & _
-                        " fG:" & .fG & " fH:" & .fH & " fI:" & .fI & " '" & sName & "'"                     
+                        var sName = *cptr(zstring ptr,strptr(g_sFilenames)+g_tModels(.lModelIndex).iFilenameOffset+6)
+                        Puts _
+                           " fX:" & .fX & " fY:" & .fY & " fZ:" & .fZ & _
+                           " fA:" & .fA & " fB:" & .fB & " fC:" & .fC & _
+                           " fD:" & .fD & " fE:" & .fE & " fF:" & .fF & _
+                           " fG:" & .fG & " fH:" & .fH & " fI:" & .fI & " '" & sName & "'"                     
                      #endif
                                        
                      'MultiplyMatrixVector( @.fX ) 
@@ -369,18 +402,12 @@ function GenArrayModel( pPart as DATFile ptr , aVertex() as VertexStruct , iBord
                      " fX1:" & .fX1 & " fY1:" & .fY1 & " fZ1:" & .fZ1 & _
                      " fX2:" & .fX2 & " fY2:" & .fY2 & " fZ2:" & .fZ2
                   #endif
-                     
-                  with aVertex(lCurPos).tColor
-                     .fR = ((uEdge shr 16) and 255)/255
-                     .fG = ((uEdge shr  8) and 255)/255
-                     .fB = ((uEdge       ) and 255)/255
-                     .fA = ((uEdge shr 24) and 255)/iif(lDrawPart=-2,510,255)                     
-                  end with
-                                    
+                  
+                  aVertex(lCurPos).uColor = ((uEdge shr iif(lDrawPart=-2,2,0)) and &hFF000000) or (uEdge and &hFFFFFF)                                                      
                   aVertex(lCurPos  ).tPos    = type(.fX1*cScale,.fY1*cScale,.fZ1*cScale)
                   aVertex(lCurPos+1).tPos    = type(.fX2*cScale,.fY2*cScale,.fZ2*cScale)
                   aVertex(lCurPos+1).tNormal = aVertex(lCurPos).tNormal
-                  aVertex(lCurPos+1).tColor  = aVertex(lCurPos).tColor                  
+                  aVertex(lCurPos+1).uColor  = aVertex(lCurPos).uColor
                   
                   lCurPos += 2
                   
@@ -400,20 +427,14 @@ function GenArrayModel( pPart as DATFile ptr , aVertex() as VertexStruct , iBord
                         " fX3:" & .fX3 & " fY3:" & .fY3 & " fZ3:" & .fZ3
                   #endif
                   
-                  with aVertex(lCurPos).tColor
-                     .fR = ((uColor shr 16) and 255)/255
-                     .fG = ((uColor shr  8) and 255)/255
-                     .fB = ((uColor       ) and 255)/255
-                     .fA = ((uColor shr 24) and 255)/255
-                  end with
-                                    
+                  aVertex(lCurPos).uColor = uColor
                   aVertex(lCurPos  ).tPos    = type(.fX1*cScale,.fY1*cScale,.fZ1*cScale)
                   aVertex(lCurPos+1).tPos    = type(.fX2*cScale,.fY2*cScale,.fZ2*cScale)
                   aVertex(lCurPos+1).tNormal = aVertex(lCurPos).tNormal
-                  aVertex(lCurPos+1).tColor  = aVertex(lCurPos).tColor                  
+                  aVertex(lCurPos+1).uColor  = aVertex(lCurPos).uColor                  
                   aVertex(lCurPos+2).tPos    = type(.fX3*cScale,.fY3*cScale,.fZ3*cScale)
                   aVertex(lCurPos+2).tNormal = aVertex(lCurPos).tNormal
-                  aVertex(lCurPos+2).tColor  = aVertex(lCurPos).tColor                  
+                  aVertex(lCurPos+2).uColor  = aVertex(lCurPos).uColor                  
                   
                   lCurPos += 3
                   
@@ -436,29 +457,23 @@ function GenArrayModel( pPart as DATFile ptr , aVertex() as VertexStruct , iBord
                         " fX4:" & .fX4 & " fY4:" & .fY4 & " fZ4:" & .fZ4
                   #endif
                   
-                  with aVertex(lCurPos).tColor
-                     .fR = ((uColor shr 16) and 255)/255
-                     .fG = ((uColor shr  8) and 255)/255
-                     .fB = ((uColor       ) and 255)/255
-                     .fA = ((uColor shr 24) and 255)/255
-                  end with
-                                    
+                  aVertex(lCurPos  ).uColor = uColor
                   aVertex(lCurPos  ).tPos    = type(.fX1*cScale,.fY1*cScale,.fZ1*cScale)
                   aVertex(lCurPos+1).tPos    = type(.fX2*cScale,.fY2*cScale,.fZ2*cScale)
                   aVertex(lCurPos+1).tNormal = aVertex(lCurPos).tNormal
-                  aVertex(lCurPos+1).tColor  = aVertex(lCurPos).tColor                  
+                  aVertex(lCurPos+1).uColor  = aVertex(lCurPos).uColor                  
                   aVertex(lCurPos+2).tPos    = type(.fX3*cScale,.fY3*cScale,.fZ3*cScale)
                   aVertex(lCurPos+2).tNormal = aVertex(lCurPos).tNormal
-                  aVertex(lCurPos+2).tColor  = aVertex(lCurPos).tColor                  
+                  aVertex(lCurPos+2).uColor  = aVertex(lCurPos).uColor                  
                   aVertex(lCurPos+3).tPos    = type(.fX1*cScale,.fY1*cScale,.fZ1*cScale)                  
                   aVertex(lCurPos+3).tNormal = aVertex(lCurPos).tNormal
-                  aVertex(lCurPos+3).tColor  = aVertex(lCurPos).tColor                  
+                  aVertex(lCurPos+3).uColor  = aVertex(lCurPos).uColor                  
                   aVertex(lCurPos+4).tPos    = type(.fX3*cScale,.fY3*cScale,.fZ3*cScale)
                   aVertex(lCurPos+4).tNormal = aVertex(lCurPos).tNormal
-                  aVertex(lCurPos+4).tColor  = aVertex(lCurPos).tColor                  
+                  aVertex(lCurPos+4).uColor  = aVertex(lCurPos).uColor                  
                   aVertex(lCurPos+5).tPos    = type(.fX4*cScale,.fY4*cScale,.fZ4*cScale)
                   aVertex(lCurPos+5).tNormal = aVertex(lCurPos).tNormal
-                  aVertex(lCurPos+5).tColor  = aVertex(lCurPos).tColor                  
+                  aVertex(lCurPos+5).uColor  = aVertex(lCurPos).uColor                  
                   
                   lCurPos += 6                  
                   
@@ -482,17 +497,11 @@ function GenArrayModel( pPart as DATFile ptr , aVertex() as VertexStruct , iBord
                   'glColor4ubv( cast(ubyte ptr,@uEdge) )
                   #ifdef RenderOptionals
                      
-                     with aVertex(lCurPos).tColor
-                        .fR = 0   '((uEdge shr 16) and 255)/255
-                        .fG = 1   '((uEdge shr  8) and 255)/255
-                        .fB = 0   '((uEdge       ) and 255)/255
-                        .fA = .33 '((uEdge shr 24) and 255)/iif(lDrawPart=-2,510,255)
-                     end with
-                                       
+                     aVertex(lCurPos  ).uColor  = rgb(0,255,0,85)
                      aVertex(lCurPos  ).tPos    = type(.fX1*cScale,.fY1*cScale,.fZ1*cScale)
                      aVertex(lCurPos+1).tPos    = type(.fX2*cScale,.fY2*cScale,.fZ2*cScale)
                      aVertex(lCurPos+1).tNormal = aVertex(lCurPos).tNormal
-                     aVertex(lCurPos+1).tColor  = aVertex(lCurPos).tColor                  
+                     aVertex(lCurPos+1).uColor  = aVertex(lCurPos).uColor
                   
                      lCurPos += 2                     
                      
@@ -505,7 +514,13 @@ function GenArrayModel( pPart as DATFile ptr , aVertex() as VertexStruct , iBord
       iOnce = 1
    end with
    
-   if bMain then redim preserve aVertex(lCurPos-1)   
+   if bMain then 
+     if (lCurPos-1) > ubound(aVertex) then
+       puts("BUFFER OVERFLOW!")
+       getchar():system
+      end if
+     'redim preserve aVertex(lCurPos-1)   
+   end if
    return lCurPos
    
 end function
@@ -1975,19 +1990,33 @@ sub DrawLimitsCube( xMin as single , xMax as single , yMin as single , yMax as s
     glEnd()
 end sub
 
-#macro DrawVBO( _vbo , _type , _count )
+#macro DrawColorVBO( _vbo , _type , _count )
    glBindBuffer(GL_ARRAY_BUFFER, _vbo )          
    glEnableClientState(GL_VERTEX_ARRAY)
    glEnableClientState(GL_NORMAL_ARRAY)
    glEnableClientState(GL_COLOR_ARRAY)         
-   glVertexPointer(3, GL_FLOAT, sizeof(VertexStruct), cast(any ptr,offsetof(VertexStruct,tPos   )) )
-   glNormalPointer(   GL_FLOAT, sizeof(VertexStruct), cast(any ptr,offsetof(VertexStruct,tNormal)) )
-   glColorPointer (4, GL_FLOAT, sizeof(VertexStruct), cast(any ptr,offsetof(VertexStruct,tColor )) )
+   glVertexPointer(3, GL_FLOAT        , sizeof(VertexStruct), cast(any ptr,offsetof(VertexStruct,tPos   )) )
+   glNormalPointer(   GL_FLOAT        , sizeof(VertexStruct), cast(any ptr,offsetof(VertexStruct,tNormal)) )
+   glColorPointer (4, GL_UNSIGNED_BYTE, sizeof(VertexStruct), cast(any ptr,offsetof(VertexStruct,uColor )) )
    glDrawArrays(_type, 0, _count )
    glDisableClientState(GL_COLOR_ARRAY)
    glDisableClientState(GL_NORMAL_ARRAY)
    glDisableClientState(GL_VERTEX_ARRAY)
 #endmacro
+#macro DrawVBO( _vbo , _type , _count )   
+   glBindBuffer(GL_ARRAY_BUFFER, _vbo )          
+   glEnableClientState(GL_VERTEX_ARRAY)
+   glEnableClientState(GL_NORMAL_ARRAY)
+   'glEnableClientState(GL_COLOR_ARRAY)         
+   glVertexPointer(3, GL_FLOAT        , sizeof(VertexStruct), cast(any ptr,offsetof(VertexStruct,tPos   )) )
+   glNormalPointer(   GL_FLOAT        , sizeof(VertexStruct), cast(any ptr,offsetof(VertexStruct,tNormal)) )
+   'glColorPointer (4, GL_UNSIGNED_BYTE, sizeof(VertexStruct), cast(any ptr,offsetof(VertexStruct,uColor )) )
+   glDrawArrays(_type, 0, _count )
+   'glDisableClientState(GL_COLOR_ARRAY)
+   glDisableClientState(GL_NORMAL_ARRAY)
+   glDisableClientState(GL_VERTEX_ARRAY)
+#endmacro
+
 
 #endif
 

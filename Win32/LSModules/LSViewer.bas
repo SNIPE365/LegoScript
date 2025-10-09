@@ -55,10 +55,10 @@ namespace Viewer
       SetEvent( g_hResizeEvent )
                   
       #ifdef UseVBO
-         redim as VertexStruct atModelTrigs() , atModelVtxLines1() , atModelVtxLines2()   
-         dim as GLuint iModelVBO, iBorderVBO(1)
-         dim as long iTrianglesCount, iBorderCount(1)
-         glGenBuffers(1, @iModelVBO) : glGenBuffers(2, @iBorderVBO(0))
+         redim as VertexStruct atModelTrigs() , atModelVtxLines()
+         dim as GLuint iModelVBO, iBorderVBO
+         dim as long iTrianglesCount, iBorderCount
+         glGenBuffers(1, @iModelVBO) : glGenBuffers(1, @iBorderVBO)
       #else
          dim as GLuint iModel=-1,iBorders=-1      
          iModel   = glGenLists( 1 )
@@ -89,7 +89,7 @@ namespace Viewer
             Case fb.EVENT_MOUSE_MOVE         
                var fX = iif( fZoom<0 , e.dx/((fZoom*fZoom)+1) , e.dx*((fZoom*fzoom)+1) )
                var fY = iif( fZoom<0 , e.dy/((fZoom*fZoom)+1) , e.dy*((fZoom*fZoom)+1) )
-               if bLeftPressed  then fRotationX += (e.dx/2) : fRotationY += (e.dy/2)
+               if bLeftPressed  then fRotationX += (e.dx/8) : fRotationY += (e.dy/8)
                if bRightPressed then fPositionX += (fX) * g_zFar/100 : fPositionY += (fY) * g_zFar/100         
             case fb.EVENT_MOUSE_WHEEL
                iWheel = e.z-iPrevWheel
@@ -195,8 +195,7 @@ namespace Viewer
          if IsWindowVisible( g_GfxHwnd ) = 0 then
             flip : sleep 10,1 : continue do
          end if
-         flip
-         
+                  
          static as double dLimitFps
          if abs(timer-dLimitFps) > 1 then dLimitFps = timer
          while (timer-dLimitFps) < 1/30
@@ -231,17 +230,15 @@ namespace Viewer
                   
                   #ifdef UseVBO
                      GenArrayModel( g_pLoadedModel , atModelTrigs()     , false )
-                     GenArrayModel( g_pLoadedModel , atModelVtxLines1() , true )
-                     GenArrayModel( g_pLoadedModel , atModelVtxLines2() , true , , -2 )                     
-                     iTrianglesCount = ubound(atModelTrigs)+1
-                     iBorderCount(0) = ubound(atModelVtxLines1)+1 
-                     iBorderCount(1) = ubound(atModelVtxLines2)+1
+                     iTrianglesCount = ubound(atModelTrigs)+1   
                      glBindBuffer(GL_ARRAY_BUFFER, iModelVBO)
                      glBufferData(GL_ARRAY_BUFFER, iTrianglesCount*sizeof(VertexStruct), @atModelTrigs(0)     , GL_STATIC_DRAW)
-                     glBindBuffer(GL_ARRAY_BUFFER, iBorderVBO(0))
-                     glBufferData(GL_ARRAY_BUFFER, iBorderCount(0)*sizeof(VertexStruct), @atModelVtxLines1(0) , GL_STATIC_DRAW)
-                     glBindBuffer(GL_ARRAY_BUFFER, iBorderVBO(1))
-                     glBufferData(GL_ARRAY_BUFFER, iBorderCount(1)*sizeof(VertexStruct), @atModelVtxLines2(0) , GL_STATIC_DRAW)   
+                     erase( atModelTrigs )
+                     GenArrayModel( g_pLoadedModel , atModelVtxLines() , true ) ',, -2 )
+                     iBorderCount = ubound(atModelVtxLines)+1
+                     glBindBuffer(GL_ARRAY_BUFFER, iBorderVBO)
+                     glBufferData(GL_ARRAY_BUFFER, iBorderCount*sizeof(VertexStruct), @atModelVtxLines(0) , GL_STATIC_DRAW)
+                     erase( atModelVtxLines )                     
                   #else                     
                      glNewList( iModel ,  GL_COMPILE ) 'GL_COMPILE_AND_EXECUTE
                      RenderModel( g_pLoadedModel , false )
@@ -315,10 +312,12 @@ namespace Viewer
             ResizeOpengGL( gfx.g_iCliWid, gfx.g_iCliHei )
          end if
          
+         dim as double dRendertime = timer
+         
          glClear GL_COLOR_BUFFER_BIT OR GL_DEPTH_BUFFER_BIT      
          glLoadIdentity()
          
-         if g_pLoadedModel=0 then continue do
+         if g_pLoadedModel=0 then flip: continue do
          
          glScalef(1/-20, 1.0/-20, 1/20 )
             
@@ -337,13 +336,14 @@ namespace Viewer
          Try()
             if g_CurDraw < 0 then
                #ifdef UseVBO
-                  DrawVBO( iModelVBO , GL_TRIANGLES , iTrianglesCount )
+                  DrawColorVBO( iModelVBO , GL_TRIANGLES , iTrianglesCount )
                #else
                   glCallList(	iModel )
                #endif
                OldDraw = -1
             else
                RenderModel( g_pLoadedModel , false , , g_CurDraw )
+               RenderModel( g_pLoadedModel , true , , g_CurDraw )
                
                scope 'Render Snap IDs
                   static as PartSnap tSnapID
@@ -402,10 +402,14 @@ namespace Viewer
                end scope
                
                'SnapModel( g_pLoadedModel , tSnap , g_CurDraw )      
-            end if
-            'glCallList(	iBorders-(g_CurDraw>=0) )
+            end if            
             #ifdef UseVBO         
-               DrawVBO( iBorderVBO(iif(g_CurDraw>=0,1,0)) , GL_LINES , iBorderCount(iif(g_CurDraw>=0,1,0)) )         
+               if g_CurDraw < 0 then                  
+                  DrawColorVBO( iBorderVBO , GL_LINES , iBorderCount )         
+               else
+                  glColor4f(.5,.5,.5,.25)
+                  DrawVBO( iBorderVBO , GL_LINES , iBorderCount )         
+               end if
             #else
                glCallList(	iBorders-(g_CurDraw>=0) )
             #endif
@@ -487,6 +491,10 @@ namespace Viewer
          glDepthMask (GL_TRUE)
          
          'glPopMatrix()
+         flip
+         
+         var dTime = (timer-dRendertime)*1000
+         printf(!"Render time=%1.2fms (%i fps)   \r",dTime,cint(int(1000/dTime)))
          
       loop
       
