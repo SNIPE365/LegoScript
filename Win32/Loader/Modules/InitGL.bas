@@ -185,6 +185,7 @@ sub ResizeOpengGL( ScrWid as long , ScrHei as long )
    gluPerspective 45.0, ScrWid/ScrHei, 1, 1000.0*cScale   '' Calculate The Aspect Ratio Of The Window
    glMatrixMode GL_MODELVIEW                        '' Select The Modelview Matrix
 end sub
+
 function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    
    'screencontrol( fb.SET_GL_NUM_SAMPLES , 4 )
@@ -196,6 +197,7 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    flip
    dim as HWND hwndGFX
    screencontrol fb.GET_WINDOW_HANDLE , *cptr(uinteger ptr,@hwndGFX)   
+   InitRawInput( hwndGFX )
    
    #macro _InitExtension(_NAME) 
       _NAME = cast(any ptr, wglGetProcAddress(#_NAME))
@@ -230,7 +232,7 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    glEnable GL_BLEND
    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
    glAlphaFunc( GL_GREATER , 0.5 )
-   
+         
    'glPolygonMode( GL_FRONT_AND_BACK , GL_LINE )
    'GL_POINT, GL_LINE, and GL_FILL.    
       
@@ -240,7 +242,7 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    'glEnable(GL_MULTISAMPLE)
    'glEnable(GL_SAMPLE_COVERAGE)
    'fnglSampleCoverage(0.5, GL_FALSE)
-   glLineWidth(1.25)
+   glLineWidth(1.25)   
    
    'glEnable( GL_CULL_FACE )
    glDisable( GL_CULL_FACE )
@@ -248,7 +250,8 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    'glFrontFace( GL_CW ): glCullFace( GL_FRONT )
    
    glEnable(GL_POLYGON_OFFSET_FILL)
-   glPolygonOffset(1.0, 1/-40)   
+   glPolygonOffset(1.0, 1/-20)   
+   
    
    '============== light initialization ==============
     glEnable(GL_LIGHTING)

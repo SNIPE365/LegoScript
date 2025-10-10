@@ -449,327 +449,51 @@ end with
 dim as PartSnap tSnapID
 
 dim as long iOldCliWid , iOldCliHei
+dim as boolean g_FreeCam = false
 
-#if 1
-do
-   
-   'resize if window size change   
-   if IsIconic( hGfxWnd )=0 then
-      dim as RECT tRc : GetClientRect(hGfxWnd,@tRc)
-      var iCliWid = tRc.right , iCliHei = tRc.bottom      
-      if iCliWid < 64 then iCliWid = 64
-      if iCliHei < 48 then iCliHei = 48
-      if iOldCliWid <> iCliWid orelse iOldCliHei <> iCliHei then         
-         iOldCliWid = iCliWid : iOldCliHei = iCliHei         
-         ResizeOpengGL( iCliWid, iCliHei )         
-      end if
-   end if
+'///////////////////// free cam variables //////////////////
+static shared as single g_fCameraX,g_fCameraY,g_fCameraZ
+static shared as single g_fYaw = -160.0 , g_fPitch = 0.0 ' Start facing -Z (standard)
+static shared as single g_fFrontX,g_fFrontY,g_fFrontZ,g_fRightX,g_fRightY,g_fRightZ
+static shared as single g_fUpX=0.0 , g_fUpY=1.0 , g_fUpZ = 0.0 ' World Up
 
-   glClear GL_COLOR_BUFFER_BIT OR GL_DEPTH_BUFFER_BIT      
-   glLoadIdentity()   
-   glScalef(1/-20, 1.0/-20, 1/20 )
-   
-   static as long OldDraw = -2
-   if g_CurDraw <> -1 then
-      if OldDraw <> g_CurDraw then                        
-         var pSubPart = g_tModels( pModel->tParts(g_CurDraw)._1.lModelIndex ).pModel                  
-         SnapModel( pSubPart , tSnapID )      
-         SortSnap( tSnapID )
-      end if
-   elseif bEditMode then      
-      if OldDraw <> g_CurDraw then
-         SnapModel( pModel , tSnapID )      
-         SortSnap( tSnapID )
-      end if
-   end if
-      
-   '// Set light position (0, 0, 0)
-   dim as GLfloat lightPos(...) = {0,0,0, 1.0f}'; // (x, y, z, w), w=1 for positional light
-   glLightfv(GL_LIGHT0, GL_POSITION, @lightPos(0))
-         
-   'g_zFar
-   glTranslatef( -fPositionX , fPositionY , fPositionZ*(fZoom+4) ) '80*fZoom ) '/-5)
-   'glTranslatef( 0 , 0 , -80*(fZoom+4) )
-         
-   glRotatef fRotationY , -1.0 , 0.0 , 0
-   glRotatef fRotationX , 0   , -1.0 , 0
-         
-   glPushMatrix()
-   with tSz
-      'glTranslatef( (.xMin+.xMax)/-2  , (.yMin+.yMax)/-2 , (.zMin+.zMax)/-2 )
-   end with
-      
-   'glDisable( GL_LIGHTING )
-   glEnable( GL_DEPTH_TEST )
-   
-   g_fNX=-.95 : g_fNY=.95
-         
-   if g_CurDraw < 0 then
-      'render whole model
-      #ifdef UseVBO
-         DrawColorVBO( iModelVBO , GL_TRIANGLES , iTrianglesCount )
-      #else
-         glCallList(	iModel )
-      #endif
-   else
-      'render single part
-      RenderModel( pModel , false , , g_CurDraw )
-   end if
-   if bViewBorders then 
-      #ifdef UseVBO         
-         if g_CurDraw<0 then            
-            DrawColorVBO( iBorderVBO , GL_LINES , iBorderCount )
-         else
-            glColor4f(.5,.5,.5,.33)
-            DrawVBO( iBorderVBO , GL_LINES , iBorderCount )
-         end if
-      #else
-         glCallList(	iBorders-(g_CurDraw>=0) )
-      #endif
-   end if
-   
-   glEnable( GL_LIGHTING )
-   
-   #ifdef DebugShadow
-      dim as PartSnap tSnap
-      static as byte bOnce   
-      'if bOnce=0 then
-         'SnapModel( pModel , tSnap , 2 )
-         'bOnce=1
-      'else
-         SnapModel( pModel , tSnap , true )
-      'end if
-   #endif
-
-   #if 0
-      glEnable( GL_POLYGON_STIPPLE )
-      
-      'SnapModel( pModel , tSnap )
-      
-      #if 0 
-         glPushMatrix()
-         glTranslatef( 10 , -2f , 0 ) '/-5)
-         glRotatef( 90 , 1,0,0 )
-         glScalef( 2 , 2 , (4.0/6.0) ) 'square
-         'glScalef( 8f/7f , 8f/7f , (4.0/6.0)*(5f/7f) ) 'cylinder
-         glPolygonStipple(	cptr(glbyte ptr,@MaleStipple(0)) )   
-         glColor3f( 0 , 1 , 0 )
-         'glutSolidSphere( 6 , 18 , 7 ) 'male round (.5,.5,N\2)
-         glutSolidCube(6) 'male square (1,1,N)
-         glPopMatrix()
-      #endif
-      #if 0
-         glPushMatrix()
-         glTranslatef( 10 , -2f , 0 )
-         
-         glRotatef( 90 , 1,0,0 )
-         glRotatef( 45 , 0,0,1 ) 'square
-         glScalef( 1 , 1 , 4 )      
-         
-         glPolygonStipple(	cptr(glbyte ptr,@FeMaleStipple(0)) )
-         glColor3f( 1 , 0 , 0 )   
-         glutSolidTorus( 0.5 , 6 , 18 , 4  ) 'female "square" (.5,.5,N*8)
-         'glutSolidTorus( 0.5 , 6 , 18 , 18 ) 'female round? (.5,.5,N*8)
-         glPopMatrix()
-      #endif
-      
-      glDisable( GL_POLYGON_STIPPLE )
-   #endif
-   
-   glPopMatrix()
-   
-   glDepthMask (GL_FALSE)
-   if bBoundingBox then
-      glColor4f(0,1,0,.25)
-      with tSz
-         DrawLimitsCube( .xMin-1,.xMax+1 , .yMin-1,.yMax+1 , .zMin-1,.zMax+1 )      
-      end with
-   end if
-   
-   #if 0
-      var iCollisions = ubound(atCollision)
-      if iCollisions andalso instr(sFile,".dat")=0 then
-         glEnable( GL_POLYGON_STIPPLE )      
-         static as ulong aStipple(32-1)
-         dim as long iMove = (timer*8) and 7
-         for iY as long = 0 to 31         
-            var iN = iif(iY and 1,&h1414141414141414ll,&h4141414141414141ll)         
-            aStipple(iY) = iN shr ((iY+iMove) and 7)
-         next iY
-         glPolygonStipple(	cptr(glbyte ptr,@aStipple(0)) )
-         if (iMove and 2) then glColor4f(1,0,0,1) else glColor4f(0,0,0,1)
-         for I as long = 0 to iCollisions-1   
-            with atCollision(I)
-               DrawLimitsCube( .xMin-1,.xMax+1 , .yMin-1,.yMax+1 , .zMin-1,.zMax+1 )
-            end with
-         next I
-         glDisable( GL_POLYGON_STIPPLE )      
-      end if
-   #endif
-   glDepthMask (GL_TRUE)
-         
-   'glDisable( GL_DEPTH_TEST )
-   
-   #macro DrawConnectorName( _YOff )      
-      var sText = "" & N+1
-      if 1 then '.tOriMat.fScaleX then
-         glPushMatrix()
-         var fPX = .tPos.X , fPY = .tPos.Y , fPZ = .tPos.Z
-         with .tOriMat
-            dim as single fMatrix(15) = { _
-               .m(0) , .m(3) , .m(6) , 0 , _ 'X scale ,    0?   ,   0?    , 0 
-               .m(1) , .m(4) , .m(7) , 0 , _ '  0?    , Y Scale ,   0?    , 0 
-               .m(2) , .m(5) , .m(8) , 0 , _ '  0?    ,    0?   , Z Scale , 0 
-                fpX  ,  fPY  ,  fpZ  , 1  }  ' X Pos  ,  Y Pos  ,  Z Pos  , 1 
-            glMultMatrixf( @fMatrix(0) )
-            glTranslateF(0,_YOff,0)
-         end with
-         glDrawText( sText , 0,0,0 , 8/len(sText),8 , true )
-         glPopMatrix()
-      else         
-         'glDrawText( sText , .tPos.X,.tPos.Y+(_YOff),.tPos.Z , 8/len(sText),8 , true )
-      end if
-   #endmacro
-
-   if g_CurDraw <> -1 orelse bEditMode then      
-      glPushMatrix()
-      if g_CurDraw <> -1 then
-         with pModel->tParts(g_CurDraw)._1
-            dim as single fMatrix(15) = { _
-               .fA , .fD , .fG , 0 , _ 'X scale ,    0?   ,   0?    , 0 
-               .fB , .fE , .fH , 0 , _ '  0?    , Y Scale ,   0?    , 0 
-               .fC , .fF , .fI , 0 , _ '  0?    ,    0?   , Z Scale , 0 
-               .fX , .fY , .fZ , 1 }   ' X Pos  ,  Y Pos  ,  Z Pos  , 1 
-            glMultMatrixf( @fMatrix(0) )
-         end with
-      end if
-      with tSnapID         
-         glColor4f(0,1,0,1)                  
-         for N as long = 0 to .lStudCnt-1
-            with .pStud[N]               
-               DrawConnectorName(-5)
-            end with         
-         next N                  
-         glColor4f(1,0,0,1)
-         for N as long = 0 to .lClutchCnt-1
-            with .pClutch[N]
-               DrawConnectorName(0)
-            end with
-         next N
-      end with
-      OldDraw = g_CurDraw
-      glPopMatrix()
-   end if
-   
-   glClear GL_DEPTH_BUFFER_BIT
-               
-   #define DrawMarker( _X , _Y , _Z ) DrawLimitsCube( (_X)-2,(_X)+2 , (_Y)-2,(_Y)+2 , (_Z)-2,(_Z)+2 )      
-   'glColor4f(1,.5,.25,.66) : DrawMarker( 0,0,0 )
-         
-   
-   'glColor4f(.25,.5,1,.66) : DrawMarker( -50,0,-50 )
-   
-            
-   Dim e as fb.EVENT = any
-   while (ScreenEvent(@e))
-      Select Case e.type
-      Case fb.EVENT_MOUSE_MOVE         
-         var fX = iif( fZoom<0 , e.dx/((fZoom*fZoom)+1) , e.dx*((fZoom*fzoom)+1) )
-         var fY = iif( fZoom<0 , e.dy/((fZoom*fZoom)+1) , e.dy*((fZoom*fZoom)+1) )
-         if bLeftPressed  then fRotationX += (e.dx/12) : fRotationY += (e.dy/12)
-         if bRightPressed then fPositionX += (fX) * g_zFar/100 : fPositionY += (fY) * g_zFar/100         
-      case fb.EVENT_MOUSE_WHEEL
-         iWheel = e.z-iPrevWheel
-         fZoom = -3+(-iWheel/64)
-         puts("" & fZoom)
-      case fb.EVENT_MOUSE_BUTTON_PRESS
-         if e.button = fb.BUTTON_MIDDLE then 
-            iPrevWheel = iWheel
-            fZoom = -3
-         end if
-         if e.button = fb.BUTTON_LEFT   then bLeftPressed  = true
-         if e.button = fb.BUTTON_RIGHT  then bRightPressed = true
-      case fb.EVENT_MOUSE_BUTTON_RELEASE
-         if e.button = fb.BUTTON_LEFT   then bLeftPressed  = false
-         if e.button = fb.BUTTON_RIGHT  then bRightPressed = false      
-      case fb.EVENT_KEY_PRESS
-         select case e.ascii
-         case 32
-            bViewBorders = not bViewBorders
-         case 8
-            if bBoundingBox then
-               g_CurPart = -1
-               printf(!"g_CurPart = %i    \r",g_CurPart)
-               dim as PartSize tSzTemp
-               SizeModel( pModel , tSzTemp , g_CurPart )
-               tSz = tSzTemp
-            else
-               g_CurDraw = -1
-               printf(!"g_CurDraw = %i    \r",g_CurDraw)
-            end if               
-         case asc("="),asc("+")
-            if bBoundingBox then
-               g_CurPart = ((g_CurPart+2) mod (g_PartCount+1))-1
-               printf(!"g_CurPart = %i    \r",g_CurPart)
-               dim as PartSize tSzTemp
-               SizeModel( pModel , tSzTemp , g_CurPart )
-               tSz = tSzTemp
-            else
-               var iOrg = g_CurDraw
-               do
-                  g_CurDraw = ((g_CurDraw+2) mod (g_DrawCount+1))-1
-                  if g_CurDraw=-1 orelse pModel->tParts(g_CurDraw).bType = 1 orelse g_CurDraw = iOrg then exit do
-               loop
-               printf(!"g_CurDraw = %i    \r",g_CurDraw)
-            end if
-         case asc("-"),asc("_")
-            if bBoundingBox then
-               g_CurPart = ((g_CurPart+g_PartCount+1) mod (g_PartCount+1))-1
-               printf(!"g_CurPart = %i    \r",g_CurPart)
-               dim as PartSize tSzTemp
-               SizeModel( pModel , tSzTemp , g_CurPart )
-               tSz = tSzTemp
-            else
-               var iOrg = g_CurDraw
-               do
-                  g_CurDraw = ((g_CurDraw+g_DrawCount+1) mod (g_DrawCount+1))-1
-                  if g_CurDraw=-1 orelse pModel->tParts(g_CurDraw).bType = 1 orelse g_CurDraw = iOrg then exit do
-               loop
-               printf(!"g_CurDraw = %i    \r",g_CurDraw)
-            end if               
-         end select
-         select case e.scancode
-         case fb.SC_TAB
-            bBoundingBox = not bBoundingBox
-         end select
-      case fb.EVENT_WINDOW_CLOSE
-         exit do
-      end select
-   wend
-               
-   flip   
-   static as double dFps : iFps += 1   
-   if abs(timer-dFps)>1 then
-      dFps = timer      
-      'WindowTitle("Fps: " & cint(1/(timer-dRot)))
-      WindowTitle("Fps: " & iFps): iFps = 0
-      'if dFps=0 then dFps = (timer-dRot) else dFps = (dFps+(timer-dRot))/2
-   else
-      sleep 1
-   end if
-   
-   'WindowTitle("Fps: " & cint(1/(timer-dRot)))
-   
-   'fRotation -= (timer-dRot)*30
-   dRot = timer
-   
-loop until multikey(fb.SC_ESCAPE)
-#else
 glEnable( GL_LIGHTING )
 glEnable( GL_DEPTH_TEST )
-dim as single fCameraX,fCameraY,fCameraZ
-dim as single fAngleX,fAngleZ
-dim as boolean g_bFocus = true
+
+const cMovementSpeed = 20f , cLookSpeed = 1/20f
+const cPI180 = atn(1)/45
+
+sub UpdateCameraVectors()
+    
+    dim as single fRadYaw = g_fYaw * cPI180 , fRadPitch = g_fPitch * cPI180
+
+    ' Calculate Front Vector (D)
+    g_fFrontX = cos(fRadYaw) * cos(fRadPitch)
+    g_fFrontY = sin(fRadPitch)
+    g_fFrontZ = sin(fRadYaw) * cos(fRadPitch)
+
+    ' Note: You'd normally normalize Front, but since Yaw/Pitch angles are unit-sphere
+    ' based, the vector is already normalized.
+
+    ' Calculate Right Vector (R) using Cross Product (Front x World Up)
+    ' Cross-product: (a2*b3 - a3*b2, a3*b1 - a1*b3, a1*b2 - a2*b1)
+    ' a=Front, b=Up(0, 1, 0)
+    g_fRightX = g_fFrontY * g_fUpZ - g_fFrontZ * g_fUpY  ' 0 - FrontZ * 1 = -FrontZ
+    g_fRightY = g_fFrontZ * g_fUpX - g_fFrontX * g_fUpZ  ' 0 - 0 = 0
+    g_fRightZ = g_fFrontX * g_fUpY - g_fFrontY * g_fUpX  ' FrontX * 1 - 0 = FrontX
+
+    ' Normalize the Right vector (essential for consistent strafing speed)
+    dim fLen as single = sqr(g_fRightX * g_fRightX + g_fRightY * g_fRightY + g_fRightZ * g_fRightZ)
+    if fLen <> 0 then
+        g_fRightX /= fLen
+        ' RightY = 0 is fine
+        g_fRightZ /= fLen
+    end if
+end sub
+dim as boolean g_bFocus = true , g_bNeedUpdate = true , g_bLocked = true
+dim as boolean bMoveForward , bMoveBackward , bStrafeLeft , bStrafeRight
+'///////////////////////////////////////////////////////////
+
 do
    
    'resize if window size change   
@@ -783,52 +507,377 @@ do
          ResizeOpengGL( iCliWid, iCliHei )         
       end if
    end if
-
+      
    glClear GL_COLOR_BUFFER_BIT OR GL_DEPTH_BUFFER_BIT      
    glLoadIdentity()   
    glScalef(1/-20, 1.0/-20, 1/20 )
-            
-   '// Set light position (0, 0, 0)
-   dim as GLfloat lightPos(...) = {0,0,0, 1.0f}'; // (x, y, z, w), w=1 for positional light
-   glLightfv(GL_LIGHT0, GL_POSITION, @lightPos(0))
    
-   glTranslatef( -fCameraX , fCameraY , fCameraZ )
+   if g_FreeCam then
+      if g_bNeedUpdate then g_bNeedUpdate=false : UpdateCameraVectors()   
+      dim as single fTargetX=g_fCameraX+g_fFrontX , fTargetY=g_fCameraY+g_fFrontY , fTargetZ=g_fCameraZ+g_fFrontZ
+      
+      dim as GLfloat lightPos(...) = {g_fCameraX,g_fCameraY,g_fCameraZ, 1.0f}'; // (x, y, z, w), w=1 for positional light
+      glLightfv(GL_LIGHT0, GL_POSITION, @lightPos(0))
          
-   'glRotatef fRotationY , -1.0 , 0.0 , 0
-   'glRotatef fRotationX , 0   , -1.0 , 0
+      ' gluLookAt(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ)
+      gluLookAt( _
+         g_fCameraX, g_fCameraY, g_fCameraZ, _  ' Camera Position (P)
+         fTargetX  , fTargetY  , fTargetZ  , _  ' Look Target (P + D)
+         g_fUpX    , g_fUpY    , g_fUpZ      _  ' World Up Vector
+      )
          
-   'glDisable( GL_LIGHTING )
-   
-   #ifdef UseVBO
-      DrawColorVBO( iModelVBO , GL_TRIANGLES , iTrianglesCount )
-      if bViewBorders then DrawColorVBO( iBorderVBO , GL_LINES , iBorderCount )
-   #else
-      glCallList(	iModel )
-      if bViewBorders then glCallList(	iBorders-(g_CurDraw>=0) )      
-   #endif
-            
-   Dim e as fb.EVENT = any
-   dim as boolean bSkipMouse = not g_bFocus
-   while (ScreenEvent(@e))
-      Select Case e.type
-      Case fb.EVENT_MOUSE_MOVE
-         if bSkipMouse=false then
-            if e.x <> (iOldCliWid\2) orelse e.y <> (iOldCliHei\2) then
-               setmouse( (iOldCliWid\2) , (iOldCliHei\2) )
-               printf(!"%i , %i\n",e.dx,e.dy)
-            end if         
+      #ifdef UseVBO
+         DrawColorVBO( iModelVBO , GL_TRIANGLES , iTrianglesCount )
+         if bViewBorders then DrawColorVBO( iBorderVBO , GL_LINES , iBorderCount )
+      #else
+         glCallList(	iModel )
+         if bViewBorders then glCallList(	iBorders-(g_CurDraw>=0) )      
+      #endif
+      
+      flip 
+      
+      Dim e as fb.EVENT = any
+      dim as boolean bSkipMouse = not g_bFocus
+      
+      #define fSpd cMovementSpeed
+      if bMoveForward  then g_fCameraX += g_fFrontX*fSpd : g_fCameraY += g_fFrontY*fSpd : g_fCameraZ += g_fFrontZ*fSpd   
+      if bMoveBackward then g_fCameraX -= g_fFrontX*fSpd : g_fCameraY -= g_fFrontY*fSpd : g_fCameraZ -= g_fFrontZ*fSpd   
+      if bStrafeLeft   then g_fCameraX += g_fRightX*fSpd : g_fCameraZ += g_fRightZ*fSpd
+      if bStrafeRight  then g_fCameraX -= g_fRightX*fSpd : g_fCameraZ -= g_fRightZ*fSpd
+      
+      dim as long lDX=any,lDY=any : GetMouseDelta( lDX, lDY )
+      if bSkipMouse=false andalso (lDX or lDY)<>0 then
+         'puts(lDX & "," & lDY)
+         'setmouse( (iOldCliWid\2) , (iOldCliHei\2) )
+         'setmouse ,,,true
+         g_fYaw   += lDX * -cLookSpeed
+         g_fPitch -= lDY * -cLookSpeed ' Assuming inverted Y-axis
+         if g_fPitch >  45.0 then g_fPitch =  45.0
+         if g_fPitch < -45.0 then g_fPitch = -45.0
+         g_bNeedUpdate = true      
+      end if            
+      
+      while (ScreenEvent(@e))
+         Select Case e.type         
+         case fb.EVENT_MOUSE_BUTTON_PRESS
+            g_bLocked = true : setmouse ,,,g_bLocked
+         case fb.EVENT_KEY_PRESS
+            select case e.ascii
+            case 13
+               g_FreeCam = not g_FreeCam
+               setmouse ,,,false
+            case 8: g_bLocked = false : setmouse ,,,g_bLocked
+            case 32: bViewBorders = not bViewBorders
+            end select
+            select case e.scancode
+            case fb.SC_W : bMoveForward  = true
+            case fb.SC_S : bMoveBackward = true
+            case fb.SC_A : bStrafeLeft   = true
+            case fb.SC_D : bStrafeRight  = true
+            end select
+         case fb.EVENT_KEY_RELEASE
+            select case e.scancode
+            case fb.SC_W : bMoveForward  = false
+            case fb.SC_S : bMoveBackward = false
+            case fb.SC_A : bStrafeLeft   = false
+            case fb.SC_D : bStrafeRight  = false
+            end select      
+         case fb.EVENT_WINDOW_GOT_FOCUS
+            g_bFocus = true : bSkipMouse = 1
+            setmouse ,,,g_bLocked
+         case fb.EVENT_WINDOW_LOST_FOCUS
+            setmouse ,,,false
+            g_bFocus = false : bSkipMouse = 1
+         case fb.EVENT_WINDOW_CLOSE
+            exit do
+         end select
+      wend
+                  
+   else   
+      static as long OldDraw = -2
+      if g_CurDraw <> -1 then
+         if OldDraw <> g_CurDraw then                        
+            var pSubPart = g_tModels( pModel->tParts(g_CurDraw)._1.lModelIndex ).pModel                  
+            SnapModel( pSubPart , tSnapID )      
+            SortSnap( tSnapID )
          end if
-      Case fb.EVENT_WINDOW_GOT_FOCUS
-         g_bFocus = true : bSkipMouse = 1
-         setmouse( (iOldCliWid\2) , (iOldCliHei\2) )         
-      Case fb.EVENT_WINDOW_LOST_FOCUS
-         g_bFocus = false : bSkipMouse = 1
-      case fb.EVENT_WINDOW_CLOSE
-         exit do
-      end select
-   wend
+      elseif bEditMode then      
+         if OldDraw <> g_CurDraw then
+            SnapModel( pModel , tSnapID )      
+            SortSnap( tSnapID )
+         end if
+      end if
+         
+      '// Set light position (0, 0, 0)
+      dim as GLfloat lightPos(...) = {0,0,0, 1.0f}'; // (x, y, z, w), w=1 for positional light
+      glLightfv(GL_LIGHT0, GL_POSITION, @lightPos(0))
+            
+      'g_zFar
+      glTranslatef( -fPositionX , fPositionY , fPositionZ*(fZoom+4) ) '80*fZoom ) '/-5)
+      'glTranslatef( 0 , 0 , -80*(fZoom+4) )
+            
+      glRotatef fRotationY , -1.0 , 0.0 , 0
+      glRotatef fRotationX , 0   , -1.0 , 0
+            
+      glPushMatrix()
+      with tSz
+         'glTranslatef( (.xMin+.xMax)/-2  , (.yMin+.yMax)/-2 , (.zMin+.zMax)/-2 )
+      end with
+         
+      'glDisable( GL_LIGHTING )
+      glEnable( GL_DEPTH_TEST )
+      
+      g_fNX=-.95 : g_fNY=.95
+            
+      if g_CurDraw < 0 then
+         'render whole model
+         #ifdef UseVBO
+            DrawColorVBO( iModelVBO , GL_TRIANGLES , iTrianglesCount )
+         #else
+            glCallList(	iModel )
+         #endif
+      else
+         'render single part
+         RenderModel( pModel , false , , g_CurDraw )
+      end if
+      if bViewBorders then 
+         #ifdef UseVBO         
+            if g_CurDraw<0 then            
+               DrawColorVBO( iBorderVBO , GL_LINES , iBorderCount )
+            else
+               glColor4f(.5,.5,.5,.33)
+               DrawVBO( iBorderVBO , GL_LINES , iBorderCount )
+            end if
+         #else
+            glCallList(	iBorders-(g_CurDraw>=0) )
+         #endif
+      end if
+      
+      glEnable( GL_LIGHTING )
+      
+      #ifdef DebugShadow
+         dim as PartSnap tSnap
+         static as byte bOnce   
+         'if bOnce=0 then
+            'SnapModel( pModel , tSnap , 2 )
+            'bOnce=1
+         'else
+            SnapModel( pModel , tSnap , true )
+         'end if
+      #endif
+   
+      #if 0
+         glEnable( GL_POLYGON_STIPPLE )
+         
+         'SnapModel( pModel , tSnap )
+         
+         #if 0 
+            glPushMatrix()
+            glTranslatef( 10 , -2f , 0 ) '/-5)
+            glRotatef( 90 , 1,0,0 )
+            glScalef( 2 , 2 , (4.0/6.0) ) 'square
+            'glScalef( 8f/7f , 8f/7f , (4.0/6.0)*(5f/7f) ) 'cylinder
+            glPolygonStipple(	cptr(glbyte ptr,@MaleStipple(0)) )   
+            glColor3f( 0 , 1 , 0 )
+            'glutSolidSphere( 6 , 18 , 7 ) 'male round (.5,.5,N\2)
+            glutSolidCube(6) 'male square (1,1,N)
+            glPopMatrix()
+         #endif
+         #if 0
+            glPushMatrix()
+            glTranslatef( 10 , -2f , 0 )
+            
+            glRotatef( 90 , 1,0,0 )
+            glRotatef( 45 , 0,0,1 ) 'square
+            glScalef( 1 , 1 , 4 )      
+            
+            glPolygonStipple(	cptr(glbyte ptr,@FeMaleStipple(0)) )
+            glColor3f( 1 , 0 , 0 )   
+            glutSolidTorus( 0.5 , 6 , 18 , 4  ) 'female "square" (.5,.5,N*8)
+            'glutSolidTorus( 0.5 , 6 , 18 , 18 ) 'female round? (.5,.5,N*8)
+            glPopMatrix()
+         #endif
+         
+         glDisable( GL_POLYGON_STIPPLE )
+      #endif
+      
+      glPopMatrix()
+      
+      glDepthMask (GL_FALSE)
+      if bBoundingBox then
+         glColor4f(0,1,0,.25)
+         with tSz
+            DrawLimitsCube( .xMin-1,.xMax+1 , .yMin-1,.yMax+1 , .zMin-1,.zMax+1 )      
+         end with
+      end if
+      
+      #if 0
+         var iCollisions = ubound(atCollision)
+         if iCollisions andalso instr(sFile,".dat")=0 then
+            glEnable( GL_POLYGON_STIPPLE )      
+            static as ulong aStipple(32-1)
+            dim as long iMove = (timer*8) and 7
+            for iY as long = 0 to 31         
+               var iN = iif(iY and 1,&h1414141414141414ll,&h4141414141414141ll)         
+               aStipple(iY) = iN shr ((iY+iMove) and 7)
+            next iY
+            glPolygonStipple(	cptr(glbyte ptr,@aStipple(0)) )
+            if (iMove and 2) then glColor4f(1,0,0,1) else glColor4f(0,0,0,1)
+            for I as long = 0 to iCollisions-1   
+               with atCollision(I)
+                  DrawLimitsCube( .xMin-1,.xMax+1 , .yMin-1,.yMax+1 , .zMin-1,.zMax+1 )
+               end with
+            next I
+            glDisable( GL_POLYGON_STIPPLE )      
+         end if
+      #endif
+      glDepthMask (GL_TRUE)
+            
+      'glDisable( GL_DEPTH_TEST )
+      
+      #macro DrawConnectorName( _YOff )      
+         var sText = "" & N+1
+         if 1 then '.tOriMat.fScaleX then
+            glPushMatrix()
+            var fPX = .tPos.X , fPY = .tPos.Y , fPZ = .tPos.Z
+            with .tOriMat
+               dim as single fMatrix(15) = { _
+                  .m(0) , .m(3) , .m(6) , 0 , _ 'X scale ,    0?   ,   0?    , 0 
+                  .m(1) , .m(4) , .m(7) , 0 , _ '  0?    , Y Scale ,   0?    , 0 
+                  .m(2) , .m(5) , .m(8) , 0 , _ '  0?    ,    0?   , Z Scale , 0 
+                   fpX  ,  fPY  ,  fpZ  , 1  }  ' X Pos  ,  Y Pos  ,  Z Pos  , 1 
+               glMultMatrixf( @fMatrix(0) )
+               glTranslateF(0,_YOff,0)
+            end with
+            glDrawText( sText , 0,0,0 , 8/len(sText),8 , true )
+            glPopMatrix()
+         else         
+            'glDrawText( sText , .tPos.X,.tPos.Y+(_YOff),.tPos.Z , 8/len(sText),8 , true )
+         end if
+      #endmacro
+   
+      if g_CurDraw <> -1 orelse bEditMode then      
+         glPushMatrix()
+         if g_CurDraw <> -1 then
+            with pModel->tParts(g_CurDraw)._1
+               dim as single fMatrix(15) = { _
+                  .fA , .fD , .fG , 0 , _ 'X scale ,    0?   ,   0?    , 0 
+                  .fB , .fE , .fH , 0 , _ '  0?    , Y Scale ,   0?    , 0 
+                  .fC , .fF , .fI , 0 , _ '  0?    ,    0?   , Z Scale , 0 
+                  .fX , .fY , .fZ , 1 }   ' X Pos  ,  Y Pos  ,  Z Pos  , 1 
+               glMultMatrixf( @fMatrix(0) )
+            end with
+         end if
+         with tSnapID         
+            glColor4f(0,1,0,1)                  
+            for N as long = 0 to .lStudCnt-1
+               with .pStud[N]               
+                  DrawConnectorName(-5)
+               end with         
+            next N                  
+            glColor4f(1,0,0,1)
+            for N as long = 0 to .lClutchCnt-1
+               with .pClutch[N]
+                  DrawConnectorName(0)
+               end with
+            next N
+         end with
+         OldDraw = g_CurDraw
+         glPopMatrix()
+      end if
+      
+      glClear GL_DEPTH_BUFFER_BIT
+                  
+      #define DrawMarker( _X , _Y , _Z ) DrawLimitsCube( (_X)-2,(_X)+2 , (_Y)-2,(_Y)+2 , (_Z)-2,(_Z)+2 )      
+      'glColor4f(1,.5,.25,.66) : DrawMarker( 0,0,0 )
+            
+      
+      'glColor4f(.25,.5,1,.66) : DrawMarker( -50,0,-50 )
+      
                
-   flip   
+      Dim e as fb.EVENT = any
+      while (ScreenEvent(@e))
+         Select Case e.type
+         Case fb.EVENT_MOUSE_MOVE         
+            var fX = iif( fZoom<0 , e.dx/((fZoom*fZoom)+1) , e.dx*((fZoom*fzoom)+1) )
+            var fY = iif( fZoom<0 , e.dy/((fZoom*fZoom)+1) , e.dy*((fZoom*fZoom)+1) )
+            if bLeftPressed  then fRotationX += (e.dx/12) : fRotationY += (e.dy/12)
+            if bRightPressed then fPositionX += (fX) * g_zFar/100 : fPositionY += (fY) * g_zFar/100         
+         case fb.EVENT_MOUSE_WHEEL
+            iWheel = e.z-iPrevWheel
+            fZoom = -3+(-iWheel/64)
+            puts("" & fZoom)
+         case fb.EVENT_MOUSE_BUTTON_PRESS
+            if e.button = fb.BUTTON_MIDDLE then 
+               iPrevWheel = iWheel
+               fZoom = -3
+            end if
+            if e.button = fb.BUTTON_LEFT   then bLeftPressed  = true
+            if e.button = fb.BUTTON_RIGHT  then bRightPressed = true
+         case fb.EVENT_MOUSE_BUTTON_RELEASE
+            if e.button = fb.BUTTON_LEFT   then bLeftPressed  = false
+            if e.button = fb.BUTTON_RIGHT  then bRightPressed = false      
+         case fb.EVENT_KEY_PRESS
+            select case e.ascii
+            case 13: 
+               g_FreeCam = not g_FreeCam : setmouse ,,,g_bLocked
+               dim as long lDummy=any : GetMouseDelta(lDummy,lDummy)
+            case 32: bViewBorders = not bViewBorders
+            case 8
+               if bBoundingBox then
+                  g_CurPart = -1
+                  printf(!"g_CurPart = %i    \r",g_CurPart)
+                  dim as PartSize tSzTemp
+                  SizeModel( pModel , tSzTemp , g_CurPart )
+                  tSz = tSzTemp
+               else
+                  g_CurDraw = -1
+                  printf(!"g_CurDraw = %i    \r",g_CurDraw)
+               end if               
+            case asc("="),asc("+")
+               if bBoundingBox then
+                  g_CurPart = ((g_CurPart+2) mod (g_PartCount+1))-1
+                  printf(!"g_CurPart = %i    \r",g_CurPart)
+                  dim as PartSize tSzTemp
+                  SizeModel( pModel , tSzTemp , g_CurPart )
+                  tSz = tSzTemp
+               else
+                  var iOrg = g_CurDraw
+                  do
+                     g_CurDraw = ((g_CurDraw+2) mod (g_DrawCount+1))-1
+                     if g_CurDraw=-1 orelse pModel->tParts(g_CurDraw).bType = 1 orelse g_CurDraw = iOrg then exit do
+                  loop
+                  printf(!"g_CurDraw = %i    \r",g_CurDraw)
+               end if
+            case asc("-"),asc("_")
+               if bBoundingBox then
+                  g_CurPart = ((g_CurPart+g_PartCount+1) mod (g_PartCount+1))-1
+                  printf(!"g_CurPart = %i    \r",g_CurPart)
+                  dim as PartSize tSzTemp
+                  SizeModel( pModel , tSzTemp , g_CurPart )
+                  tSz = tSzTemp
+               else
+                  var iOrg = g_CurDraw
+                  do
+                     g_CurDraw = ((g_CurDraw+g_DrawCount+1) mod (g_DrawCount+1))-1
+                     if g_CurDraw=-1 orelse pModel->tParts(g_CurDraw).bType = 1 orelse g_CurDraw = iOrg then exit do
+                  loop
+                  printf(!"g_CurDraw = %i    \r",g_CurDraw)
+               end if               
+            end select
+            select case e.scancode
+            case fb.SC_TAB
+               bBoundingBox = not bBoundingBox
+            end select
+         case fb.EVENT_WINDOW_CLOSE
+            exit do
+         end select
+      wend
+      
+      flip
+      
+   end if
+               
    static as double dFps : iFps += 1   
    if abs(timer-dFps)>1 then
       dFps = timer      
@@ -845,6 +894,6 @@ do
    dRot = timer
    
 loop until multikey(fb.SC_ESCAPE)
-#endif
+
 
 

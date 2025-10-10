@@ -14,7 +14,7 @@ extern GfxWin32(290) alias "fb_win32" as any ptr
 namespace gfx
   dim shared as long lOrgFbProc,lOldStyle,lScreenFlags
   dim shared as integer g_iScrWid,g_iScrHei,g_lFirstSize,g_iAspect,g_iOffLeft,g_iOffTop
-  dim shared as integer g_iCliWid,g_iCliHei
+  dim shared as integer g_iCliWid,g_iCliHei,g_DeltaX,g_DeltaY
   dim shared as byte g_Temp,g_Fullscreen
   dim shared as string g_sGfxDriver
   dim shared as COLORREF g_BorderColor 
@@ -84,6 +84,39 @@ namespace gfx
       xPos = cshort((xPos*g_iScrWid)\fbcli.Right)
       yPos = cshort((yPos*g_iScrHei)\fbcli.Bottom)      
       lParam = MAKELONG(cushort(xPos),cushort(yPos))
+    case WM_INPUT
+      '// Determine the size of the raw input data buffer needed
+      'dim as ulong dwSize = 0
+      'GetRawInputData(cast(HRAWINPUT,lParam), RID_INPUT, NULL, @dwSize, sizeof(RAWINPUTHEADER))            
+      '// Allocate memory for the raw input data
+      static as ubyte bBuff(1023) 'lpb
+      dim lpb as LPBYTE = @bBuff(0), dwSize as ulong = 1024
+      if lpb = NULL then return 0 '// Allocation failed
+      '// Get the actual data
+      if GetRawInputData(cast(HRAWINPUT,lParam), RID_INPUT, lpb, @dwSize, sizeof(RAWINPUTHEADER))=0 then
+         puts("Failed!")
+      end if
+      '// Cast the data to the RAWINPUT structure
+      dim as RAWINPUT ptr raw = cast(RAWINPUT ptr,lpb)
+      '// Check if the device is a mouse
+      if raw->header.dwType = RIM_TYPEMOUSE then         
+         with raw->data.mouse
+            static as long lMouseX,lMouseY         
+            dim as long deltaX = .lLastX , deltaY = .lLastY
+            if (.usFlags and MOUSE_MOVE_ABSOLUTE) then
+               deltaX \= (65536\768) : DeltaY \= (65536\768)
+               swap lMouseX,deltaX : swap lMouseY,deltaY
+               deltaX = lMouseX-deltaX : deltaY = lMouseY-deltaY
+            else
+               lMouseX += deltaX : lMouseY += deltaY
+            end if
+            if deltaX < 8192 andalso deltaY < 8192 then
+               InterlockedExchangeAdd( @g_DeltaX , deltaX )
+               InterlockedExchangeAdd( @g_DeltaY , deltaY )
+            end if
+         end with
+      end if
+      return 0' // Must return 0 to indicate the WM_INPUT message has been processed
     case WM_MOUSEMOVE      
       var xPos = cshort(LOWORD(lParam)),yPos = cshort(HIWORD(lParam))      
       dim as rect fbcli = any: GetClientRect(hwnd,@fbcli)            
@@ -228,5 +261,25 @@ function _SetMouse( x As long = _UNUSED, y As long = _UNUSED, visibility As long
 end function
 #undef setmouse
 #define setmouse _setmouse
+
+function InitRawInput( hWnd as HWND ) as boolean
+   
+   dim as RAWINPUTDEVICE rid(1-1)
+
+   '1. Setup for the Mouse Device
+   with rid(0)
+    .usUsagePage = &h01            ' Generic Desktop Controls (Hut usage page for mouse)
+    .usUsage     = &h02            ' Mouse (Hut usage for mouse)
+    .dwFlags     = RIDEV_INPUTSINK ' RIDEV_INPUTSINK ensures WM_INPUT messages are received even if the window is not in the foreground.
+    .hwndTarget  = hWnd            ' The window handle that will receive the WM_INPUT messages
+   end with
+   '2. Register the device
+   return RegisterRawInputDevices(@rid(0), 1, sizeof(rid(0)))    
+end function
+sub GetMouseDelta( byref lX as long , byref lY as long )
+   lX = gfx.g_DeltaX : lY = gfx.g_DeltaY
+   InterlockedExchangeAdd( @gfx.g_DeltaX , -lX )
+   InterlockedExchangeAdd( @gfx.g_DeltaY , -lY )
+end sub
   
 
