@@ -256,9 +256,6 @@ static shared as single g_fYaw = -160.0 , g_fPitch = 0.0 ' Start facing -Z (stan
 static shared as single g_fFrontX,g_fFrontY,g_fFrontZ,g_fRightX,g_fRightY,g_fRightZ
 static shared as single g_fUpX=0.0 , g_fUpY=1.0 , g_fUpZ = 0.0 ' World Up
 
-glEnable( GL_LIGHTING )
-glEnable( GL_DEPTH_TEST )
-
 const cMovementSpeed = 2f , cLookSpeed = 1/20f
 const cPI180 = atn(1)/45
 
@@ -290,13 +287,13 @@ sub UpdateCameraVectors()
     end if
 end sub
 dim as boolean g_bFocus = true , g_bNeedUpdate = true , g_bLocked = false , g_bRotate = false
-dim as boolean bMoveForward , bMoveBackward , bStrafeLeft , bStrafeRight
+dim as boolean bMoveForward , bMoveBackward , bStrafeLeft , bStrafeRight , bMoveUp , bMoveDown
 '///////////////////////////////////////////////////////////
 
 dim as single fRotationX = 120 , fRotationY = 20
 dim as single fPositionX , fPositionY , fPositionZ , fZoom = -3
 dim as long iWheel , iPrevWheel , g_CurDraw = -1
-dim as boolean bBoundingBox,bViewBorders=true
+dim as boolean bBoundingBox,bViewBorders=true,bLighting=false
 dim as boolean bLeftPressed,bRightPressed,bWheelPressed
 dim as hwnd hGfxWnd
 dim as boolean g_FreeCam = false  
@@ -372,7 +369,11 @@ do
    
    puts("Load Model Time: " & timer-dLoadTIme)   
    if sEndsExt=".dat" then bEditMode = true   
-   if hGfxWnd=0 then  hGfxWnd = InitOpenGL()
+   if hGfxWnd=0 then
+      hGfxWnd = InitOpenGL()
+      glDisable( GL_LIGHTING )
+      glEnable( GL_DEPTH_TEST )
+   end if
    
    'glPolygonMode( GL_FRONT_AND_BACK, GL_LINE )
    dim as long g_DrawCount = pModel->iPartCount
@@ -548,6 +549,8 @@ do
          if bMoveBackward then g_fCameraX -= g_fFrontX*fSpd : g_fCameraY -= g_fFrontY*fSpd : g_fCameraZ -= g_fFrontZ*fSpd   
          if bStrafeLeft   then g_fCameraX += g_fRightX*fSpd : g_fCameraZ += g_fRightZ*fSpd
          if bStrafeRight  then g_fCameraX -= g_fRightX*fSpd : g_fCameraZ -= g_fRightZ*fSpd
+         if bMoveUp       then g_fCameraY -= fSpd
+         if bMoveDown     then g_fCameraY += fSpd
          
          if g_bLocked then
             dim as long lDX=any,lDY=any : GetMouseDelta( lDX, lDY )
@@ -578,21 +581,31 @@ do
                case 8: 
                   g_fCameraX = 0 : g_fCameraY = 0 : g_fCameraZ = 0
                'case 8: if g_bLocked then g_bLocked = false : setmouse ,,,g_bLocked
-               case 32: bViewBorders = not bViewBorders
+               case asc("B")-asc("@")
+                  bViewBorders = not bViewBorders
+                  printf(!"Borders: %s\n",iif(bViewBorders,"ENABLED","DISABLED"))
+               case asc("L")-asc("@")
+                  bLighting = not bLighting
+                  printf(!"Lighting: %s\n",iif(bLighting,"ENABLED","DISABLED"))
+                  if bLighting then glEnable(GL_LIGHTING) else glDIsable(GL_LIGHTING)
                end select
                select case e.scancode
-               case fb.SC_F5 : exit do 'reload
-               case fb.SC_W  : bMoveForward  = true
-               case fb.SC_S  : bMoveBackward = true
-               case fb.SC_A  : bStrafeLeft   = true
-               case fb.SC_D  : bStrafeRight  = true
+               case fb.SC_F5     : exit do 'reload
+               case fb.SC_W      : bMoveForward  = true
+               case fb.SC_S      : bMoveBackward = true
+               case fb.SC_A      : bStrafeLeft   = true
+               case fb.SC_D      : bStrafeRight  = true
+               case fb.SC_SPACE  : bMoveUp       = true
+               case fb.SC_LSHIFT : bMoveDown     = true
                end select
             case fb.EVENT_KEY_RELEASE
                select case e.scancode
-               case fb.SC_W : bMoveForward  = false
-               case fb.SC_S : bMoveBackward = false
-               case fb.SC_A : bStrafeLeft   = false
-               case fb.SC_D : bStrafeRight  = false
+               case fb.SC_W      : bMoveForward  = false
+               case fb.SC_S      : bMoveBackward = false
+               case fb.SC_A      : bStrafeLeft   = false
+               case fb.SC_D      : bStrafeRight  = false
+               case fb.SC_SPACE  : bMoveUp       = false
+               case fb.SC_LSHIFT : bMoveDown     = false
                end select      
             case fb.EVENT_WINDOW_GOT_FOCUS
                g_bFocus = true : bSkipMouse = 1
@@ -665,7 +678,7 @@ do
             #endif
          end if
          
-         glEnable( GL_LIGHTING )
+         ' glEnable( GL_LIGHTING )
          
          #ifdef DebugShadow
             dim as PartSnap tSnap
@@ -831,10 +844,6 @@ do
                if e.button = fb.BUTTON_RIGHT  then bRightPressed = false      
             case fb.EVENT_KEY_PRESS
                select case e.ascii
-               case 13: 
-                  g_FreeCam = not g_FreeCam : setmouse ,,,g_bLocked
-                  dim as long lDummy=any : GetMouseDelta(lDummy,lDummy)
-               case 32: bViewBorders = not bViewBorders
                case 8
                   if bBoundingBox then
                      g_CurPart = -1
@@ -846,6 +855,16 @@ do
                      g_CurDraw = -1
                      printf(!"g_CurDraw = %i    \r",g_CurDraw)
                   end if               
+               case 13: 
+                  g_FreeCam = not g_FreeCam : setmouse ,,,g_bLocked
+                  dim as long lDummy=any : GetMouseDelta(lDummy,lDummy)
+               case asc("B")-asc("@")
+                  bViewBorders = not bViewBorders
+                  printf(!"Borders: %s\n",iif(bViewBorders,"ENABLED","DISABLED"))
+               case asc("L")-asc("@")
+                  bLighting = not bLighting
+                  printf(!"Lighting: %s\n",iif(bLighting,"ENABLED","DISABLED"))
+                  if bLighting then glEnable(GL_LIGHTING) else glDIsable(GL_LIGHTING)
                case asc("="),asc("+")
                   if bBoundingBox then
                      g_CurPart = ((g_CurPart+2) mod (g_PartCount+1))-1
