@@ -16,7 +16,7 @@
 '#define __DebugShadowLoad
 '#define DebugPrimitive
 '#define DebugLoading
-'#define IgnoreMissingDependencies
+#define IgnoreMissingDependencies
 
 const cScale = 1'/20
 
@@ -25,7 +25,7 @@ const cScale = 1'/20
 
 'dim shared as string g_sLog
 dim shared as string g_sFilenames,g_sFilesToLoad
-dim shared as long g_ModelCount , g_LoadQuality = 3 'normal
+dim shared as long g_ModelCount , g_LoadQuality = 2 'normal
 redim shared as ModelList g_tModels(0)
 
 g_sFilenames = chr(0)
@@ -601,7 +601,7 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
    #endmacro
 
    #define PartsToBytes(_N) (offsetof(DATFile,tParts(0))+(_N)*sizeof(PartStruct))
-      
+         
    dim as long iLastPart=0 , iLimitParts=-1 , iFailed=0, iLineNum = 1
    dim as long iType = any , iColour = any , iResu = any   
    dim as DATFile ptr pT = NULL 'pointer to the file structure in memory
@@ -644,6 +644,7 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
          pT = pNew
       end if
       'at this point we should assume we are at the begin of a line so we get a line type
+      var pLineStart = pFile
       iResu = ReadInt( pFile , iType )
       if iResu=0 then 'empty line
          NextLine() : continue do 'so let's get the next one         
@@ -679,7 +680,7 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
          elseif ucase(sComment) = "FILE" then            
             dim as string sFile
             pFile += iResu
-            ReadFilename( pFile , sFile )
+            ReadFilename( pFile , sFile )            
             'print sFile
             pFile += iResu            
             'go to start of next line and recursively call the model load function
@@ -692,6 +693,10 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
             
             var sFileL = lcase(sFile)+chr(0), iIndex = -1 'default to new index
             var iOffset = instr(g_sFilenames,chr(0)+sFileL)
+            
+            'puts("'"+sFile+"'")
+            'puts("'"+sFileL+"'")
+            'puts(" " & iOffset)
             
             #if 0
                if iLastPart = 0 andalso RecursionLevel=1 then 'no parts were added so this 
@@ -717,7 +722,17 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
                iIndex = *cptr(ulong ptr,strptr(g_sFilenames)+iOffset-(1+sizeof(ulong)))
                'ok but so, this submodel then is on the loadlist, we must remove it from that list
                iOffset = instr(lcase(g_sFilesToLoad),chr(0)+lcase(sFile)+chr(0)) '"\0previousname\0name\0nextname\0"
-               if iOffset = 0 then print "/!\ INTERNAL ERROR: forwarded entry not found at the 'To Load List' /!\"
+               if iOffset = 0 then 
+                  print "/!\ INTERNAL ERROR: forwarded entry not found at the 'To Load List' /!\"
+                  var f = freefile()
+                  open exepath+"\internal.txt" for output as #f                  
+                  print #f,sFile
+                  print #f,"-----"
+                  put #f,,g_sFilesToLoad
+                  print #f,!"\n-----"
+                  put #f,,g_sFilenames
+                  close #f
+               end if
                g_sFilesToLoad = left(g_sFilesToLoad,iOffset)+mid(g_sFilesToLoad,iOffset+len(sFile)+2)
             end if
             LoadModel( pFile , sFile , iIndex )            
@@ -830,9 +845,14 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
          iLastPart += 1 'one part added
          'check if it's the end of line before continuing
          CheckEndOfLine()
-      case else
-         puts "Unknown line"
-         NextLine() : continue do
+      case else         
+         NextLine()
+         var pLineEnd = pFile 
+         while pLineEnd[-1] = 13 orelse pLineEnd[-1] = 10: pLineEnd -= 1: wend
+         var iLen = (cuint(pLineEnd)-cuint(pLineStart)) , sLine = space(iLen)
+         memcpy( strptr(sLine) , pLineStart , iLen )
+         puts sFilename+":" & iLineNum & " Unknown line '"+sLine+"'"
+         continue do
       end select
    loop
    
@@ -880,12 +900,23 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
                      LoadModel( strptr(sModel) , sFile , iIndex )
                      continue do
                   end if
-               end if
-               #ifndef IgnoreMissingDependencies
+               end if               
+               var sFileL = lcase(sFile)+chr(0), iIndex = -1 'default to new index
+               var iOffset = instr(g_sFilenames,chr(0)+sFileL)
+               iIndex = *cptr(ulong ptr,strptr(g_sFilenames)+iOffset-(1+sizeof(ulong)))
+               scope 
+                  var sModel = _
+                     "3 1 -40  -2  -2 40  0  0 42  2  2" !"\n" _
+                     "3 2  -2 -40  -2 0  40  0  2 42  2" !"\n" _
+                     "3 3  -2  -2 -40 0   0 40  2  2 42" !"\n"
+                  LoadModel( strptr(sModel) , sFile , iIndex )
                   print "ERROR: DEPENDENCY NOT FOUND! '"+sFile+"'"
-                  print "Model Path: '"+g_sPathList(0)+"'"
-               #endif
-               GiveUp(1)
+                  print "Model Path: '"+g_sPathList(0)+"'"               
+                  #ifndef IgnoreMissingDependencies
+                     GiveUp(1)
+                  #endif
+                  continue do
+               end scope
             loop
          end if         
          

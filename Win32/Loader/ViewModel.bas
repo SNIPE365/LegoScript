@@ -8,6 +8,7 @@
 
 '#define ColorizePrimatives
 '#define RenderOptionals
+'#define DebugLoading
 
 #define UseVBO
 
@@ -225,9 +226,11 @@ scope
    'crashing due to fallback additions
    '#include "CrashTest.bi"
    'sFile = sPath+"LDraw\models\pyramid.ldr"
-   sFile = sPath+"\examples\8891-towTruck.mpd"
+   'sFile = sPath+"\examples\8891-towTruck.mpd"
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\5510.mpd"
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\cube10x10x10.ldr"
+   'sFile = "C:\Users\greg\Desktop\LS\TLG_Map\TrainStationEntranceA.ldr"
+   'sFile = "light.dat"
    'sFile = "3001.dat" 
    'sFile = "F:\10294 - Titanic.mpd"
    'sFile = "4070.dat" '4070 , 87087 , 26604 , 47905 , 4733 , 30414
@@ -317,11 +320,12 @@ do
       var sEndsExt = lcase(right(sFile,4))
    #else
       sModel = command(1)
-      var sEndsExt = lcase(right(sModel,4))
+      var sEndsExt = lcase(right(sModel,4)), sFilename = "Copy Paste.ldr"
       var IsFilename = (instr(sModel,chr(10))=0) andalso ((sEndsExt=".dat") orelse (sEndsExt=".ldr"))
       if IsFilename then      
          print "loading from '"+sModel+"'"
-         if FileExists(sModel)=0 then FindFile(sModel)      
+         if FileExists(sModel)=0 then FindFile(sModel)
+         sFilename = sModel
          if LoadFile( sModel , sModel ) = 0 then
             print "Failed to load '"+sModel+"'"
             sleep : system
@@ -340,8 +344,8 @@ do
                   if sModel[N]=13 then sModel[N]=32
                next N
             else 'if there isnt a model in the clipboard, then load this:
-               'sModel = _    
-               '"1 2 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 4070.dat" EOL _
+               sModel = _    
+               "1 2 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 NotFound.dat" EOL _
                ' ------------------------------------------------------
                'sModel = _ 'all of lines belo should end with EOL _
                '   "1 4 0 0 0 1 0 0 0 1 0 0 0 1 30068.dat"    EOL _
@@ -351,19 +355,18 @@ do
                '   "1 0 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 3958.dat"       EOL _
                '   "1 16 -50.000000 -24.000000 50.000000 1 0 0 0 1 0 0 0 1 3005.dat"
                ' ------------------------------------------------------
-               sModel = _
-                  "1 1 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 47905.dat"     ' EOL _
+               'sModel = _
+               '   "1 1 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 47905.dat"     ' EOL _
                   '"1 0 -60.000000 -24.000000 20.000000 1 0 0 0 1 0 0 0 1 3001.dat"
                ' ------------------------------------------------------
                'sModel = _
                '   "1 0 0.000000 0.000000 0.000000 1 0 0 0 -1 -8.74228e-008 0 8.74228e-008 -1 3001.dat" EOL _
                '   "1 22 -60.000000 24.000002 -19.999998 1 0 0 0 -1 -0 0 0 -1 3001.dat"
-   
                
             end if
          end if            
       end if
-      pModel = LoadModel( strptr(sModel) , "CopyPaste.ldr" )
+      pModel = LoadModel( strptr(sModel) , sFilename )
       
    #endif
    

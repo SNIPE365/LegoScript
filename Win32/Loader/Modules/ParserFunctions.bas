@@ -153,9 +153,9 @@ function ReadToken( pFile as ubyte ptr , byref sString as string ) as long
    return iRead
 end function
 function LoadFile( sFile as string , byref sFileContents as string , bAddPathToSearch as boolean = true ) as boolean
-   
+      
    #ifdef DebugLoading
-      print "Loading '"+sFile+"' ";      
+      printf "Loading '"+sFile+"' "
    #endif
    #ifdef g_sLog
    g_sLog += "Loading '"+sFile+"' "
@@ -181,20 +181,20 @@ function LoadFile( sFile as string , byref sFileContents as string , bAddPathToS
    
    var f = freefile()
    if open(sFile for input as #f) then
-      print "Failed to open file '"+sFile+"'": sleep:system
+      puts "Failed to open file '"+sFile+"'": getchar():system
       return false
    end if
    dim as uinteger uFileSize = lof(f)   
    if uFileSize < (1024*1024) then
       #ifdef DebugLoading
-         print csng(uFileSize/(1024)) & "kb"
+         printf(!"%s\n",csng(uFileSize/(1024)) & "kb")
       #endif
       #ifdef g_sLog
          g_sLog &= csng(uFileSize/(1024)) & !"kb\n"
       #endif
    else
       #ifdef DebugLoading
-         print csng(uFileSize/(1024*1024)) & "mb"
+         printf(!"%s\n",csng(uFileSize/(1024*1024)) & "mb")
       #endif
       #ifdef g_sLog
          g_sLog &= csng(uFileSize/(1024*1024)) & !"mb\n"
