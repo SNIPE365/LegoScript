@@ -3,6 +3,7 @@
 #endif  
 
 'TODO (20/02/2025) - Create a free index list, so that holes in the array and string can be reused
+'TODO (16/10/2025) - Make submodels to be avaliable only for the model that called them
 
 '#cmdline "-gen gcc -O 3"
 #include once "crt.bi"
@@ -25,7 +26,7 @@ const cScale = 1'/20
 
 'dim shared as string g_sLog
 dim shared as string g_sFilenames,g_sFilesToLoad
-dim shared as long g_ModelCount , g_LoadQuality = 2 'normal
+dim shared as long g_ModelCount , g_LoadQuality = 1 'normal
 redim shared as ModelList g_tModels(0)
 
 g_sFilenames = chr(0)
@@ -617,6 +618,8 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
       redim preserve g_tModels( g_ModelCount )
       g_ModelCount += 1
    end if
+   
+   'puts "load model: '" & sFilename & "'"
          
    do
       if iLastPart > iLimitParts then 'allocate more entries if necessary
@@ -627,9 +630,10 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
             iFailed = 1 : exit do 'gives up
          end if
          if pT=NULL then 'first allocation
-            pT = pNew
-            iFilenameOffset = len(g_sFilenames)
-            g_sFilenames += chr(255)+mkl(iModelIndex)+chr(0)+lcase(sFilename)+chr(0)
+            pT = pNew            
+            
+            'add to list
+            iFilenameOffset = LoadedList_AddFile( sFilename , iModelIndex )
             pNew->iModelIndex = iModelIndex
             pNew->iShadowCount = 0
             pNew->pData = NULL
@@ -645,6 +649,15 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
       end if
       'at this point we should assume we are at the begin of a line so we get a line type
       var pLineStart = pFile
+      
+      #if 0 'show current line
+         NextLine()
+         if pFile[-2] = asc(!"\r") then pFile[-2] = 0 else pFile[-1] = 0
+         printf(!"'%s'\n",pLineStart)
+         if pFile[-2] = 0 then pFile[-2] = asc(!"\r") else pFile[-1] = asc(!"\n")
+         pFile = pLineStart
+      #endif
+      
       iResu = ReadInt( pFile , iType )
       if iResu=0 then 'empty line
          NextLine() : continue do 'so let's get the next one         
@@ -681,19 +694,18 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
             dim as string sFile
             pFile += iResu
             ReadFilename( pFile , sFile )            
-            'print sFile
-            pFile += iResu            
-            'go to start of next line and recursively call the model load function
+            'go to start of next line to recursively call the model load function
             NextLine()
             'is this submodel already referenced? if so then grab it's index
-            
             if iLastPart = 0 andalso RecursionLevel=1 then 'ignore naming alias
-               NextLine() : continue do
+               print "Name Alias: '"+sFile+"'"
+               continue do
             end if
             
-            var sFileL = lcase(sFile)+chr(0), iIndex = -1 'default to new index
-            var iOffset = instr(g_sFilenames,chr(0)+sFileL)
+            print "SubModel: '"+sFile+"'"
             
+            var iOffset = LoadedList_IsFileLoaded( sFile ), iIndex = -1 'default to new index
+                        
             'puts("'"+sFile+"'")
             'puts("'"+sFileL+"'")
             'puts(" " & iOffset)
@@ -708,7 +720,7 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
                      .fD = 0 : .fE = 1 : .fF = 0
                      .fG = 0 : .fH = 0 : .fI = 0 'ident matrix                   
                      .lModelIndex = g_ModelCount 'so the current count is the new model index               
-                     g_sFilenames += chr(255)+mkl(g_ModelCount)+chr(0)+sFileL 'add the index to it along the lowercase name to loaded list                                 
+                     AddLoadedFile( sFile , g_ModelCount )                     
                      redim preserve g_tModels( g_ModelCount ) : g_ModelCount += 1
                   end with                   
                   iLastPart += 1
@@ -717,25 +729,22 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
             
             'print sFilename, iLineNum & " lines and " & iLastPart & " parts were read Rec: " & RecursionLevel
             'print "submodel: '"+lcase(sFile)+"'",iOffset
+            var bLoadSubModel = true
             if iOffset > 4 then 'file already indexed
                'so get index directly from  an ulong stored in the string
-               iIndex = *cptr(ulong ptr,strptr(g_sFilenames)+iOffset-(1+sizeof(ulong)))
+               iIndex = LoadedList_IndexFromOffset( iOffset )               
                'ok but so, this submodel then is on the loadlist, we must remove it from that list
                iOffset = instr(lcase(g_sFilesToLoad),chr(0)+lcase(sFile)+chr(0)) '"\0previousname\0name\0nextname\0"
                if iOffset = 0 then 
-                  print "/!\ INTERNAL ERROR: forwarded entry not found at the 'To Load List' /!\"
-                  var f = freefile()
-                  open exepath+"\internal.txt" for output as #f                  
-                  print #f,sFile
-                  print #f,"-----"
-                  put #f,,g_sFilesToLoad
-                  print #f,!"\n-----"
-                  put #f,,g_sFilenames
-                  close #f
+                  bLoadSubModel = false
+                  'print "/!\ INTERNAL ERROR: forwarded entry not found at the 'To Load List' /!\"
+                  'print sFile                  
+                  'getchar()
+               else
+                  g_sFilesToLoad = left(g_sFilesToLoad,iOffset)+mid(g_sFilesToLoad,iOffset+len(sFile)+2)
                end if
-               g_sFilesToLoad = left(g_sFilesToLoad,iOffset)+mid(g_sFilesToLoad,iOffset+len(sFile)+2)
             end if
-            LoadModel( pFile , sFile , iIndex )            
+            if bLoadSubModel then LoadModel( pFile , sFile , iIndex )            
             exit do 'from this point is a different file, so we can stop parsing it here
          else
             ReadFilename( pFile , sComment )
@@ -762,15 +771,15 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
             iResu = ReadFilename( pFile , sFile )             
             CheckError( "Expected filename as fourteenth parameter" ) 'failed to read the line type string?
             pFile += iResu
-            var sFileL = lcase(sFile)+chr(0)            
-            var iOffset = instr(g_sFilenames,chr(0)+sFileL)
+            'var sFileL = lcase(sFile)+chr(0)
+            var iOffset = LoadedList_IsFileLoaded( sFile )            
             if iOffset then 'file already indexed               
                'so get index directly from  an ulong stored in the string
-               .lModelIndex = *cptr(ulong ptr,strptr(g_sFilenames)+iOffset-(1+sizeof(ulong)))
+               .lModelIndex = LoadedList_IndexFromOffset( iOffset )
             else 'file isnt loaded so put it on the load list and on the loaded list
                .lModelIndex = g_ModelCount 'so the current count is the new model index               
-               g_sFilenames += chr(255)+mkl(g_ModelCount)+chr(0)+sFileL 'add the index to it along the lowercase name to loaded list
-               g_sFilesToLoad += sFile+chr(0)                           'add the real name to the "to load" list                                             
+               LoadedList_AddFile( sFile , g_ModelCount ) 'add the index to it along the lowercase name to loaded list
+               QueueList_AddFile( sFile ) 'add the real name to the "to load" list
                'print g_sFilesToLoad 'if instr(sFileL,".ldr") then puts("File: " & SFile)
                redim preserve g_tModels( g_ModelCount ) : g_ModelCount += 1
             end if
@@ -873,7 +882,7 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
       pT = reallocate( pT , PartsToBytes(pT->iPartCount) )
       iTotalLines += iLineNum : iTotalParts += pT->iPartCount
       if RecursionLevel=0 then 'finished loading everything         
-         'print "Files List: "+g_sFilenames
+         'print "Files List: "+g _sFilenames
          #ifdef DebugLoading
             print "FINISHED LOADING:"
             print iTotalLines & " lines and " & iTotalParts & " parts were read"
@@ -890,20 +899,22 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
                iStart = iEnd+1
                var sFullPathFile = sFile
                'if instr(sFile,".ldr") then puts("Dep: " & SFile)
+               
+               '>>>> optimize this
                if FindFile(sFullPathFile) then
-                  var sFileL = lcase(sFile)+chr(0), iIndex = -1 'default to new index
-                  var iOffset = instr(g_sFilenames,chr(0)+sFileL)
-                  iIndex = *cptr(ulong ptr,strptr(g_sFilenames)+iOffset-(1+sizeof(ulong)))
+                  var iOffset = LoadedList_IsFileLoaded(sFile) , iIndex = -1 'default to new index
+                  iIndex = LoadedList_IndexFromOffset( iOffset )
                   dim as string sModel 
                   if LoadFile( sFullPathFile , sModel ) then                     
                      'print sFile,iIndex
                      LoadModel( strptr(sModel) , sFile , iIndex )
                      continue do
                   end if
-               end if               
-               var sFileL = lcase(sFile)+chr(0), iIndex = -1 'default to new index
-               var iOffset = instr(g_sFilenames,chr(0)+sFileL)
-               iIndex = *cptr(ulong ptr,strptr(g_sFilenames)+iOffset-(1+sizeof(ulong)))
+               end if
+               
+               var iOffset = LoadedList_IsFileLoaded( sFile )', iIndex = -1 'default to new index
+               var iIndex = LoadedList_IndexFromOffset( iOffset )
+               '<<<< ---------------
                scope 
                   var sModel = _
                      "3 1 -40  -2  -2 40  0  0 42  2  2" !"\n" _
@@ -921,8 +932,7 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
          end if         
          
       end if
-   end if
-   
+   end if   
    return pT
    
 end function
@@ -935,7 +945,7 @@ sub FreeModel( byref pPart as DATFile ptr )
          var iPosEnd = instr(.iFilenameOffset+5,g_sFilenames,chr(255))         
          if iPosEnd=0 then 
             cptr(uinteger ptr,@g_sFilenames)[1] = .iFilenameOffset 'crop from end            
-         else 'TODO: WORKAROUND: clean the deleted part so it wont be found (need to compact them later)
+         else 'WORKAROUND: clean the deleted part so it wont be found (TODO: need to compact them later)
             memset( strptr(g_sFilenames)+.iFilenameOffset , 0 , (iPosEnd-.iFilenameOffset)-2 )
          end if         
          .iFilenameOffset = - 1 : .pModel = 0

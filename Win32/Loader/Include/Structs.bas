@@ -50,7 +50,7 @@ end type
    type AxleInfo as StudInfo
 #endif
 
-const cShadowMaxSecs = 8
+const cShadowMaxSecs = 12
 
 enum PartCathegory
    pcNone   

@@ -2,6 +2,8 @@
   #error " Don't compile this one"
 #endif  
 
+static shared as double g_TotalLoadFileTime
+
 function ReadHex( pFile as ubyte ptr , byref iInt as long ) as long
    dim as long iResu = 0, iRead, iHasDigits=0   
    do      
@@ -153,7 +155,7 @@ function ReadToken( pFile as ubyte ptr , byref sString as string ) as long
    return iRead
 end function
 function LoadFile( sFile as string , byref sFileContents as string , bAddPathToSearch as boolean = true ) as boolean
-      
+   dim as double dLoadTime = timer
    #ifdef DebugLoading
       printf "Loading '"+sFile+"' "
    #endif
@@ -184,6 +186,8 @@ function LoadFile( sFile as string , byref sFileContents as string , bAddPathToS
       puts "Failed to open file '"+sFile+"'": getchar():system
       return false
    end if
+   'puts "load file: '" & sFile & "'"
+   
    dim as uinteger uFileSize = lof(f)   
    if uFileSize < (1024*1024) then
       #ifdef DebugLoading
@@ -203,6 +207,7 @@ function LoadFile( sFile as string , byref sFileContents as string , bAddPathToS
    sFileContents = string( uFileSize , 0 )
    get #f,,sFileContents
    close #f
+   g_TotalLoadFileTime += timer-dLoadTime
    return true
 end function
 function FindFile( sFile as string ) as long
@@ -301,4 +306,26 @@ function ReadBracketOption( pFile as ubyte ptr , sName as string , sParms as str
    'success
    return iRead
 end function
+
+'add filename to list of loaded files as well it's model index
+'returns offset into the list where it was loaded
+function LoadedList_AddFile( sFilename as string , iModelIndex as long ) as long
+   function = len(g_sFilenames)            
+   g_sFilenames += chr(255)+mkl(iModelIndex)+chr(0)+lcase(sFilename)+chr(0)
+   exit function
+end function
+'checks if the file was on the loaded list and return it's offset
+function LoadedList_IsFileLoaded( sFile as string ) as long
+   var sFileL = lcase(sFile)+chr(0)
+   return instr(g_sFilenames,chr(0)+sFileL)
+end function
+'return index of model from offset into loaded list
+function LoadedList_IndexFromOffset( iOffset as long ) as long
+   return *cptr(ulong ptr,strptr(g_sFilenames)+iOffset-(1+sizeof(ulong))) 
+end function
+
+'add a filename to the list of files that need to be loaded
+sub QueueList_AddFile( sFile as string )
+   g_sFilesToLoad += sFile+chr(0)
+end sub
 

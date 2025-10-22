@@ -227,9 +227,10 @@ scope
    '#include "CrashTest.bi"
    'sFile = sPath+"LDraw\models\pyramid.ldr"
    'sFile = sPath+"\examples\8891-towTruck.mpd"
-   'sFile = "C:\Users\greg\Desktop\LDCAD\examples\5510.mpd"
+   sFile = "C:\Users\greg\Desktop\LDCAD\examples\5510.mpd"
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\cube10x10x10.ldr"
    'sFile = "C:\Users\greg\Desktop\LS\TLG_Map\TrainStationEntranceA.ldr"
+   'sFile = "C:\Users\greg\Desktop\LS\TLG_Map\FileA.ldr"
    'sFile = "light.dat"
    'sFile = "3001.dat" 
    'sFile = "F:\10294 - Titanic.mpd"
@@ -250,8 +251,6 @@ end scope
 dim as string sModel
 dim as DATFile ptr pModel
 dim as boolean bEditMode
-
-dim as double dLoadTime = timer
 
 '///////////////////// free cam variables //////////////////
 static shared as single g_fCameraX,g_fCameraY,g_fCameraZ
@@ -303,6 +302,9 @@ dim as boolean g_FreeCam = false
 dim as long iOldCliWid , iOldCliHei   
 
 do
+   dim as double dLoadTime = timer
+   g_TotalLoadFileTime = 0
+   
    for N as long = g_ModelCount-1 to 0 step -1
       FreeModel( g_tModels(N).pModel )
    next N
@@ -317,7 +319,7 @@ do
          sleep : system
       end if
       pModel = LoadModel( strptr(sModel) , sFile )
-      var sEndsExt = lcase(right(sFile,4))
+      var sEndsExt = lcase(right(sFile,4))      
    #else
       sModel = command(1)
       var sEndsExt = lcase(right(sModel,4)), sFilename = "Copy Paste.ldr"
@@ -370,7 +372,12 @@ do
       
    #endif
    
-   puts("Load Model Time: " & timer-dLoadTIme)   
+   dLoadTime = timer-dLoadTime
+   printf(!"Total Load Model Time: %1.2f\n",dLoadTime)   
+   printf(!"File Load Time: %1.2f\n",g_TotalLoadFileTime)
+   printf(!"Processing time: %1.2f\n",dLoadTime-g_TotalLoadFileTime)
+   'getchar()
+      
    if sEndsExt=".dat" then bEditMode = true   
    if hGfxWnd=0 then
       hGfxWnd = InitOpenGL()
@@ -388,13 +395,13 @@ do
       dim as GLuint iModelVBO, iBorderVBO
       glGenBuffers(1, @iModelVBO) : glGenBuffers(1, @iBorderVBO)   
       
-      GenArrayModel( pModel , atModelTrigs()     , false )
+      'GenArrayModel( pModel , atModelTrigs()     , false )
       iTrianglesCount = ubound(atModelTrigs)+1   
       glBindBuffer(GL_ARRAY_BUFFER, iModelVBO)
       glBufferData(GL_ARRAY_BUFFER, iTrianglesCount*sizeof(VertexStruct), @atModelTrigs(0)     , GL_STATIC_DRAW)
       erase( atModelTrigs )
          
-      GenArrayModel( pModel , atModelVtxLines() , true )
+      'GenArrayModel( pModel , atModelVtxLines() , true )
       iBorderCount = ubound(atModelVtxLines)+1
       glBindBuffer(GL_ARRAY_BUFFER, iBorderVBO)
       glBufferData(GL_ARRAY_BUFFER, iBorderCount*sizeof(VertexStruct), @atModelVtxLines(0) , GL_STATIC_DRAW)
@@ -414,6 +421,7 @@ do
       glEndList()
    #endif 
    puts("Load Time: " & timer-dLoadTIme)
+   'getchar()
    
    dim as single xMid,yMid,zMid , g_zFar
    dim as PartSize tSz
@@ -440,6 +448,7 @@ do
       )
       
    end with
+   'getchar()
    
    redim as PartCollisionBox atCollision()
    CheckCollisionModel( pModel , atCollision() )
