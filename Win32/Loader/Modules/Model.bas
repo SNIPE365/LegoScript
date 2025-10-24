@@ -291,7 +291,6 @@ function GetModelVertexCount( pPart as DATFile ptr , iBorders as long , lDrawPar
    return lCurPos
    
 end function
-
 function GenArrayModel( pPart as DATFile ptr , aVertex() as VertexStruct , iBorders as long , uCurrentColor as ulong = &h70605040 , lDrawPart as long = -1 , byref lCurPos as long = -1 , uCurrentEdge as ulong = 0 DebugPrimParm ) as ulong
    if uCurrentColor = &h70605040 then uCurrentColor = g_Colours(c_Blue) : uCurrentEdge = g_EdgeColours(c_Blue)
    
@@ -524,6 +523,55 @@ function GenArrayModel( pPart as DATFile ptr , aVertex() as VertexStruct , iBord
    return lCurPos
    
 end function
+
+function GetPieceAndVtxCount( pPart as DATFile ptr , byref tCntVBO as VBOStruct , byref lUnique as long = 0 , byref lCurPos as long = 0 ) as ulong  
+  with *pPart
+    var bHasCNT = .bHasCNT
+    for N as long = 0 to .iPartCount-1
+      with .tParts(N)            
+        select case .bType
+        case 1 'include
+          with ._1
+            var pSubPart = g_tModels(.lModelIndex).pModel                     
+            GetPieceAndVtxCount( pSubPart , tCntVBO , lUnique , lCurPos )
+          end with
+        case 2 'line
+          if bHasCNT then continue for
+          if .wColour = c_Edge_Colour then
+            tCntVBO.lBorderCnt += 2
+          else
+            tCntVBO.lColorBrdCnt += 2
+          end if
+        case 3 'triangle
+          if bHasCNT then continue for
+          if .wColour = c_Main_Colour then
+            tCntVBO.lTriangleCnt += 3
+          else
+            tCntVBO.lColorTriCnt += 3
+          end if
+        case 4 'quad
+          if bHasCNT then continue for
+          if .wColour = c_Main_Colour then
+            tCntVBO.lTriangleCnt += 6
+          else
+            tCntVBO.lColorTriCnt += 6
+          end if           
+        case 5 'optional line
+          continue for
+          if bHasCNT then continue for
+          if .wColour = c_Edge_Colour then
+            tCntVBO.lBorderCnt += 2
+          else
+            tCntVBO.lColorBrdCnt += 2
+          end if
+        end select
+      end with
+    next N
+    if .bIsUnique then lCurPos += 1 : if .bHasCNT=0 then lUnique += 1
+    .bHasCNT = 1
+  end with      
+  return lCurPos
+end function  
 
 #endif
 
