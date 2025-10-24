@@ -85,7 +85,7 @@ enum ShadowCaps
    sc_Two  'The shape is closed (blocked) at both sides. e.g. the male bar of a minifig suitcase handle.
    sc_A    'A: The bottom is closed / blocked. e.g. a stud.
    sc_B    'B: The top is closed / blocked. e.g. an anti stud.
-end enum   
+end enum
 type ShadowGrid
    as byte  Xcnt,Zcnt   'negative values means CENTERED
    as ubyte Xstep,Zstep
@@ -142,7 +142,7 @@ type PartStruct
    end union   
    union                 'color/data
       wColour as ushort
-      wData   as ushort
+      wData   as ushort  'data???
    end union
    union                 '> type specific data
       _1 as LineType1Struct
@@ -160,6 +160,16 @@ type PartSize
    as single yMin = fUnused , yMax = fUnused
    as single zMin = fUnused , zMax = fUnused
 end type
+#ifdef UseVBO
+  type VBOStruct
+    as long lTriangleOff , lTriangleCnt
+    as long lColorTriOff , lColorTriCnt
+    as long lTransTriOff , lTransTriCnt
+    as long lTrColTriOff , lTrColTriCnt
+    as long lBorderOff   , lBorderCnt
+    as long lColorBrdOff , lColorBrdCnt
+  end type
+#endif
 
 type DATFile
   iModelIndex     as long
@@ -169,10 +179,16 @@ type DATFile
   'fSizeY          as single     'Y Size
   'fSizeZ          as single     'Z Size
   'this info is filled dynamically based on studs/clutches etc... (also including the shadow info)
-  iShadowCount    as long                  'number of entries in the shadow dynamic array
+  iShadowCount:16 as ulong 'number of entries in the shadow dynamic array
+  bIsUnique:1     as ulong 'if 1 then this is not a .ldr but a .dat, and a main one, not an included one
+  bHasVBO  :1     as ulong 'if this is unique, this means that the VBO for this part was loaded.
+  bHasCNT  :1     as ulong
   paShadow        as ShadowStruct ptr
   pData           as any ptr
   as PartStruct tParts( (1 shl 25)-1 ) 'maximum number of parts (dynamic)
+  #ifdef UseVBO
+    tVBO as VBOStruct
+  #endif
 end type
 type ModelList
    iFilenameOffset as long                 'offset for the file name string
@@ -196,4 +212,12 @@ type VertexStruct
    as Vertex3 tPos,tNormal
    as ulong uColor 'Color4 tColor   
 end type
+type VertexStruct0
+  as Vertex3 tPos,tNormal
+end type
 
+type DisplayPiece
+  pModel        as DATFile ptr
+  atMatrix(9-1) as long
+  lBaseColor    as ulong
+end type
