@@ -570,7 +570,12 @@ function LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as 
 
 end function
 
-function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex as long = -1 , iLoadDependencies as byte = 1 ) as DATFile ptr   
+type LoadFlagStruct
+  bLoadDependency:1 as ubyte
+  bIsPart        :2 as ubyte  
+end type
+
+function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex as long = -1 , tLoadFlags as LoadFlagStruct = type(1) ) as DATFile ptr   
    if pFile = NULL then pFile = @" "
    #macro CheckError(_s , _separator... )
       #if len( #_separator )
@@ -607,9 +612,12 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
    dim as long iType = any , iColour = any , iResu = any   
    dim as DATFile ptr pT = NULL 'pointer to the file structure in memory
    dim as long iFilenameOffset=0
-   static as long RecursionLevel , iTotalLines , iTotalParts
+   static as long RecursionLevel , iTotalLines , iTotalParts 
+   dim as boolean bIsModel
    iTotalLines = 0 : iTotalParts = 0
    RecursionLevel += 1
+   
+   'puts(sFilename & " // " & tLoadFlags.bIsPart)
    
    'if already referenced then we will use that index
    'otherwise add a new index to the model/submodel
@@ -744,7 +752,7 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
                   g_sFilesToLoad = left(g_sFilesToLoad,iOffset)+mid(g_sFilesToLoad,iOffset+len(sFile)+2)
                end if
             end if
-            if bLoadSubModel then LoadModel( pFile , sFile , iIndex )            
+            if bLoadSubModel then LoadModel( pFile , sFile , iIndex , tLoadFlags )
             exit do 'from this point is a different file, so we can stop parsing it here
          else
             ReadFilename( pFile , sComment )
@@ -890,7 +898,7 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
          'if len(trim(g_sFilesToLoad)) then print "Files Yet to load:"+g_sFilesToLoad
          'split the files to load list, so we load each of the dependencies
          'increase recursion level again, so that it does not show information about dependency files         
-         if iLoadDependencies then
+         if tLoadFlags.bLoadDependency then
             var iStart=2, sFilesToLoad = g_sFilesToLoad : g_sFilesToLoad=chr(0)
             do            
                var iEnd = instr( iStart , sFilesToLoad , chr(0) ) 'end of filename exists?
@@ -907,7 +915,13 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
                   dim as string sModel 
                   if LoadFile( sFullPathFile , sModel ) then                     
                      'print sFile,iIndex
-                     LoadModel( strptr(sModel) , sFile , iIndex )
+                     var tFlags = tLoadFlags
+                     if tFlags.bIsPart=0 then 
+                        if instr(lcase(sFile),".dat") then tFlags.bIsPart = 1
+                     elseif tFlags.bIsPart=1 then
+                       tFlags.bIsPart=2
+                     end if
+                     LoadModel( strptr(sModel) , sFile , iIndex , tFlags )
                      continue do
                   end if
                end if
@@ -933,6 +947,11 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
          
       end if
    end if   
+   
+   if tLoadFlags.bIsPart=1 then 'this is the begin of a part
+      if pT then pT->bIsUnique = 1
+   end if
+   
    return pT
    
 end function

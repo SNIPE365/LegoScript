@@ -227,9 +227,12 @@ scope
    '#include "CrashTest.bi"
    'sFile = sPath+"LDraw\models\pyramid.ldr"
    'sFile = sPath+"\examples\8891-towTruck.mpd"
-   sFile = "C:\Users\greg\Desktop\LDCAD\examples\5510.mpd"
+   'sFile = "C:\Users\greg\Desktop\LDCAD\examples\5510.mpd"
+   'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\examples\5510.mpd"
+   'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\LDraw\models\pyramid.ldr"
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\cube10x10x10.ldr"
    'sFile = "C:\Users\greg\Desktop\LS\TLG_Map\TrainStationEntranceA.ldr"
+   sFile = "G:\Jogos\LegoScript-main\examples\TLG_Map0\Build\Blocks\B1\Eldon Square.ldr"
    'sFile = "C:\Users\greg\Desktop\LS\TLG_Map\FileA.ldr"
    'sFile = "light.dat"
    'sFile = "3001.dat" 
@@ -393,15 +396,30 @@ do
       redim as VertexStruct atModelTrigs() , atModelVtxLines()
       dim as long iTrianglesCount,iBorderCount
       dim as GLuint iModelVBO, iBorderVBO
-      glGenBuffers(1, @iModelVBO) : glGenBuffers(1, @iBorderVBO)   
+      glGenBuffers(1, @iModelVBO) : glGenBuffers(1, @iBorderVBO)
       
-      'GenArrayModel( pModel , atModelTrigs()     , false )
+      dim as VBOStruct tCntVBO
+      dim as long lUnique
+      var iPieces = GetPieceAndVtxCount( pModel , tCntVBO , lUnique )
+      puts("Number of Pieces: " & iPieces & " Unique: " & lUnique)
+      with tCntVBO
+        puts("Vtx Tri: " & .lTriangleCnt & " , Vtx CTri: " & .lColorTriCnt & _
+        " , Vtx Brd: " & .lBorderCnt & " , Vtx CBrd: " & .lColorBrdCnt )
+        
+        puts (( .lTriangleCnt*sizeof(VertexStruct0)+.lBorderCnt*sizeof(VertexStruct0) + _
+        .lColorTriCnt*sizeof(VertexStruct)+.lColorBrdCnt*sizeof(VertexStruct) )+1023)\1024 & "kb"
+        
+      end with
+      
+      
+      
+      GenArrayModel( pModel , atModelTrigs()     , false )
       iTrianglesCount = ubound(atModelTrigs)+1   
       glBindBuffer(GL_ARRAY_BUFFER, iModelVBO)
       glBufferData(GL_ARRAY_BUFFER, iTrianglesCount*sizeof(VertexStruct), @atModelTrigs(0)     , GL_STATIC_DRAW)
       erase( atModelTrigs )
          
-      'GenArrayModel( pModel , atModelVtxLines() , true )
+      GenArrayModel( pModel , atModelVtxLines() , true )
       iBorderCount = ubound(atModelVtxLines)+1
       glBindBuffer(GL_ARRAY_BUFFER, iBorderVBO)
       glBufferData(GL_ARRAY_BUFFER, iBorderCount*sizeof(VertexStruct), @atModelVtxLines(0) , GL_STATIC_DRAW)
