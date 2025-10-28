@@ -524,7 +524,7 @@ function GenArrayModel( pPart as DATFile ptr , aVertex() as VertexStruct , iBord
    
 end function
 
-#ifdef VBOEx
+#ifdef UseVBOEx
 function AllocateModelDrawArrays( pPart as DATFile ptr , tDraw as ModelDrawArrays , bFlags as byte = 1 ) as boolean
   const bRoot=1 , bNewPart=2 , bPart=4
   with *pPart 'include: "andalso .bHasVBO=0"

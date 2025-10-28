@@ -314,6 +314,7 @@ dim as hwnd hGfxWnd
 dim as boolean g_FreeCam = false  
 dim as long iOldCliWid , iOldCliHei   
 
+
 do
    dim as double dLoadTime = timer
    g_TotalLoadFileTime = 0
@@ -323,7 +324,7 @@ do
    next N
    g_sFilenames = chr(0) : g_sFilesToLoad = chr(0)   
 
-   #if 1 '1 = Load File , 0 = Load From clipboard
+   #if 0 '1 = Load File , 0 = Load From clipboard
       if len(sFile)=0 then sFile=command(1)
       if instr(sFile,"\")=0 andalso instr(sFile,"/")=0 then FindFile(sFile)
       printf(!"Model: '%s'\n",sFile)
@@ -400,7 +401,7 @@ do
    
    'glPolygonMode( GL_FRONT_AND_BACK, GL_LINE )
    dim as long g_DrawCount = pModel->iPartCount
-   
+  
    dLoadTIme = timer
    #ifdef UseVBO   
       #ifndef UseVBOEx
