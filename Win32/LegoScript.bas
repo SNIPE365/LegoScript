@@ -119,18 +119,18 @@ declare sub RichEdit_Replace( hCtl as HWND , iStart as long , iEnd as long , sTe
 declare sub ChangeToTabByFile( sFullPath as string , iLine as long = -1 )
 
 #include once "LSModules\Settings.bas"
+#include "Loader\Modules\Matrix.bas"
 #include "Loader\LoadLDR.bas"
 #include "Loader\Include\Colours.bas"
 #include "Loader\Modules\Clipboard.bas"
 #include "Loader\Modules\InitGL.bas"
 #include "Loader\Modules\Math3D.bas"
 #include "Loader\Modules\Normals.bas"
-#include "Loader\Modules\Matrix.bas"
 #include "Loader\Modules\Model.bas"
 '#include "Loader\Modules\modelA.bas"
 '#include "Loader\Modules\modelB.bas"
-#include "LS2LDR.bas"
-#include "ComboBox.bas"
+#include "LSModules\LS2LDR.bas"
+#include "LSModules\ComboBox.bas"
 #include once "LSModules\CommandLine.bas"
 
 sub LogError( sError as string )   

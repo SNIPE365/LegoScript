@@ -1,0 +1,6 @@
+ 
+:: 1x1DummySlab SB1 #3; ^   1x1DummySlab SB2 #5 #yo16; ^   SB1 c1 = NULL; //{438} 			
+// Warning: part 'SB1(1x1dummyslab.dat)' only have 0 clutches. at '':3 'SB1 c1 = NULL' 
+:: 1x1DummySlab SB98 #6 c1 = 1x1DummySlab SB99 #9 #yo16  s1; //{441} 			
+// Warning: part 'SB98(1x1dummyslab.dat)' only have 0 clutches. at '':1 '1x1DummySlab SB98 #6 c1 = 1x1DummySlab SB99 #9 #yo16  s1' 
+:: //} //{442} 			
