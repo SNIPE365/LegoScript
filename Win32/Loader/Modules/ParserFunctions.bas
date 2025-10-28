@@ -211,6 +211,7 @@ function LoadFile( sFile as string , byref sFileContents as string , bAddPathToS
    return true
 end function
 function FindFile( sFile as string ) as long
+   if len(sFile)=0 then return FALSE
    const cPathLastIndex = ubound(g_sPathList)
    dim as byte bTried( cPathLastIndex )
    for N as long = g_LoadQuality to 3

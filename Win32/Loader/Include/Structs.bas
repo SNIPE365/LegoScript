@@ -185,10 +185,10 @@ type DATFile
   bHasCNT  :1     as ulong
   paShadow        as ShadowStruct ptr
   pData           as any ptr
-  as PartStruct tParts( (1 shl 25)-1 ) 'maximum number of parts (dynamic)
   #ifdef UseVBO
     tVBO as VBOStruct
   #endif
+  as PartStruct tParts( (1 shl 25)-1 ) 'maximum number of parts (dynamic)
 end type
 type ModelList
    iFilenameOffset as long                 'offset for the file name string
@@ -205,19 +205,27 @@ end type
 type Vertex3   
    as single fX,fY,fZ   
 end type
-type Color4   
-   as single fB,fG,fR,fA
-end type
 type VertexStruct
    as Vertex3 tPos,tNormal
-   as ulong uColor 'Color4 tColor   
+   as ulong uColor
 end type
-type VertexStruct0
+type VertexStructNoColor
   as Vertex3 tPos,tNormal
 end type
 
 type DisplayPiece
-  pModel        as DATFile ptr
-  atMatrix(9-1) as long
-  lBaseColor    as ulong
+  pModel         as DATFile ptr
+  tMatrix        as Matrix4x4
+  lBaseColor     as ulong  
+  lBaseEdge      as ulong
+end type
+
+type ModelDrawArrays
+  as long lTriangleCnt , lColorTriCnt 
+  as long lTransTriCnt , lTrColTriCnt
+  as long lBorderCnt   , lColorBrdCnt
+  as long lPieceCount  , lUniquePieces
+  as VertexStructNoColor ptr pTriangleVtx , pTransTriVtx , pBorderVtx
+  as VertexStruct        ptr pColorTriVtx , pTrColTriVtx , pColorBrdVtx  
+  as DisplayPiece        ptr pPieces
 end type

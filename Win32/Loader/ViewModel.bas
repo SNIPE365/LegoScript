@@ -1,5 +1,11 @@
 #define __Main "ViewModel.bas"
-#cmdline "-Wl '--large-address-aware'"
+#cmdline "-g -Wl '--large-address-aware'"
+
+#include "MyTDT\Exceptions.bas"
+StartExceptions()
+
+#include once "crt.bi"
+#include once "vbcompat.bi"
 
 '#define __Tester
 
@@ -11,9 +17,11 @@
 '#define DebugLoading
 
 #define UseVBO
+#define UseVBOEx
 
 '#ifndef __NoRender
 
+#include "Modules\Matrix.bas"
 #include "LoadLDR.bas"
 
 #include "Include\Colours.bas"
@@ -22,7 +30,6 @@
 #include "Modules\InitGL.bas"
 #include "Modules\Math3D.bas"
 #include "Modules\Normals.bas"
-#include "Modules\Matrix.bas"
 #include "Modules\Model.bas"
 '#include "Modules\modelA.bas"
 '#include "Modules\modelB.bas"
@@ -229,10 +236,13 @@ scope
    'sFile = sPath+"\examples\8891-towTruck.mpd"
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\5510.mpd"
    'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\examples\5510.mpd"
+   'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\examples\8851.mpd"
    'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\LDraw\models\pyramid.ldr"
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\cube10x10x10.ldr"
    'sFile = "C:\Users\greg\Desktop\LS\TLG_Map\TrainStationEntranceA.ldr"
-   sFile = "G:\Jogos\LegoScript-main\examples\TLG_Map0\Build\Blocks\B1\Eldon Square.ldr"
+   'sFile = "G:\Jogos\LegoScript-main\examples\TLG_Map0\Build\Blocks\B1\Eldon Square.ldr"
+   'sFile = "G:\Jogos\LegoScript-main\examples\TLG_Map\TestMap2.ldr"
+   sFile = "G:\Jogos\LegoScript-main\examples\TLG_Map\Blocks\10232 - Palace Cinema.mpd"
    'sFile = "C:\Users\greg\Desktop\LS\TLG_Map\FileA.ldr"
    'sFile = "light.dat"
    'sFile = "3001.dat" 
@@ -313,7 +323,7 @@ do
    next N
    g_sFilenames = chr(0) : g_sFilesToLoad = chr(0)   
 
-   #if 0 '1 = Load File , 0 = Load From clipboard
+   #if 1 '1 = Load File , 0 = Load From clipboard
       if len(sFile)=0 then sFile=command(1)
       if instr(sFile,"\")=0 andalso instr(sFile,"/")=0 then FindFile(sFile)
       printf(!"Model: '%s'\n",sFile)
@@ -393,38 +403,46 @@ do
    
    dLoadTIme = timer
    #ifdef UseVBO   
-      redim as VertexStruct atModelTrigs() , atModelVtxLines()
-      dim as long iTrianglesCount,iBorderCount
-      dim as GLuint iModelVBO, iBorderVBO
-      glGenBuffers(1, @iModelVBO) : glGenBuffers(1, @iBorderVBO)
-      
-      dim as VBOStruct tCntVBO
-      dim as long lUnique
-      var iPieces = GetPieceAndVtxCount( pModel , tCntVBO , lUnique )
-      puts("Number of Pieces: " & iPieces & " Unique: " & lUnique)
-      with tCntVBO
-        puts("Vtx Tri: " & .lTriangleCnt & " , Vtx CTri: " & .lColorTriCnt & _
-        " , Vtx Brd: " & .lBorderCnt & " , Vtx CBrd: " & .lColorBrdCnt )
-        
-        puts (( .lTriangleCnt*sizeof(VertexStruct0)+.lBorderCnt*sizeof(VertexStruct0) + _
-        .lColorTriCnt*sizeof(VertexStruct)+.lColorBrdCnt*sizeof(VertexStruct) )+1023)\1024 & "kb"
-        
-      end with
-      
-      
-      
-      GenArrayModel( pModel , atModelTrigs()     , false )
-      iTrianglesCount = ubound(atModelTrigs)+1   
-      glBindBuffer(GL_ARRAY_BUFFER, iModelVBO)
-      glBufferData(GL_ARRAY_BUFFER, iTrianglesCount*sizeof(VertexStruct), @atModelTrigs(0)     , GL_STATIC_DRAW)
-      erase( atModelTrigs )
+      #ifndef UseVBOEx
+        redim as VertexStruct atModelTrigs() , atModelVtxLines()
+        dim as long iTrianglesCount,iBorderCount
+        dim as GLuint iModelVBO, iBorderVBO
+        glGenBuffers(1, @iModelVBO) : glGenBuffers(1, @iBorderVBO)
          
-      GenArrayModel( pModel , atModelVtxLines() , true )
-      iBorderCount = ubound(atModelVtxLines)+1
-      glBindBuffer(GL_ARRAY_BUFFER, iBorderVBO)
-      glBufferData(GL_ARRAY_BUFFER, iBorderCount*sizeof(VertexStruct), @atModelVtxLines(0) , GL_STATIC_DRAW)
-      erase( atModelVtxLines )
-            
+        GenArrayModel( pModel , atModelTrigs()     , false )
+        iTrianglesCount = ubound(atModelTrigs)+1   
+        glBindBuffer(GL_ARRAY_BUFFER, iModelVBO)
+        glBufferData(GL_ARRAY_BUFFER, iTrianglesCount*sizeof(VertexStruct), @atModelTrigs(0)     , GL_STATIC_DRAW)
+        erase( atModelTrigs )
+           
+        GenArrayModel( pModel , atModelVtxLines() , true )
+        iBorderCount = ubound(atModelVtxLines)+1
+        glBindBuffer(GL_ARRAY_BUFFER, iBorderVBO)
+        glBufferData(GL_ARRAY_BUFFER, iBorderCount*sizeof(VertexStruct), @atModelVtxLines(0) , GL_STATIC_DRAW)
+        erase( atModelVtxLines )
+      #else     
+        dim as ModelDrawArrays tModelArrays
+        GenModelDrawArrays( pModel , tModelArrays )
+        
+        #macro CreateVBO( _name )
+          dim as GLuint i##_name##VBO : glGenBuffers(1 , @i##_name##VBO)          
+          with tModelArrays
+            if .p##_name##vtx andalso .l##_name##Cnt then
+              glBindBuffer(GL_ARRAY_BUFFER, i##_name##VBO)          
+              glBufferData(GL_ARRAY_BUFFER, .l##_name##Cnt * sizeof(typeof(*.p##_name##vtx)), .p##_name##vtx , GL_STATIC_DRAW)          
+              'free( p##_name##vtx )
+            end if
+          end with
+        #endmacro
+        
+        CreateVBO( Triangle )
+        CreateVBO( ColorTri )
+        'CreateVBO( TransTri )
+        CreateVBO( TrColTri )
+        CreateVBO( Border   )
+        CreateVBO( ColorBrd )
+        
+      #endif
    #else
       var iModel   = glGenLists( 1 )
       var iBorders = glGenLists( 2 )
@@ -551,7 +569,8 @@ do
          if g_bNeedUpdate then g_bNeedUpdate=false : UpdateCameraVectors()   
          dim as single fTargetX=g_fCameraX+g_fFrontX , fTargetY=g_fCameraY+g_fFrontY , fTargetZ=g_fCameraZ+g_fFrontZ
          
-         dim as GLfloat lightPos(...) = {g_fCameraX,g_fCameraY,g_fCameraZ, 1.0f}'; // (x, y, z, w), w=1 for positional light
+         'dim as GLfloat lightPos(...) = {g_fCameraX,g_fCameraY,g_fCameraZ, 1.0f}'; // (x, y, z, w), w=1 for positional light
+         dim as GLfloat lightPos(...) = {0,0,0, 1.0f}
          glLightfv(GL_LIGHT0, GL_POSITION, @lightPos(0))
             
          ' gluLookAt(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ)
@@ -562,8 +581,29 @@ do
          )
             
          #ifdef UseVBO
-            DrawColorVBO( iModelVBO , GL_TRIANGLES , iTrianglesCount )
-            if bViewBorders then DrawColorVBO( iBorderVBO , GL_LINES , iBorderCount )
+            #ifndef UseVBOEx
+              DrawColorVBO( iModelVBO , GL_TRIANGLES , iTrianglesCount )
+              if bViewBorders then DrawColorVBO( iBorderVBO , GL_LINES , iBorderCount )
+            #else
+              with tModelArrays
+                glDisable( GL_BLEND )
+                glEnableClientState(GL_VERTEX_ARRAY)
+                glEnableClientState(GL_NORMAL_ARRAY)
+                DrawPieces( Triangle , GL_TRIANGLES , false )
+                DrawPieces( ColorTri , GL_TRIANGLES , true  )
+                glEnable( GL_BLEND )                  
+                DrawPieces( TransTri , GL_TRIANGLES , false )
+                DrawPieces( TrColTri , GL_TRIANGLES , true  )
+                glDisable( GL_BLEND )
+                if bViewBorders then 
+                  DrawPieces( Border   , GL_LINES     , false )
+                  DrawPieces( ColorBrd , GL_LINES     , true  )
+                end if
+                glDisableClientState(GL_COLOR_ARRAY)
+                glDisableClientState(GL_NORMAL_ARRAY)
+                glDisableClientState(GL_VERTEX_ARRAY)
+              end with
+            #endif
          #else
             glCallList(	iModel )
             if bViewBorders then glCallList(	iBorders-(g_CurDraw>=0) )      
@@ -687,7 +727,28 @@ do
          if g_CurDraw < 0 then
             'render whole model
             #ifdef UseVBO
-               DrawColorVBO( iModelVBO , GL_TRIANGLES , iTrianglesCount )
+              #ifndef UseVBOEx
+                DrawColorVBO( iModelVBO , GL_TRIANGLES , iTrianglesCount )
+              #else                
+                with tModelArrays
+                  glDisable( GL_BLEND )
+                  glEnableClientState(GL_VERTEX_ARRAY)
+                  glEnableClientState(GL_NORMAL_ARRAY)
+                  DrawPieces( Triangle , GL_TRIANGLES , false )
+                  DrawPieces( ColorTri , GL_TRIANGLES , true  )
+                  glEnable( GL_BLEND )                  
+                  DrawPieces( TransTri , GL_TRIANGLES , false )
+                  DrawPieces( TrColTri , GL_TRIANGLES , true  )
+                  glDisable( GL_BLEND )
+                  if bViewBorders then 
+                    DrawPieces( Border   , GL_LINES     , false )
+                    DrawPieces( ColorBrd , GL_LINES     , true  )
+                  end if
+                  glDisableClientState(GL_COLOR_ARRAY)
+                  glDisableClientState(GL_NORMAL_ARRAY)
+                  glDisableClientState(GL_VERTEX_ARRAY)
+                end with
+              #endif
             #else
                glCallList(	iModel )
             #endif
@@ -698,10 +759,16 @@ do
          if bViewBorders then 
             #ifdef UseVBO         
                if g_CurDraw<0 then            
+                 #ifndef UseVBOEx
                   DrawColorVBO( iBorderVBO , GL_LINES , iBorderCount )
+                  #else
+                  #endif
                else
+                 #ifndef UseVBOEx
                   glColor4f(.5,.5,.5,.33)
                   DrawVBO( iBorderVBO , GL_LINES , iBorderCount )
+                 #else
+                 #endif
                end if
             #else
                glCallList(	iBorders-(g_CurDraw>=0) )

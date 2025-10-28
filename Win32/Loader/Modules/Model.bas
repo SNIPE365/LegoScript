@@ -524,54 +524,366 @@ function GenArrayModel( pPart as DATFile ptr , aVertex() as VertexStruct , iBord
    
 end function
 
-function GetPieceAndVtxCount( pPart as DATFile ptr , byref tCntVBO as VBOStruct , byref lUnique as long = 0 , byref lCurPos as long = 0 ) as ulong  
-  with *pPart
-    var bHasCNT = .bHasCNT
+function AllocateModelDrawArrays( pPart as DATFile ptr , tDraw as ModelDrawArrays , bFlags as byte = 1 ) as boolean
+  const bRoot=1 , bNewPart=2 , bPart=4
+  with *pPart 'include: "andalso .bHasVBO=0"
+    if .bIsUnique andalso .bHasCNT=0 then .bHasCNT=1 : bFlags or= (bNewPart or bPart)
     for N as long = 0 to .iPartCount-1
-      with .tParts(N)            
+      with .tParts(N)
         select case .bType
         case 1 'include
           with ._1
-            var pSubPart = g_tModels(.lModelIndex).pModel                     
-            GetPieceAndVtxCount( pSubPart , tCntVBO , lUnique , lCurPos )
-          end with
+            var pSubPart = g_tModels(.lModelIndex).pModel
+            AllocateModelDrawArrays( pSubPart , tDraw , (bFlags and bPart) )
+          end with          
         case 2 'line
-          if bHasCNT then continue for
+          if (bFlags and bPart)=0 then continue for
           if .wColour = c_Edge_Colour then
-            tCntVBO.lBorderCnt += 2
+            tDraw.lBorderCnt += 2
           else
-            tCntVBO.lColorBrdCnt += 2
+            tDraw.lColorBrdCnt += 2
           end if
         case 3 'triangle
-          if bHasCNT then continue for
+          if (bFlags and bPart)=0 then continue for
           if .wColour = c_Main_Colour then
-            tCntVBO.lTriangleCnt += 3
+            tDraw.lTriangleCnt += 3
           else
-            tCntVBO.lColorTriCnt += 3
+            tDraw.lColorTriCnt += 3
           end if
         case 4 'quad
-          if bHasCNT then continue for
+          if (bFlags and bPart)=0 then continue for
           if .wColour = c_Main_Colour then
-            tCntVBO.lTriangleCnt += 6
+            tDraw.lTriangleCnt += 6
           else
-            tCntVBO.lColorTriCnt += 6
-          end if           
-        case 5 'optional line
-          continue for
-          if bHasCNT then continue for
-          if .wColour = c_Edge_Colour then
-            tCntVBO.lBorderCnt += 2
-          else
-            tCntVBO.lColorBrdCnt += 2
+            tDraw.lColorTriCnt += 6
           end if
+        case 5 'optional line
+          #ifdef RenderOptionals
+            if bFlags.bPart=0 then continue for
+            if .wColour = c_Edge_Colour then
+              tDraw.lBorderCnt += 2
+            else
+              tDraw.lColorBrdCnt += 2
+            end if
+          #endif
         end select
       end with
     next N
-    if .bIsUnique then lCurPos += 1 : if .bHasCNT=0 then lUnique += 1
-    .bHasCNT = 1
+    if .bIsUnique then
+      tDraw.lPieceCount += 1 
+      if (bFlags and bNewPart) then 
+        tDraw.lUniquePieces += 1 : bFlags and= (not (bNewPart or bPart))            
+      end if
+    end if    
   end with      
-  return lCurPos
-end function  
+  if (bFlags and bRoot) then
+    with tDraw      
+      #define Init( _Member ) .p##_Member##Vtx = iif(.l##_Member##Cnt,malloc(.l##_Member##cnt * sizeof(typeof(*.p##_Member##Vtx))),NULL)
+      Init( Triangle ) : Init( TransTri ) : Init( Border )
+      Init( ColorTri ) : Init( TrColTri ) : Init( ColorBrd )      
+      .pPieces = iif( .lPieceCount , malloc( sizeof(typeof(*.pPieces)) * (.lPieceCount) ) , NULL )
+    end with
+  end if    
+  return true
+end function
+function GenModelDrawArrays( pPart as DATFile ptr , tDraw as ModelDrawArrays, uCurrentColor as ulong = 0, uCurrentEdge as ulong = 0 , bFlags as byte = 1 ) as ulong
+  const bRoot=1 , bNewPart=2 , bPart=4
+  static as long _lTriangleCnt , _lColorTriCnt , _lBorderCnt , _lTransTriCnt , _lTrColTriCnt , _lColorBrdCnt , _lPieceCount
+  
+  if (bFlags and bRoot) then
+    AllocateModelDrawArrays( pPart , tDraw )        
+    with tDraw 'show info
+      puts("Number of Pieces: " & .lPieceCount & " Unique: " & .lUniquePieces)        
+      puts("Vtx Tri: " & .lTriangleCnt & " , Vtx CTri: " & .lColorTriCnt & _
+      " , Vtx Brd: " & .lBorderCnt & " , Vtx CBrd: " & .lColorBrdCnt )
+        
+      puts ((.lPieceCount*sizeof(DisplayPiece)+ _
+        .lTriangleCnt*sizeof(VertexStructNoColor)+ _
+        .lBorderCnt*sizeof(VertexStructNoColor) + _
+        .lColorTriCnt*sizeof(VertexStruct)+ _
+        .lColorBrdCnt*sizeof(VertexStruct) ) _
+        +1023)\1024 & "kb"
+        
+    end with
+    with tDraw 'store temp counts and reset for re-count
+      _lTriangleCnt = .lTriangleCnt : _lColorTriCnt = .lColorTriCnt 
+      _lBorderCnt   = .lBorderCnt   : _lTransTriCnt = .lTransTriCnt 
+      _lTrColTriCnt = .lTrColTriCnt : _lColorBrdCnt = .lColorBrdCnt
+      _lPieceCount  = .lPieceCount
+      .lTriangleCnt = 0 : .lColorTriCnt = 0 : .lBorderCnt   = 0
+      .lTransTriCnt = 0 : .lTrColTriCnt = 0 : .lColorBrdCnt = 0 
+      .lPieceCount = 0
+    end with
+    uCurrentColor = g_Colours(c_Blue) : uCurrentEdge = g_EdgeColours(c_Blue)
+  end if   
+  
+  var uEdge = uCurrentEdge  
+         
+  with *pPart    
+    'if it's a unique piece then start storing a new piece
+    if .bIsUnique then       
+      with tDraw.pPieces[tDraw.lPieceCount]        
+        .pModel  = pPart
+        .tMatrix = tCurrentMatrix()
+        .lBaseColor = uCurrentColor
+        .lBaseEdge  = uCurrentEdge
+      end with
+      if .bHasCNT then
+        .bHasCNT = 0 : .bHasVBO = 1 : bFlags or= (bNewPart or bPart)
+        with .tVBO          
+          .lTriangleOff = tDraw.lTriangleCnt
+          .lColorTriOff = tDraw.lColorTriCnt
+          .lTransTriOff = tDraw.lTransTriCnt 
+          .lTrColTriOff = tDraw.lTrColTriCnt 
+          .lBorderOff   = tDraw.lBorderCnt   
+          .lColorBrdOff = tDraw.lColorBrdCnt 
+        end with
+      end if
+      PushIdentityMatrix()
+    end if
+    
+    for N as long = 0 to .iPartCount-1
+      dim as ulong uColor = any', uEdge = any
+      with .tParts(N)
+        var wColour = .wColour
+        if .wColour = c_Main_Colour then 'inherit
+          uColor = uCurrentColor ': uEdge = uCurrentEdge
+        elseif .wColour <> c_Edge_Colour then
+          if .wColour > ubound(g_Colours) then
+            puts("Bad Color: " & .wColour)
+          end if
+          uColor = g_Colours(.wColour)
+        end if      
+        select case .bType
+        case 1 'includes
+          'if wColour <> c_Main_Colour then printf("@")
+          'uEdge = rgb(rnd*255,rnd*255,rnd*255)
+          uEdge = ((uColor and &hFEFEFE) shr 1) or (uColor and &hFF000000)
+          'g_EdgeColours(.wColour)
+          var T1 = ._1
+          with T1          
+            var pSubPart = g_tModels(.lModelIndex).pModel            
+            #ifdef DebugPrimitive
+              var sName = *cptr(zstring ptr,strptr(g_sFilenames)+g_tModels(.lModelIndex).iFilenameOffset+6)
+              Puts _
+                 " fX:" & .fX & " fY:" & .fY & " fZ:" & .fZ & _
+                 " fA:" & .fA & " fB:" & .fB & " fC:" & .fC & _
+                 " fD:" & .fD & " fE:" & .fE & " fF:" & .fF & _
+                 " fG:" & .fG & " fH:" & .fH & " fI:" & .fI & " '" & sName & "'"                     
+            #endif                             
+            'MultiplyMatrixVector( @.fX )
+            dim as single fMatrix(15) = { _
+             .fA*cScale , .fD*cScale , .fG*cScale , 0 , _ 'X scale ,    ?    ,    ?    
+             .fB*cScale , .fE*cScale , .fH*cScale , 0 , _ '  ?     , Y Scale ,    ?    
+             .fC*cScale , .fF*cScale , .fI*cScale , 0 , _ '  ?     ,    ?    , Z Scale 
+             .fX*cScale , .fY*cScale , .fZ*cScale , 1 }   ' X Pos  ,  Y Pos  ,  Z Pos  
+            'if sName = "axle.dat" then fMatrix(4) *= 2
+            PushAndMultMatrix( @fMatrix(0) )
+            GenModelDrawArrays( pSubPart , tDraw, uColor , uEdge , (bFlags and bPart) )
+            PopMatrix()        
+          end with               
+        case 2 'line
+          if (bFlags and bPart)=0 then continue for
+          var T2 = ._2 , bIsDefaultColor = (.wColour = c_Edge_Colour)
+          MultiplyMatrixVector( @T2.fX1 )
+          MultiplyMatrixVector( @T2.fX2 )
+          dim as Vertex3 tNormal = any
+          SetLineNormal( T2 , @tNormal )                                       
+          with T2
+            #ifdef DebugPrimitive
+            puts _
+               " fX1:" & .fX1 & " fY1:" & .fY1 & " fZ1:" & .fZ1 & _
+               " fX2:" & .fX2 & " fY2:" & .fY2 & " fZ2:" & .fZ2
+            #endif
+            
+            if bIsDefaultColor then
+              var pVtx = tDraw.pBorderVtx+tDraw.lBorderCnt : tDraw.lBorderCnt += 2
+              pVtx[0].tPos    = type(.fX1*cScale,.fY1*cScale,.fZ1*cScale)              
+              pVtx[0].tNormal = tNormal
+              pVtx[1].tPos    = type(.fX2*cScale,.fY2*cScale,.fZ2*cScale)
+              pVtx[1].tNormal = pVtx[0].tNormal              
+            else
+              var pVtx = tDraw.pColorBrdVtx+tDraw.lColorBrdCnt : tDraw.lColorBrdCnt += 2                                        
+              pVtx[0].tPos    = type(.fX1*cScale,.fY1*cScale,.fZ1*cScale)
+              pVtx[0].tNormal = tNormal
+              pVtx[0].uColor = ((uEdge shr 2) and &hFF000000) or (uEdge and &hFFFFFF)
+              pVtx[1].tPos    = type(.fX2*cScale,.fY2*cScale,.fZ2*cScale)
+              pVtx[1].tNormal = tNormal
+              pVtx[1].uColor  = pVtx[0].uColor
+            end if
+            
+          end with
+        case 3 'triangle
+          if (bFlags and bPart)=0 then continue for
+          var T3 = ._3 , bIsDefaultColor = (.wColour = c_Main_Colour)
+          MultiplyMatrixVector( @T3.fX1 ) 
+          MultiplyMatrixVector( @T3.fX2 )
+          MultiplyMatrixVector( @T3.fX3 )
+          dim as vertex3 tNormal = any
+          SetTrigNormal( T3 , @tNormal )
+          
+          with T3
+            #ifdef DebugPrimitive
+               puts _
+                  " fX1:" & .fX1 & " fY1:" & .fY1 & " fZ1:" & .fZ1 & _
+                  " fX2:" & .fX2 & " fY2:" & .fY2 & " fZ2:" & .fZ2 & _
+                  " fX3:" & .fX3 & " fY3:" & .fY3 & " fZ3:" & .fZ3
+            #endif            
+            if bIsDefaultColor then
+              var pVtx = tDraw.pTriangleVtx+tDraw.lTriangleCnt : tDraw.lTriangleCnt += 3
+              pVtx[0].tPos    = type(.fX1*cScale,.fY1*cScale,.fZ1*cScale)
+              pVtx[0].tNormal = tNormal              
+              pVtx[1].tPos    = type(.fX2*cScale,.fY2*cScale,.fZ2*cScale)
+              pVtx[1].tNormal = tNormal              
+              pVtx[2].tPos    = type(.fX3*cScale,.fY3*cScale,.fZ3*cScale)
+              pVtx[2].tNormal = tNormal              
+            else
+              var pVtx = tDraw.pColorTriVtx+tDraw.lColorTriCnt : tDraw.lColorTriCnt += 3              
+              pVtx[0].tPos    = type(.fX1*cScale,.fY1*cScale,.fZ1*cScale)
+              pVtx[0].tNormal = tNormal
+              pVtx[0].uColor  = uColor
+              pVtx[1].tPos    = type(.fX2*cScale,.fY2*cScale,.fZ2*cScale)
+              pVtx[1].tNormal = tNormal
+              pVtx[1].uColor  = uColor
+              pVtx[2].tPos    = type(.fX3*cScale,.fY3*cScale,.fZ3*cScale)
+              pVtx[2].tNormal = tNormal
+              pVtx[2].uColor  = uColor
+            end if            
+          end with
+        case 4 'quad
+          if (bFlags and bPart)=0 then continue for
+          var T4 = ._4 , bIsDefaultColor = (.wColour = c_Main_Colour)              
+          MultiplyMatrixVector( @T4.fX1 ) 
+          MultiplyMatrixVector( @T4.fX2 )
+          MultiplyMatrixVector( @T4.fX3 )
+          MultiplyMatrixVector( @T4.fX4 )               
+          dim as vertex3 tNormal = any
+          SetQuadNormal( T4 , @tNormal )          
+          with T4
+            #ifdef DebugPrimitive
+               puts _
+                  " fX1:" & .fX1 & " fY1:" & .fY1 & " fZ1:" & .fZ1 & _
+                  " fX2:" & .fX2 & " fY2:" & .fY2 & " fZ2:" & .fZ2 & _
+                  " fX3:" & .fX3 & " fY3:" & .fY3 & " fZ3:" & .fZ3 & _
+                  " fX4:" & .fX4 & " fY4:" & .fY4 & " fZ4:" & .fZ4
+            #endif
+            
+            if bIsDefaultColor then
+              var pVtx = tDraw.pTriangleVtx+tDraw.lTriangleCnt : tDraw.lTriangleCnt += 6
+              pVtx[0].tPos    = type(.fX1*cScale,.fY1*cScale,.fZ1*cScale)
+              pVtx[0].tNormal = tNormal
+              pVtx[1].tPos    = type(.fX2*cScale,.fY2*cScale,.fZ2*cScale)
+              pVtx[1].tNormal = tNormal
+              pVtx[2].tPos    = type(.fX3*cScale,.fY3*cScale,.fZ3*cScale)
+              pVtx[2].tNormal = tNormal
+              pVtx[3].tPos    = type(.fX1*cScale,.fY1*cScale,.fZ1*cScale)
+              pVtx[3].tNormal = tNormal
+              pVtx[4].tPos    = type(.fX3*cScale,.fY3*cScale,.fZ3*cScale)
+              pVtx[4].tNormal = tNormal
+              pVtx[5].tPos    = type(.fX4*cScale,.fY4*cScale,.fZ4*cScale)
+              pVtx[5].tNormal = tNormal              
+            else
+              var pVtx = tDraw.pColorTriVtx+tDraw.lColorTriCnt : tDraw.lColorTriCnt += 6
+              pVtx[0].uColor  = uColor
+              pVtx[0].tPos    = type(.fX1*cScale,.fY1*cScale,.fZ1*cScale)
+              pVtx[0].tNormal = tNormal
+              pVtx[1].tPos    = type(.fX2*cScale,.fY2*cScale,.fZ2*cScale)
+              pVtx[1].tNormal = tNormal
+              pVtx[1].uColor  = uColor
+              pVtx[2].tPos    = type(.fX3*cScale,.fY3*cScale,.fZ3*cScale)
+              pVtx[2].tNormal = tNormal
+              pVtx[2].uColor  = uColor
+              pVtx[3].tPos    = type(.fX1*cScale,.fY1*cScale,.fZ1*cScale)
+              pVtx[3].tNormal = tNormal
+              pVtx[3].uColor  = uColor
+              pVtx[4].tPos    = type(.fX3*cScale,.fY3*cScale,.fZ3*cScale)
+              pVtx[4].tNormal = tNormal
+              pVtx[4].uColor  = uColor
+              pVtx[5].tPos    = type(.fX4*cScale,.fY4*cScale,.fZ4*cScale)
+              pVtx[5].tNormal = tNormal
+              pVtx[5].uColor  = uColor
+            end if
+            
+          end with
+        case 5 'opt line
+          #ifdef RenderOptionals
+            if (bFlags and bPart)=0 then continue for
+            var T5 = ._5 , bIsDefaultColor = (.wColour = c_Edge_Colour)              
+            MultiplyMatrixVector( @T5.fX1 )
+            MultiplyMatrixVector( @T5.fX2 )
+            #ifdef DebugPrimitive
+               puts _
+                  " fX1:" & .fX1 & " fY1:" & .fY1 & " fZ1:" & .fZ1 & _
+                  " fX2:" & .fX2 & " fY2:" & .fY2 & " fZ2:" & .fZ2 & _
+                  " fXA:" & .fX3 & " fYA:" & .fY3 & " fZA:" & .fZ3 & _
+                  " fXB:" & .fX4 & " fYB:" & .fY4 & " fZB:" & .fZ4
+            #endif
+            dim as Vertex3 tNormal = any
+            SetLineNormal( *cptr( typeof(._2) ptr , @T5 ) , @tNormal )
+            with T5
+              #ifdef DebugPrimitive
+              puts _
+                 " fX1:" & .fX1 & " fY1:" & .fY1 & " fZ1:" & .fZ1 & _
+                 " fX2:" & .fX2 & " fY2:" & .fY2 & " fZ2:" & .fZ2
+              #endif
+              
+              if bIsDefaultColor then
+                var pVtx = tDraw.pBorderVtx+tDraw.lBorderCnt : tDraw.lBorderCnt += 2
+                pVtx[0].tPos    = type(.fX1*cScale,.fY1*cScale,.fZ1*cScale)              
+                pVtx[0].tNormal = tNormal
+                pVtx[1].tPos    = type(.fX2*cScale,.fY2*cScale,.fZ2*cScale)
+                pVtx[1].tNormal = pVtx[0].tNormal              
+              else
+                var pVtx = tDraw.pColorBrdVtx+tDraw.lColorBrdCnt : tDraw.lColorBrdCnt += 2                                        
+                pVtx[0].tPos    = type(.fX1*cScale,.fY1*cScale,.fZ1*cScale)
+                pVtx[0].tNormal = tNormal
+                pVtx[0].uColor = ((uEdge shr 2) and &hFF000000) or (uEdge and &hFFFFFF)
+                pVtx[1].tPos    = type(.fX2*cScale,.fY2*cScale,.fZ2*cScale)
+                pVtx[1].tNormal = tNormal
+                pVtx[1].uColor  = pVtx[0].uColor
+              end if
+              
+            end with
+          #endif
+        end select
+      end with
+    next N
+    
+    if .bIsUnique then
+      if (bFlags and bNewPart) then
+        bFlags and= (not (bNewPart or bPart))
+        with .tVBO
+          .lTriangleCnt = tDraw.lTriangleCnt-.lTriangleOff
+          .lColorTriCnt = tDraw.lColorTriCnt-.lColorTriOff
+          .lTransTriCnt = tDraw.lTransTriCnt-.lTransTriOff
+          .lTrColTriCnt = tDraw.lTrColTriCnt-.lTrColTriOff
+          .lBorderCnt   = tDraw.lBorderCnt  -.lBorderOff
+          .lColorBrdCnt = tDraw.lBorderCnt  -.lColorBrdOff
+        end with
+      end if
+      PopMatrix()
+      tDraw.lPieceCount += 1
+    end if    
+    
+  end with
+  
+  if (bFlags and bRoot) then
+    with tDraw
+      var bFailed = 0
+      if _lTriangleCnt <> .lTriangleCnt then puts "mismatch Triangle: " & _lTriangleCnt & " <> " & .lTriangleCnt : bFailed = 1
+      if _lColorTriCnt <> .lColorTriCnt then puts "mismatch ColorTri: " & _lColorTriCnt & " <> " & .lColorTriCnt : bFailed = 1
+      if _lBorderCnt   <> .lBorderCnt   then puts "mismatch Border..: " & _lBorderCnt   & " <> " & .lBorderCnt   : bFailed = 1
+      if _lTransTriCnt <> .lTransTriCnt then puts "mismatch TransTri: " & _lTransTriCnt & " <> " & .lTransTriCnt : bFailed = 1
+      if _lTrColTriCnt <> .lTrColTriCnt then puts "mismatch TrColTri: " & _lTrColTriCnt & " <> " & .lTrColTriCnt : bFailed = 1
+      if _lColorBrdCnt <> .lColorBrdCnt then puts "mismatch ColorBrd: " & _lColorBrdCnt & " <> " & .lColorBrdCnt : bFailed = 1
+      if _lPieceCount  <> .lPieceCount  then puts "mismatch Pieces..: " & _lPieceCount  & " <> " & .lPieceCount  : bFailed = 1
+      if bFailed then getchar()
+    end with        
+  end if
+  
+  return tDraw.lPieceCount
+   
+end function
 
 #endif
 
@@ -2065,6 +2377,55 @@ end sub
    glDisableClientState(GL_VERTEX_ARRAY)
 #endmacro
 
+#macro DrawPieces( __name , _type , _UseColor )
+  #if #__name = "TransTri"
+    _DrawPieces( Triangle , _type , _UseColor , true )
+  #else
+    _DrawPieces( __name , _type , _UseCOlor , false )
+  #endif
+#endmacro
+#macro _DrawPieces( _name , _type , _UseColor , _Transparency )                  
+  if .l##_name##Cnt then
+    glBindBuffer(GL_ARRAY_BUFFER, i##_name##VBO )
+    #if _UseColor                      
+      const cVtxSz = sizeof(VertexStruct)
+      glEnableClientState(GL_COLOR_ARRAY)
+      glVertexPointer(3, GL_FLOAT        , cVtxSz, cast(any ptr,offsetof(VertexStruct,tPos   )) )
+      glNormalPointer(   GL_FLOAT        , cVtxSz, cast(any ptr,offsetof(VertexStruct,tNormal)) )                  
+      glColorPointer (4, GL_UNSIGNED_BYTE, cVtxSz, cast(any ptr,offsetof(VertexStruct,uColor )) )
+    #else
+      const cVtxSz = sizeof(VertexStructNoColor)
+      glDisableClientState(GL_COLOR_ARRAY)                    
+      glVertexPointer(3, GL_FLOAT        , cVtxSz, cast(any ptr,offsetof(VertexStructNoColor,tPos   )) )
+      glNormalPointer(   GL_FLOAT        , cVtxSz, cast(any ptr,offsetof(VertexStructNoColor,tNormal)) )                    
+    #endif                                                            
+    for N as long = 0 to .lPieceCount-1
+      with .pPieces[N]                        
+        if .pModel andalso .pModel->tVBO.l##_name##Cnt then
+          #if #_name = "Triangle"
+            #if _Transparency
+              if (.lBaseColor and &hFF000000) = &hFF000000 then continue for
+            #else                          
+              if (.lBaseColor and &hFF000000) <> &hFF000000 then continue for
+            #endif
+          #endif                          
+          glPushMatrix()
+          glMultMatrixf( @.tMatrix.m(0) )
+          #if _type = GL_LINES
+            'var lColor = ((.lBaseColor shr 2) and &hFF000000) or (.lBaseColor and &hFFFFFF)                          
+            glColor4ubv( cast(ubyte ptr,@.lBaseEdge) )
+          #else
+            glColor4ubv( cast(ubyte ptr,@.lBaseColor) )
+          #endif                          
+          with .pModel->tVBO                            
+            glDrawArrays( _type, .l##_name##Off , .l##_name##Cnt )                            
+          end with
+          glPopMatrix()
+        end if
+      end with                      
+    next N                    
+  end if
+#endmacro
 
 #endif
 

@@ -68,7 +68,7 @@ function LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as 
       if *pFile=0 then exit do 'last line of file so we're done SUCCESS
       iLineNum += 1 : pFile += 1 'now it point to the being of next line
    #endmacro
-         
+
    var iPos = instrrev(sFromFile,"\") , iPos2 = instrrev(sFromFile,"/")
    if iPos2 > iPos then iPos = iPos2      
    var sShadowFile = mid(sFromFile,iPos+1)
@@ -639,13 +639,13 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
          end if
          if pT=NULL then 'first allocation
             pT = pNew            
-            
+            clear *pNew , 0 , offsetof( DATFile , tParts(0) )
             'add to list
             iFilenameOffset = LoadedList_AddFile( sFilename , iModelIndex )
             pNew->iModelIndex = iModelIndex
-            pNew->iShadowCount = 0
-            pNew->pData = NULL
-            pNew->paShadow = NULL
+            'pNew->iShadowCount = 0
+            'pNew->pData = NULL
+            'pNew->paShadow = NULL
             with pNew->tSize
                .xMin = fUnused : .xMax = fUnused
                .yMin = fUnused : .yMax = fUnused
@@ -710,7 +710,7 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
                continue do
             end if
             
-            print "SubModel: '"+sFile+"'"
+            'print "SubModel: '"+sFile+"'"
             
             var iOffset = LoadedList_IsFileLoaded( sFile ), iIndex = -1 'default to new index
                         
@@ -950,6 +950,7 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
    
    if tLoadFlags.bIsPart=1 then 'this is the begin of a part
       if pT then pT->bIsUnique = 1
+      'puts(sFilename)
    end if
    
    return pT
