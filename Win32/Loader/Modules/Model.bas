@@ -256,6 +256,7 @@ sub RenderModel( pPart as DATFile ptr , iBorders as long , uCurrentColor as ulon
    end with   
 end sub
 
+#ifndef UseVBOEx
 function GetModelVertexCount( pPart as DATFile ptr , iBorders as long , lDrawPart as long = -1 , byref lCurPos as long = 0 ) as ulong
                     
    with *pPart
@@ -523,8 +524,7 @@ function GenArrayModel( pPart as DATFile ptr , aVertex() as VertexStruct , iBord
    return lCurPos
    
 end function
-
-#ifdef UseVBOEx
+#else
 function AllocateModelDrawArrays( pPart as DATFile ptr , tDraw as ModelDrawArrays , bFlags as byte = 1 ) as boolean
   const bRoot=1 , bNewPart=2 , bPart=4
   with *pPart 'include: "andalso .bHasVBO=0"
@@ -644,7 +644,7 @@ function GenModelDrawArrays( pPart as DATFile ptr , tDraw as ModelDrawArrays, uC
     end if
     
     for N as long = 0 to .iPartCount-1
-      dim as ulong uColor = any', uEdge = any
+      dim as ulong uColor', uEdge = any
       with .tParts(N)
         var wColour = .wColour
         if .wColour = c_Main_Colour then 'inherit
@@ -1160,7 +1160,6 @@ type Vector3
     as single x, y, z
 end type
 #endif
-
 
 type SnapPV
    as Vector3 tPos      'position
@@ -2403,27 +2402,34 @@ end sub
     #endif                                                            
     for N as long = 0 to .lPieceCount-1
       with .pPieces[N]                        
-        if .pModel andalso .pModel->tVBO.l##_name##Cnt then
-          #if #_name = "Triangle"
-            #if _Transparency
-              if (.lBaseColor and &hFF000000) = &hFF000000 then continue for
-            #else                          
-              if (.lBaseColor and &hFF000000) <> &hFF000000 then continue for
-            #endif
-          #endif                          
-          glPushMatrix()
-          glMultMatrixf( @.tMatrix.m(0) )
-          #if _type = GL_LINES
-            'var lColor = ((.lBaseColor shr 2) and &hFF000000) or (.lBaseColor and &hFFFFFF)                          
+        '.pModel is assumed always valid by pre-step (before the macro)
+        if .bDisplay=0 orelse .pModel=0 orelse .pModel->tVBO.l##_name##Cnt=0 then continue for 
+        #if #_name = "Triangle"
+          #if _Transparency
+            if (.lBaseColor and &hFF000000) = &hFF000000 then continue for
+          #else                          
+            if (.lBaseColor and &hFF000000) <> &hFF000000 then continue for
+          #endif
+        #endif                                  
+        'MultMatrix4x4( tMat , tCur , .tMatrix ) : glLoadMatrixf( @tMat.m(0) )
+        #if _type = GL_LINES
+          if .bSkipBorder then continue for
+          'var lColor = ((.lBaseColor shr 2) and &hFF000000) or (.lBaseColor and &hFFFFFF)                          
+          if uLastColor <> .lBaseEdge then 
+            uLastColor = .lBaseEdge
             glColor4ubv( cast(ubyte ptr,@.lBaseEdge) )
-          #else
+          end if
+        #else
+          if .bSkipBody then continue for
+          if uLastColor <> .lBaseColor then 
+            uLastColor = .lBaseColor
             glColor4ubv( cast(ubyte ptr,@.lBaseColor) )
-          #endif                          
-          with .pModel->tVBO                            
-            glDrawArrays( _type, .l##_name##Off , .l##_name##Cnt )                            
-          end with
-          glPopMatrix()
-        end if
+          end if
+        #endif
+        glLoadMatrixf( @.tMatView.m(0) )
+        with .pModel->tVBO                            
+          glDrawArrays( _type, .l##_name##Off , .l##_name##Cnt )
+        end with
       end with                      
     next N                    
   end if

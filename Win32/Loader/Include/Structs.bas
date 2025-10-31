@@ -180,9 +180,11 @@ type DATFile
   'fSizeZ          as single     'Z Size
   'this info is filled dynamically based on studs/clutches etc... (also including the shadow info)
   iShadowCount:16 as ulong 'number of entries in the shadow dynamic array
-  bIsUnique:1     as ulong 'if 1 then this is not a .ldr but a .dat, and a main one, not an included one
-  bHasVBO  :1     as ulong 'if this is unique, this means that the VBO for this part was loaded.
-  bHasCNT  :1     as ulong
+  bIsUnique   :1  as ulong 'if 1 then this is not a .ldr but a .dat, and a main one, not an included one
+  bHasVBO     :1  as ulong 'if this is unique, this means that the VBO for this part was loaded.
+  bHasCNT     :1  as ulong 'temporary used while generate vertex
+  bHasSize    :1  as ulong 'size was calculated for this part
+  bHasCube    :1  as ulong 'have mapped cube (3D imposter)
   paShadow        as ShadowStruct ptr
   pData           as any ptr
   #ifdef UseVBO
@@ -214,10 +216,12 @@ type VertexStructNoColor
 end type
 
 type DisplayPiece
-  pModel         as DATFile ptr
-  tMatrix        as Matrix4x4
-  lBaseColor     as ulong  
-  lBaseEdge      as ulong
+  as DATFile ptr pModel  
+  as Matrix4x4   tMatrix , tMatView       
+  as ulong       lBaseColor , lBaseEdge
+  bSkipBody  :1 as ulong
+  bSkipBorder:1 as ulong
+  bDisplay   :1 as ulong
 end type
 
 type ModelDrawArrays

@@ -44,7 +44,10 @@
    _do( glGenBuffers )
    _do( glBindBuffer )
    _do( glBufferData )
+   _do( wglSwapIntervalEXT )
 #endmacro
+
+type PFNWGLSWAPINTERVALEXTPROC as function (as long) as winbool
 
 #define DeclareExtension(_NAME) static shared as PFN##_NAME##PROC _NAME
 ForEachExtensionGL( DeclareExtension )
@@ -201,6 +204,7 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    
    #macro _InitExtension(_NAME) 
       _NAME = cast(any ptr, wglGetProcAddress(#_NAME))
+      'printf(!"%s = %p\n",#_NAME,_NAME)
       if _NAME = 0 then
          printf("%s%s%s","ERROR: required extension '",#_NAME,!"' was not found\n")
          getchar : system()

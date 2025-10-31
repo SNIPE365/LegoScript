@@ -152,25 +152,20 @@ sub MultMatrix4x4WithVector3x3( tmOut as Matrix4x4 , tmIn as Matrix4x4 , pIn as 
 end sub
 '#define MultMatrix4x4( _Out , _In , _pMul ) MultMatrix4x4WithVector3x3( _Out , _In , cptr(const single ptr,(_pMul)) )
 ' A safe and correct function for row-major 4x4 matrix multiplication.
-sub MultMatrix4x4(byref result as Matrix4x4, byref a as Matrix4x4, byref b as Matrix4x4)
-    dim as integer i, j, k
-    dim as Matrix4x4 tempResult ' Use a temporary matrix to prevent conflicts
 
-    for i = 0 to 3 ' Loop through the rows of the result matrix
-        for j = 0 to 3 ' Loop through the columns of the result matrix
-            ' Initialize the current element of the result to zero
-            tempResult.m(i * 4 + j) = 0.0
-            
-            ' Perform the dot product of row i of matrix 'a' and column j of matrix 'b'
+sub MultMatrix4x4(byref result as Matrix4x4, byref a as Matrix4x4, byref b as Matrix4x4)
+    dim as integer i=any, j=any, k=any
+    for j = 0 to 3 ' Columns of the result
+        for i = 0 to 3 ' Rows of the result
+            result.m(j * 4 + i) = 0.0
             for k = 0 to 3
-                tempResult.m(i * 4 + j) += a.m(i * 4 + k) * b.m(k * 4 + j)
+                ' The indexing here is different
+                result.m(j * 4 + i) += a.m(k * 4 + i) * b.m(j * 4 + k)
             next k
-        next j
-    next i
-    
-    ' Copy the final, correct result to the output matrix
-    result = tempResult
+        next i
+    next j    
 end sub
+
 #if 0
 sub MultMatrix4x4_RowMajor(byref result as Matrix4x4, byref a as Matrix4x4, byref b as Matrix4x4)
     dim as integer i, j, k
