@@ -226,7 +226,7 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    glLoadIdentity                                   '' Reset The Modelview Matrix
    
    '' All Setup For OpenGL Goes Here
-   glShadeModel GL_SMOOTH                           '' Enable Smooth Shading
+   glShadeModel GL_FLAT                             '' Enable Smooth Shading
    glClearColor 115/255, 140/255, 191/255, 1        '' Background color
    glClearDepth 1.0                                 '' Depth Buffer Setup
    glEnable GL_DEPTH_TEST                           '' Enables Depth Testing
@@ -236,26 +236,27 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    glEnable GL_BLEND
    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
    glAlphaFunc( GL_GREATER , 0.5 )
-         
-   'glPolygonMode( GL_FRONT_AND_BACK , GL_LINE )
-   'GL_POINT, GL_LINE, and GL_FILL.    
       
    glEnable(GL_TEXTURE_2D)
-   glEnable(GL_LINE_SMOOTH)
+   
+   'glEnable(GL_LINE_SMOOTH)
+   'glLineWidth(1.25)   
+   
    'glEnable(GL_POLYGON_SMOOTH)
    'glEnable(GL_MULTISAMPLE)
    'glEnable(GL_SAMPLE_COVERAGE)
    'fnglSampleCoverage(0.5, GL_FALSE)
-   glLineWidth(1.25)   
    
+   
+   'glPolygonMode( GL_FRONT_AND_BACK , GL_LINE )
+   'GL_POINT, GL_LINE, and GL_FILL.
    'glEnable( GL_CULL_FACE )
    glDisable( GL_CULL_FACE )
    'glFrontFace( GL_CCW ): glCullFace(	GL_BACK )
    'glFrontFace( GL_CW ): glCullFace( GL_FRONT )
-   
+      
    glEnable(GL_POLYGON_OFFSET_FILL)
-   glPolygonOffset(1.0, 1/-20)   
-   
+   glPolygonOffset(1.0, 1/-20)
    
    '============== light initialization ==============
     glEnable(GL_LIGHTING)

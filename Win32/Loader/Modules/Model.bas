@@ -580,9 +580,10 @@ function AllocateModelDrawArrays( pPart as DATFile ptr , tDraw as ModelDrawArray
   if (bFlags and bRoot) then
     with tDraw      
       #define Init( _Member ) .p##_Member##Vtx = iif(.l##_Member##Cnt,malloc(.l##_Member##cnt * sizeof(typeof(*.p##_Member##Vtx))),NULL)
-      Init( Triangle ) : Init( TransTri ) : Init( Border )
+      .lCubemapCnt = .lPieceCount*36 '6 faces * 2 triangles * 3 vertices
+      Init( Triangle ) : Init( Cubemap )  : Init( Border )
       Init( ColorTri ) : Init( TrColTri ) : Init( ColorBrd )      
-      .pPieces = iif( .lPieceCount , malloc( sizeof(typeof(*.pPieces)) * (.lPieceCount) ) , NULL )
+      .pPieces  = iif( .lPieceCount , malloc( sizeof(typeof(*.pPieces)) * (.lPieceCount) ) , NULL )
     end with
   end if    
   return true
@@ -608,11 +609,11 @@ function GenModelDrawArrays( pPart as DATFile ptr , tDraw as ModelDrawArrays, uC
     end with
     with tDraw 'store temp counts and reset for re-count
       _lTriangleCnt = .lTriangleCnt : _lColorTriCnt = .lColorTriCnt 
-      _lBorderCnt   = .lBorderCnt   : _lTransTriCnt = .lTransTriCnt 
+      _lBorderCnt   = .lBorderCnt   ': _lTransTriCnt = .lTransTriCnt 
       _lTrColTriCnt = .lTrColTriCnt : _lColorBrdCnt = .lColorBrdCnt
       _lPieceCount  = .lPieceCount
       .lTriangleCnt = 0 : .lColorTriCnt = 0 : .lBorderCnt   = 0
-      .lTransTriCnt = 0 : .lTrColTriCnt = 0 : .lColorBrdCnt = 0 
+      .lTrColTriCnt = 0 : .lColorBrdCnt = 0 ': .lTransTriCnt = 0
       .lPieceCount = 0
     end with
     uCurrentColor = g_Colours(c_Blue) : uCurrentEdge = g_EdgeColours(c_Blue)
@@ -634,7 +635,7 @@ function GenModelDrawArrays( pPart as DATFile ptr , tDraw as ModelDrawArrays, uC
         with .tVBO          
           .lTriangleOff = tDraw.lTriangleCnt
           .lColorTriOff = tDraw.lColorTriCnt
-          .lTransTriOff = tDraw.lTransTriCnt 
+          '.lTransTriOff = tDraw.lTransTriCnt 
           .lTrColTriOff = tDraw.lTrColTriCnt 
           .lBorderOff   = tDraw.lBorderCnt   
           .lColorBrdOff = tDraw.lColorBrdCnt 
@@ -856,7 +857,7 @@ function GenModelDrawArrays( pPart as DATFile ptr , tDraw as ModelDrawArrays, uC
         with .tVBO
           .lTriangleCnt = tDraw.lTriangleCnt-.lTriangleOff
           .lColorTriCnt = tDraw.lColorTriCnt-.lColorTriOff
-          .lTransTriCnt = tDraw.lTransTriCnt-.lTransTriOff
+          '.lTransTriCnt = tDraw.lTransTriCnt-.lTransTriOff
           .lTrColTriCnt = tDraw.lTrColTriCnt-.lTrColTriOff
           .lBorderCnt   = tDraw.lBorderCnt  -.lBorderOff
           .lColorBrdCnt = tDraw.lBorderCnt  -.lColorBrdOff
@@ -874,7 +875,7 @@ function GenModelDrawArrays( pPart as DATFile ptr , tDraw as ModelDrawArrays, uC
       if _lTriangleCnt <> .lTriangleCnt then puts "mismatch Triangle: " & _lTriangleCnt & " <> " & .lTriangleCnt : bFailed = 1
       if _lColorTriCnt <> .lColorTriCnt then puts "mismatch ColorTri: " & _lColorTriCnt & " <> " & .lColorTriCnt : bFailed = 1
       if _lBorderCnt   <> .lBorderCnt   then puts "mismatch Border..: " & _lBorderCnt   & " <> " & .lBorderCnt   : bFailed = 1
-      if _lTransTriCnt <> .lTransTriCnt then puts "mismatch TransTri: " & _lTransTriCnt & " <> " & .lTransTriCnt : bFailed = 1
+      'if _lTransTriCnt <> .lTransTriCnt then puts "mismatch TransTri: " & _lTransTriCnt & " <> " & .lTransTriCnt : bFailed = 1
       if _lTrColTriCnt <> .lTrColTriCnt then puts "mismatch TrColTri: " & _lTrColTriCnt & " <> " & .lTrColTriCnt : bFailed = 1
       if _lColorBrdCnt <> .lColorBrdCnt then puts "mismatch ColorBrd: " & _lColorBrdCnt & " <> " & .lColorBrdCnt : bFailed = 1
       if _lPieceCount  <> .lPieceCount  then puts "mismatch Pieces..: " & _lPieceCount  & " <> " & .lPieceCount  : bFailed = 1
@@ -884,6 +885,42 @@ function GenModelDrawArrays( pPart as DATFile ptr , tDraw as ModelDrawArrays, uC
   
   return tDraw.lPieceCount
    
+end function
+function GenCubeVtx( pVtx as VertexCubeMap ptr, uColor as const ulong, tBound as PartSize ) as long 'byref tBound as const PartSize ) as long
+  dim as Vertex3 p(7) = any
+  dim as long i = 0
+    
+  ' define cube corners
+  with tBound
+    p(0) = type(.xMin, .yMin, .zMin)
+    p(1) = type(.xMax, .yMin, .zMin)
+    p(2) = type(.xMax, .yMax, .zMin)
+    p(3) = type(.xMin, .yMax, .zMin)
+    p(4) = type(.xMin, .yMin, .zMax)
+    p(5) = type(.xMax, .yMin, .zMax)
+    p(6) = type(.xMax, .yMax, .zMax)
+    p(7) = type(.xMin, .yMax, .zMax)
+  end with
+    
+  #macro FACE(a,b,c,d,nx,ny,nz)
+    pVtx[i].tPos = p(a): pVtx[i].tNormal = type(nx,ny,nz): pVtx[i].uColor = uColor: i+=1
+    pVtx[i].tPos = p(b): pVtx[i].tNormal = type(nx,ny,nz): pVtx[i].uColor = uColor: i+=1
+    pVtx[i].tPos = p(c): pVtx[i].tNormal = type(nx,ny,nz): pVtx[i].uColor = uColor: i+=1
+    pVtx[i].tPos = p(a): pVtx[i].tNormal = type(nx,ny,nz): pVtx[i].uColor = uColor: i+=1
+    pVtx[i].tPos = p(c): pVtx[i].tNormal = type(nx,ny,nz): pVtx[i].uColor = uColor: i+=1
+    pVtx[i].tPos = p(d): pVtx[i].tNormal = type(nx,ny,nz): pVtx[i].uColor = uColor: i+=1
+  #endmacro
+  
+  ' +X, -X, +Y, -Y, +Z, -Z
+  
+  FACE(1,5,6,2,  1,0,0)
+  FACE(4,0,3,7, -1,0,0)
+  FACE(3,2,6,7,  0,1,0)
+  FACE(4,5,1,0,  0,-1,0)
+  FACE(5,4,7,6,  0,0,1)
+  FACE(0,1,2,3,  0,0,-1)
+  
+  return i  ' should be 36
 end function
 #endif
 
@@ -1067,7 +1104,7 @@ sub CheckCollisionModel( pPart as DATFile ptr , atCollision() as PartCollisionBo
                'continue for
                with ._1
                   var pSubPart = g_tModels(.lModelIndex).pModel
-                  var sName = *cptr(zstring ptr,strptr(g_sFilenames)+g_tModels(.lModelIndex).iFilenameOffset+6)                  
+                  'var sName = *cptr(zstring ptr,strptr(g_sFilenames)+g_tModels(.lModelIndex).iFilenameOffset+6)                  
                   dim as single fMatrix(15) = { _
                     .fA*cScale , .fD*cScale , .fG*cScale , 0 , _
                     .fB*cScale , .fE*cScale , .fH*cScale , 0 , _
@@ -1119,6 +1156,7 @@ sub CheckCollisionModel( pPart as DATFile ptr , atCollision() as PartCollisionBo
    'now check for coordinate collisions 
    '(need to ignore Y overflows and for that need untransformed sizes as well)
    if pRoot = pPart then 
+      #if 1
       for N as long = 0 to pPart->iPartCount-1
          if pPart->tParts(N).bType <> 1 then continue for
          'adjust the box to ignore the negative part of the base height (Y)
@@ -1144,6 +1182,7 @@ sub CheckCollisionModel( pPart as DATFile ptr , atCollision() as PartCollisionBo
             end if
          next M
       next N
+      #endif
       erase AtPartBound 
    end if
    
@@ -2392,7 +2431,7 @@ end sub
       const cVtxSz = sizeof(VertexStruct)
       glEnableClientState(GL_COLOR_ARRAY)
       glVertexPointer(3, GL_FLOAT        , cVtxSz, cast(any ptr,offsetof(VertexStruct,tPos   )) )
-      glNormalPointer(   GL_FLOAT        , cVtxSz, cast(any ptr,offsetof(VertexStruct,tNormal)) )                  
+      glNormalPointer(   GL_FLOAT        , cVtxSz, cast(any ptr,offsetof(VertexStruct,tNormal)) )
       glColorPointer (4, GL_UNSIGNED_BYTE, cVtxSz, cast(any ptr,offsetof(VertexStruct,uColor )) )
     #else
       const cVtxSz = sizeof(VertexStructNoColor)

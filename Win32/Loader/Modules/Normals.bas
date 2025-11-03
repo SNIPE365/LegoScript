@@ -112,3 +112,30 @@ sub SetQuadNormal( byRef tQuad as LineType4Struct , ptNormal as Vertex3 ptr = NU
       
    end with
 end sub
+
+sub SetVtxTrigNormal( ptVtx as VertexCubeMap ptr )
+  
+  'normalize triangle
+  dim as single edge1(3-1) = any, edge2(3-1) = any
+  dim as Vertex3 tEdge1=any, tEdge2=any , tNormal = any
+  
+  'Compute edge vectors
+  tEdge1.fX = ptVtx[1].tPos.fX - ptVtx[0].tPos.fX
+  tEdge1.fY = ptVtx[1].tPos.fY - ptVtx[0].tPos.fY
+  tEdge1.fZ = ptVtx[1].tPos.fZ - ptVtx[0].tPos.fZ
+  
+  tEdge2.fX = ptVtx[2].tPos.fX - ptVtx[0].tPos.fX
+  tEdge2.fY = ptVtx[2].tPos.fX - ptVtx[0].tPos.fY
+  tEdge2.fZ = ptVtx[2].tPos.fX - ptVtx[0].tPos.fZ
+  
+  '// Compute normal
+  crossProduct( @tEdge1.fX , @tEdge2.fX , @tNormal.fX )
+  
+  '// Normalize the normal vector
+  normalize( @tNormal.fX )
+  
+  ptVtx[0].tNormal = tNormal
+  ptVtx[1].tNormal = tNormal
+  ptVtx[2].tNormal = tNormal      
+
+end sub   
