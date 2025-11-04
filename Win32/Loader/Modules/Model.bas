@@ -441,7 +441,8 @@ function GenArrayModel( pPart as DATFile ptr , aVertex() as VertexStruct , iBord
                end with
             case 4               
                if iBorders orelse bDoDraw=0 then continue for
-               var T4 = ._4               
+               var T4 = ._4
+               
                MultiplyMatrixVector( @T4.fX1 ) 
                MultiplyMatrixVector( @T4.fX2 )
                MultiplyMatrixVector( @T4.fX3 )
@@ -755,6 +756,10 @@ function GenModelDrawArrays( pPart as DATFile ptr , tDraw as ModelDrawArrays, uC
         case 4 'quad
           if (bFlags and bPart)=0 then continue for
           var T4 = ._4 , bIsDefaultColor = (.wColour = c_Main_Colour)              
+          
+          CheckAndFlipQuadWinding( T4 , cast(single ptr,@tMatrixStack(g_CurrentMatrix)) )
+          'clear T4,,sizeof(T4)
+          
           MultiplyMatrixVector( @T4.fX1 ) 
           MultiplyMatrixVector( @T4.fX2 )
           MultiplyMatrixVector( @T4.fX3 )
@@ -913,12 +918,12 @@ function GenCubeVtx( pVtx as VertexCubeMap ptr, uColor as const ulong, tBound as
   
   ' +X, -X, +Y, -Y, +Z, -Z
   
-  FACE(1,5,6,2,  1,0,0)
-  FACE(4,0,3,7, -1,0,0)
-  FACE(3,2,6,7,  0,1,0)
-  FACE(4,5,1,0,  0,-1,0)
-  FACE(5,4,7,6,  0,0,1)
-  FACE(0,1,2,3,  0,0,-1)
+  FACE(1,5,6,2,  1, 0, 0)
+  FACE(4,0,3,7, -1, 0, 0)
+  FACE(3,2,6,7,  0, 1, 0)
+  FACE(4,5,1,0,  0,-1, 0)
+  FACE(5,4,7,6,  0, 0, 1)
+  FACE(0,1,2,3,  0, 0,-1)
   
   return i  ' should be 36
 end function

@@ -164,7 +164,7 @@ end type
   type VBOStruct
     as long lTriangleOff , lTriangleCnt
     as long lColorTriOff , lColorTriCnt
-    as long lTransTriOff , lTransTriCnt
+    'as long lTransTriOff , lTransTriCnt
     as long lTrColTriOff , lTrColTriCnt
     as long lBorderOff   , lBorderCnt
     as long lColorBrdOff , lColorBrdCnt
@@ -214,22 +214,36 @@ end type
 type VertexStructNoColor
   as Vertex3 tPos,tNormal
 end type
+type VertexCubeMap
+  as Vertex3 tPos,tNormal
+  'as single TexS,TexT
+  as ulong uColor',uTexMap
+end type
 
 type DisplayPiece
   as DATFile ptr pModel  
   as Matrix4x4   tMatrix , tMatView       
   as ulong       lBaseColor , lBaseEdge
-  bSkipBody  :1 as ulong
-  bSkipBorder:1 as ulong
-  bDisplay   :1 as ulong
+  as ulong       lCoverage                'coverage object
+  bCoverage     as byte                   'coverage failed skip frames
+  union
+    bFlags      as ubyte
+    type
+      bSkipBody  :1 as ubyte
+      bSkipBorder:1 as ubyte
+      bDisplay   :1 as ubyte
+    end type
+  end union
 end type
 
 type ModelDrawArrays
   as long lTriangleCnt , lColorTriCnt 
-  as long lTransTriCnt , lTrColTriCnt
+  as long lCubemapCnt  , lTrColTriCnt
   as long lBorderCnt   , lColorBrdCnt
   as long lPieceCount  , lUniquePieces
-  as VertexStructNoColor ptr pTriangleVtx , pTransTriVtx , pBorderVtx
+  as VertexStructNoColor ptr pTriangleVtx , pBorderVtx
   as VertexStruct        ptr pColorTriVtx , pTrColTriVtx , pColorBrdVtx  
+  as VertexCubeMap       ptr pCubemapVtx
   as DisplayPiece        ptr pPieces
+  
 end type

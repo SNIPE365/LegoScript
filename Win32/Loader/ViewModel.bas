@@ -277,7 +277,7 @@ static shared as single g_fYaw = -190.0 , g_fPitch = 0.0 ' Start facing -Z (stan
 static shared as single g_fFrontX,g_fFrontY,g_fFrontZ,g_fRightX,g_fRightY,g_fRightZ
 static shared as single g_fUpX=0.0 , g_fUpY=1.0 , g_fUpZ = 0.0 ' World Up
 
-const cMovementSpeed = 2f , cLookSpeed = 1/20f
+const cMovementSpeed = 2f , cLookSpeed = 4/20f
 const cPI180 = atn(1)/45
 
 sub UpdateCameraVectors()
@@ -316,7 +316,7 @@ dim shared as single fRotationX = 120 , fRotationY = 20
 dim shared as single fPositionX , fPositionY , fPositionZ , fZoom = -3
 dim shared as long iWheel , iPrevWheel , g_CurDraw = -1
 dim shared as byte g_Vsync=0
-dim shared as boolean bBoundingBox,bViewBorders=true,bLighting=false
+dim shared as boolean bBoundingBox,bViewBorders=true,bLighting=true
 dim shared as boolean bLeftPressed,bRightPressed,bWheelPressed
 dim shared as hwnd hGfxWnd
 dim shared as boolean g_FreeCam = false  
@@ -349,6 +349,7 @@ function RenderScenery() as ulong
             glEnableClientState(GL_VERTEX_ARRAY)
             glEnableClientState(GL_NORMAL_ARRAY)
             glEnableClientState(GL_COLOR_ARRAY)
+            'glColor4ub(255,255,255,255)
             glLoadMatrixf( @tCur.m(0) )
             glBindBuffer(GL_ARRAY_BUFFER, iCubemapVBO )
             const cVtxSz = sizeof(VertexCubeMap)
@@ -362,12 +363,14 @@ function RenderScenery() as ulong
               .bFlags=0 : '.bDisplay=0:.bSkipBorder=0:.bSkipBody=0
               if .pModel=0 then continue for
               MultMatrix4x4( .tMatView , tCur , .tMatrix )
+              if .tMatView.fPosX > (pModel->tSize.xMax-pModel->tSize.xMin) then continue for
+              if .tMatView.fPosY > (pModel->tSize.yMax-pModel->tSize.yMin) then continue for
               if .tMatView.fPosZ > (pModel->tSize.zMax-pModel->tSize.zMin) then continue for
               #if 1
               if .tMatView.fPosZ < -50 then                     
                 #if 0
                   glLoadMatrixf( @.tMatView.m(0) )
-                  glColor4ubv( cast(ubyte ptr,@.lBaseColor) )
+                  glColor4ubv( cast(ubyte ptr,@.lBaseColor) )                  
                   with .pModel->tSize
                     DrawLimitsCube( .xMin , .xMax , .yMin , .yMax , .zMin , .zMax )
                   end with
@@ -384,20 +387,14 @@ function RenderScenery() as ulong
           
           #if 1          
           DrawPieces( Triangle , GL_TRIANGLES , false )
-          glFlush()
           DrawPieces( ColorTri , GL_TRIANGLES , true  )
-          glFlush()
+          glEnable( GL_BLEND )
           if bViewBorders then 
             DrawPieces( Border   , GL_LINES   , false )
-            glFlush()
             DrawPieces( ColorBrd , GL_LINES   , true  )
-            glFlush()
-          end if
-          glEnable( GL_BLEND )
+          end if          
           DrawPieces( TransTri , GL_TRIANGLES , false )
-          glFlush()
           DrawPieces( TrColTri , GL_TRIANGLES , true  )
-          glFlush()
           glDisableClientState(GL_COLOR_ARRAY)
           glDisableClientState(GL_NORMAL_ARRAY)
           glDisableClientState(GL_VERTEX_ARRAY)
@@ -433,6 +430,10 @@ function RenderScenery() as ulong
   return uDrawParts
 end function
 sub RenderOverlay()
+  
+  glPushAttrib(GL_ENABLE_BIT)
+  glDisable( GL_CULL_FACE )
+  
   #ifdef DebugShadow
     dim as PartSnap tSnap
     static as byte bOnce   
@@ -476,7 +477,9 @@ sub RenderOverlay()
     
     glDisable( GL_POLYGON_STIPPLE )
   #endif      
-  glPopMatrix()
+  
+  glLoadMatrixf( @tCur.m(0) )
+  
   glDepthMask (GL_FALSE)
   if bBoundingBox then
     glColor4f(0,1,0,.25)
@@ -560,6 +563,10 @@ sub RenderOverlay()
   #define DrawMarker( _X , _Y , _Z ) DrawLimitsCube( (_X)-2,(_X)+2 , (_Y)-2,(_Y)+2 , (_Z)-2,(_Z)+2 )      
   'glColor4f(1,.5,.25,.66) : DrawMarker( 0,0,0 )
   'glColor4f(.25,.5,1,.66) : DrawMarker( -50,0,-50 )
+  
+  glPopAttrib()
+  
+  
 end sub
 
 do
@@ -595,7 +602,7 @@ do
           sleep : system
        end if   
     else
-       if instr(sModel,".dat")  then
+       if instr(sModel,".dat") then
           print "loading from cmdline"
           for N as long = 0 to len(sModel)
              if sModel[N]=13 then sModel[N]=32
@@ -608,8 +615,11 @@ do
                 if sModel[N]=13 then sModel[N]=32
              next N
           else 'if there isnt a model in the clipboard, then load this:
+             'sModel = _    
+             '"1 2 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 NotFound.dat" EOL _
              sModel = _    
-             "1 2 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 NotFound.dat" EOL _
+             "1 1 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 3001.dat" EOL
+             
              ' ------------------------------------------------------
              'sModel = _ 'all of lines belo should end with EOL _
              '   "1 4 0 0 0 1 0 0 0 1 0 0 0 1 30068.dat"    EOL _
@@ -643,7 +653,7 @@ do
   if sEndsExt=".dat" then bEditMode = true   
   if hGfxWnd=0 then
     hGfxWnd = InitOpenGL()
-    glDisable( GL_LIGHTING )
+    if bLighting then glEnable( GL_LIGHTING ) else glDisable( GL_LIGHTING )
     glEnable( GL_DEPTH_TEST )
     wglSwapIntervalEXT(g_Vsync)
   end if
@@ -793,9 +803,10 @@ do
         GenCubeVtx( pVtxBase , .lBaseColor , .pModel->tSize )
         for N as long = 0 to 35
           MultiplyMatrixVector( @pVtxBase[N].tPos.fX , @.tMatrix )
+          'MultiplyMatrixVector( @pVtxBase[N].tNormal.fX , @.tMatrix )
         next N
         for N as long = 0 to 35 step 3
-          'SetVtxTrigNormal( pVtxBase+N )
+          SetVtxTrigNormal( pVtxBase+N )
         next N
         
       end with
@@ -867,6 +878,7 @@ do
     
   end with  
   
+  glFinish()
   flip
     
   dim as double dFrameCPU , dAccCPU , dSpeed = 1
@@ -892,10 +904,11 @@ do
     dFrameCPU = timer
     
     glClear GL_COLOR_BUFFER_BIT OR GL_DEPTH_BUFFER_BIT
-    'glLoadIdentity()
+    glLoadIdentity()
     tCur = g_tIdentityMatrix
     'glScalef(1/-20, 1.0/-20, 1/20 )
-    Matrix4x4Scale( tCur , 1/-20 , 1.0/-20 , 1/20 )
+    'Matrix4x4Scale( tCur , 1/-20 , 1.0/-20 , 1/20 )
+    Matrix4x4Scale( tCur , 1/-20 , 1/-20 , 1/20 )
     
     if g_FreeCam then
       
@@ -1027,9 +1040,7 @@ do
       Matrix4x4RotateY( tCur , tCur , fRotationX*-cPI180 )
       'glRotatef fRotationX , 0   , -1.0 , 0
       
-      glPushMatrix()
-      
-      uDrawParts = RenderScenery()            
+      uDrawParts = RenderScenery()
       RenderOverlay()
       
       dim e as fb.EVENT = any
