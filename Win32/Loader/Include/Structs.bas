@@ -159,6 +159,7 @@ type PartSize
    as single xMin = fUnused , xMax = fUnused
    as single yMin = fUnused , yMax = fUnused
    as single zMin = fUnused , zMax = fUnused
+   as single fRad
 end type
 #ifdef UseVBO
   type VBOStruct
@@ -217,7 +218,7 @@ end type
 type VertexCubeMap
   as Vertex3 tPos,tNormal
   'as single TexS,TexT
-  as ulong uColor',uTexMap
+  'as ulong uColor',uTexMap
 end type
 
 type DisplayPiece

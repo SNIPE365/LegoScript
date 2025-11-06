@@ -9,7 +9,7 @@
 #include once "crt.bi"
 #include once "vbcompat.bi"
 
-'#define LoadFromSFile
+#define LoadFromSFile
 '#define __Tester
 
 '#define DebugShadow
@@ -245,8 +245,8 @@ scope
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\cube10x10x10.ldr"
    'sFile = "C:\Users\greg\Desktop\LS\TLG_Map\TrainStationEntranceA.ldr"
    'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map0\Build\Blocks\B1\Eldon Square.ldr"
-   'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\TestMap2.ldr"
-   sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\Blocks\10232 - Palace Cinema.mpd"
+   sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\TestMap2.ldr"
+   'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\Blocks\10232 - Palace Cinema.mpd"
    'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\Blocks\10255 - Assembly Square.mpd"
    'sFile = "G:\Jogos\LegoScript\examples\10294 - Titanic.mpd"
    'sFile = "C:\Users\greg\Desktop\LS\TLG_Map\FileA.ldr"
@@ -268,7 +268,7 @@ scope
 end scope
 
 dim as string sModel
-dim shared as DATFile ptr pModel
+dim shared as DATFile ptr g_pModel
 dim shared as boolean bEditMode
 
 '///////////////////// free cam variables //////////////////
@@ -347,15 +347,13 @@ function RenderScenery() as ulong
           glDisable( GL_BLEND )
           scope
             glEnableClientState(GL_VERTEX_ARRAY)
-            glEnableClientState(GL_NORMAL_ARRAY)
-            glEnableClientState(GL_COLOR_ARRAY)
+            glEnableClientState(GL_NORMAL_ARRAY)            
             'glColor4ub(255,255,255,255)
             glLoadMatrixf( @tCur.m(0) )
             glBindBuffer(GL_ARRAY_BUFFER, iCubemapVBO )
             const cVtxSz = sizeof(VertexCubeMap)
             glVertexPointer(3, GL_FLOAT        , cVtxSz, cast(any ptr,offsetof(VertexCubeMap,tPos   )) )
-            glNormalPointer(   GL_FLOAT        , cVtxSz, cast(any ptr,offsetof(VertexCubeMap,tNormal)) )
-            glColorPointer (4, GL_UNSIGNED_BYTE, cVtxSz, cast(any ptr,offsetof(VertexCubeMap,uColor )) )
+            glNormalPointer(   GL_FLOAT        , cVtxSz, cast(any ptr,offsetof(VertexCubeMap,tNormal)) )            
           end scope
           
           for I as long = 0 to .lPieceCount-1
@@ -363,18 +361,18 @@ function RenderScenery() as ulong
               .bFlags=0 : '.bDisplay=0:.bSkipBorder=0:.bSkipBody=0
               if .pModel=0 then continue for
               MultMatrix4x4( .tMatView , tCur , .tMatrix )
-              if .tMatView.fPosX > (pModel->tSize.xMax-pModel->tSize.xMin) then continue for
-              if .tMatView.fPosY > (pModel->tSize.yMax-pModel->tSize.yMin) then continue for
-              if .tMatView.fPosZ > (pModel->tSize.zMax-pModel->tSize.zMin) then continue for
+              'printf(!"Z = %1.1f Rad=%1.1f \r",.tMatView.fPosZ,.pModel->tSize.fRad)
+              if .tMatView.fPosZ > (.pModel->tSize.fRad) then continue for              
               #if 1
               if .tMatView.fPosZ < -50 then                     
                 #if 0
                   glLoadMatrixf( @.tMatView.m(0) )
-                  glColor4ubv( cast(ubyte ptr,@.lBaseColor) )                  
+                  glColor4ubv( cast(ubyte ptr,@.lBaseColor) )
                   with .pModel->tSize
                     DrawLimitsCube( .xMin , .xMax , .yMin , .yMax , .zMin , .zMax )
                   end with
                 #else
+                  glColor4ubv( cast(ubyte ptr,@.lBaseColor) )
                   glDrawArrays( GL_TRIANGLES, I*36 , 36 )
                 #endif
                 continue for
@@ -387,14 +385,14 @@ function RenderScenery() as ulong
           
           #if 1          
           DrawPieces( Triangle , GL_TRIANGLES , false )
-          DrawPieces( ColorTri , GL_TRIANGLES , true  )
+          'DrawPieces( ColorTri , GL_TRIANGLES , true  )
           glEnable( GL_BLEND )
           if bViewBorders then 
             DrawPieces( Border   , GL_LINES   , false )
-            DrawPieces( ColorBrd , GL_LINES   , true  )
+            'DrawPieces( ColorBrd , GL_LINES   , true  )
           end if          
-          DrawPieces( TransTri , GL_TRIANGLES , false )
-          DrawPieces( TrColTri , GL_TRIANGLES , true  )
+          'DrawPieces( TransTri , GL_TRIANGLES , false )
+          'DrawPieces( TrColTri , GL_TRIANGLES , true  )
           glDisableClientState(GL_COLOR_ARRAY)
           glDisableClientState(GL_NORMAL_ARRAY)
           glDisableClientState(GL_VERTEX_ARRAY)
@@ -407,7 +405,7 @@ function RenderScenery() as ulong
     #endif
   else
     'render single part
-    RenderModel( pModel , false , , g_CurDraw )
+    RenderModel( g_pModel , false , , g_CurDraw )
   end if
   if bViewBorders then 
     #ifdef UseVBO         
@@ -438,15 +436,15 @@ sub RenderOverlay()
     dim as PartSnap tSnap
     static as byte bOnce   
     'if bOnce=0 then
-      'SnapModel( pModel , tSnap , 2 )
+      'SnapModel( g_pModel , tSnap , 2 )
       'bOnce=1
     'else
-      SnapModel( pModel , tSnap , true )
+      SnapModel( g_pModel , tSnap , true )
     'end if
   #endif      
   #if 0
     glEnable( GL_POLYGON_STIPPLE )        
-    'SnapModel( pModel , tSnap )
+    'SnapModel( g_pModel , tSnap )
     
     #if 0 
        glPushMatrix()
@@ -532,7 +530,7 @@ sub RenderOverlay()
   if g_CurDraw <> -1 orelse bEditMode then      
     glPushMatrix()
     if g_CurDraw <> -1 then
-       with pModel->tParts(g_CurDraw)._1
+       with g_pModel->tParts(g_CurDraw)._1
           dim as single fMatrix(15) = { _
              .fA , .fD , .fG , 0 , _ 'X scale ,    0?   ,   0?    , 0 
              .fB , .fE , .fH , 0 , _ '  0?    , Y Scale ,   0?    , 0 
@@ -586,7 +584,7 @@ do
        print "Failed to load '"+sFile+"'"
        sleep : system
     end if
-    pModel = LoadModel( strptr(sModel) , sFile )
+    g_pModel = LoadModel( strptr(sModel) , sFile )
     var sEndsExt = lcase(right(sFile,4))      
   #else
     sModel = command(1)
@@ -618,7 +616,7 @@ do
              'sModel = _    
              '"1 2 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 NotFound.dat" EOL _
              sModel = _    
-             "1 1 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 3001.dat" EOL
+             "1 1 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 91405.dat" EOL
              
              ' ------------------------------------------------------
              'sModel = _ 'all of lines belo should end with EOL _
@@ -640,7 +638,7 @@ do
           end if
        end if            
     end if
-    pModel = LoadModel( strptr(sModel) , sFilename )
+    g_pModel = LoadModel( strptr(sModel) , sFilename )
     
   #endif
   
@@ -659,7 +657,7 @@ do
   end if
   
   'glPolygonMode( GL_FRONT_AND_BACK, GL_LINE )
-  dim as long g_DrawCount = pModel->iPartCount
+  dim as long g_DrawCount = g_pModel->iPartCount
   
   dLoadTIme = timer
   #ifdef UseVBO   
@@ -669,26 +667,26 @@ do
       dim as GLuint iModelVBO, iBorderVBO
       glGenBuffers(1, @iModelVBO) : glGenBuffers(1, @iBorderVBO)
        
-      GenArrayModel( pModel , atModelTrigs()     , false )
+      GenArrayModel( g_pModel , atModelTrigs()     , false )
       iTrianglesCount = ubound(atModelTrigs)+1   
       glBindBuffer(GL_ARRAY_BUFFER, iModelVBO)
       glBufferData(GL_ARRAY_BUFFER, iTrianglesCount*sizeof(VertexStruct), @atModelTrigs(0)     , GL_STATIC_DRAW)
       erase( atModelTrigs )
          
-      GenArrayModel( pModel , atModelVtxLines() , true )
+      GenArrayModel( g_pModel , atModelVtxLines() , true )
       iBorderCount = ubound(atModelVtxLines)+1
       glBindBuffer(GL_ARRAY_BUFFER, iBorderVBO)
       glBufferData(GL_ARRAY_BUFFER, iBorderCount*sizeof(VertexStruct), @atModelVtxLines(0) , GL_STATIC_DRAW)
       erase( atModelVtxLines )
     #else
-      GenModelDrawArrays( pModel , g_tModelArrays )
+      GenModelDrawArrays( g_pModel , g_tModelArrays )
       #macro CreateVBO( _name )
         glGenBuffers(1 , @i##_name##VBO)          
         with g_tModelArrays
           if .p##_name##vtx andalso .l##_name##Cnt then
             glBindBuffer(GL_ARRAY_BUFFER, i##_name##VBO)          
             glBufferData(GL_ARRAY_BUFFER, .l##_name##Cnt * sizeof(typeof(*.p##_name##vtx)), .p##_name##vtx , GL_STREAM_DRAW) 'GL_STATIC_DRAW)
-            puts( #_name )
+            printf(!"%s = %f1.1mb\n" , #_name , (.l##_name##Cnt * sizeof(typeof(*.p##_name##vtx)))/(1024*1024) )
             free( .p##_name##vtx )
           end if
         end with
@@ -703,13 +701,13 @@ do
     var iModel   = glGenLists( 1 )
     var iBorders = glGenLists( 2 )
     glNewList( iModel ,  GL_COMPILE ) 'GL_COMPILE_AND_EXECUTE
-    RenderModel( pModel , false )
+    RenderModel( g_pModel , false )
     glEndList()   
     glNewList( iBorders ,  GL_COMPILE )
-    RenderModel( pModel , true )
+    RenderModel( g_pModel , true )
     glEndList()
     glNewList( iBorders+1 ,  GL_COMPILE )
-    RenderModel( pModel , true , , -2 )
+    RenderModel( g_pModel , true , , -2 )
     glEndList()
   #endif   
   
@@ -718,7 +716,7 @@ do
   dim as single xMid,yMid,zMid,g_zFar  
   dim as long g_PartCount = -1 , g_CurPart = -1
     
-  SizeModel( pModel , g_tSz , , g_PartCount )
+  SizeModel( g_pModel , g_tSz , , g_PartCount )
   
   with g_tSz
     xMid = (.xMin+.xMax)*.5
@@ -767,8 +765,8 @@ do
   end with
 
   redim as PartCollisionBox atCollision()
-  #if 1
-  CheckCollisionModel( pModel , atCollision() )
+  #if 0
+  CheckCollisionModel( g_pModel , atCollision() )
   #endif  
   printf(!"Parts: %i , Collisions: %i \n",g_PartCount,ubound(atCollision)\2)
   
@@ -782,25 +780,35 @@ do
       with .pPieces[I]                
         if .pModel = 0 then continue for
         if isBadReadPtr(.pModel,offsetof(DATFile,tParts(0))) then 
-          puts(I & " BAD?"): .pModel = 0 : continue for
-        end if
-        #if 0
-          if .pModel->bHasSize then continue for            
+          puts(I & " BAD?") : .pModel = 0 : continue for
+        end if        
+        if .pModel->bHasSize=0 then
+          #if 0
           with .pModel->tSize
             printf(!"%5i: xMin=%1.1f , yMin=%1.1f , zMin=%1.1f , xMax=%1.1f , yMax=%1.1f , zMax=%1.1f\n" , _
             lUnique , .xMin , .yMin , .zMin , .xMax , .yMax , .zMax )
           end with
-          .pModel->bHasSize=1 : 'SizeModel( .pModel , .pModel->tSize )
-          with .pModel->tSize
-            printf(!"%5i: xMin=%1.1f , yMin=%1.1f , zMin=%1.1f , xMax=%1.1f , yMax=%1.1f , zMax=%1.1f\n" , _
-            lUnique , .xMin , .yMin , .zMin , .xMax , .yMax , .zMax )
+          #endif
+          .pModel->bHasSize=1 : SizeModel( .pModel , .pModel->tSize )
+          
+          with .pModel->tSize            
+            .fRad = 0
+            if abs(.xMin) > .fRad then .fRad = abs(.xMin)
+            if abs(.yMin) > .fRad then .fRad = abs(.yMin)
+            if abs(.zMin) > .fRad then .fRad = abs(.zMin)
+            if abs(.xMax) > .fRad then .fRad = abs(.xMax)
+            if abs(.yMax) > .fRad then .fRad = abs(.yMax)
+            if abs(.xMax) > .fRad then .fRad = abs(.zMax)
+            .fRad /= 19
+            'printf(!"%5i: fRad=%1.1f xMin=%1.1f , yMin=%1.1f , zMin=%1.1f , xMax=%1.1f , yMax=%1.1f , zMax=%1.1f\n" , _
+            'lUnique , .fRad , .xMin , .yMin , .zMin , .xMax , .yMax , .zMax )
           end with
           lUnique += 1
-        #endif
+        end if
         
         var pVtxBase = pCubeVtx+I*36
         'printf(!"%i of %i > %p\n",I,lCount-1,pVtxBase)
-        GenCubeVtx( pVtxBase , .lBaseColor , .pModel->tSize )
+        GenCubeVtx( pVtxBase , .pModel->tSize )
         for N as long = 0 to 35
           MultiplyMatrixVector( @pVtxBase[N].tPos.fX , @.tMatrix )
           'MultiplyMatrixVector( @pVtxBase[N].tNormal.fX , @.tMatrix )
@@ -808,9 +816,21 @@ do
         for N as long = 0 to 35 step 3
           SetVtxTrigNormal( pVtxBase+N )
         next N
-        
       end with
     next I
+    #if 0
+    scope      
+      dim as long ptr pIndex(255)
+      var iUnique=0 , pVtxOut = pCubeVtx 
+      var pVtxBase = pCubeVtx+I*36;/      
+      for I as long = 0 to .lPieceCount-1
+        with .pPieces[I]                
+          if .pModel = 0 then continue for
+          var fSum = 
+        end with
+      next I
+    #endif
+    
   end with
   CreateVBO( Cubemap  )
   #endif  
@@ -821,9 +841,9 @@ do
   scope      
      dim as PartSnap tSnap
      for I as long = 0 to g_PartCount-1               
-        if pModel->tParts(I).bType <> 1 then continue for
+        if g_pModel->tParts(I).bType <> 1 then continue for
         puts("=========== Part " & I & " ===========")
-        var pSubPart = g_tModels( pModel->tParts(I)._1.lModelIndex ).pModel                  
+        var pSubPart = g_tModels( g_pModel->tParts(I)._1.lModelIndex ).pModel                  
         SnapModel( pSubPart , tSnap )
         with tSnap
            printf(!"Studs=%i Clutchs=%i Aliases=%i Axles=%i Axlehs=%i Bars=%i Barhs=%i Pins=%i Pinhs=%i\n", _            
@@ -845,7 +865,7 @@ do
      next I
   end scope
   #endif
-    
+
   'DrawLimitsCube( .xMin-1,.xMax+1 , .yMin-1,.yMax+1 , .zMin-1,.zMax+1 )
   with g_tSz   
     
@@ -878,8 +898,7 @@ do
     
   end with  
   
-  glFinish()
-  flip
+  glFinish() : flip
     
   dim as double dFrameCPU , dAccCPU , dSpeed = 1
   dim as double dFrameGL  , dAccGL
@@ -926,15 +945,15 @@ do
         g_fUpX    , g_fUpY    , g_fUpZ      _  ' World Up Vector
       )
       
-      glPushMatrix()
-      RenderScenery()
-      glPopMatrix()
+      'glPushMatrix()
+      uDrawParts = RenderScenery()
+      'glPopMatrix()
       
       Dim e as fb.EVENT = any
       dim as boolean bSkipMouse = not g_bFocus
       
       #define fSpd (cMovementSpeed*dSpeed)
-      printf(!"%1.2f\r",dSpeed)
+      'printf(!"%1.2f\r",dSpeed)
       if bMoveForward  then g_fCameraX += g_fFrontX*fSpd : g_fCameraY += g_fFrontY*fSpd : g_fCameraZ += g_fFrontZ*fSpd   
       if bMoveBackward then g_fCameraX -= g_fFrontX*fSpd : g_fCameraY -= g_fFrontY*fSpd : g_fCameraZ -= g_fFrontZ*fSpd   
       if bStrafeLeft   then g_fCameraX += g_fRightX*fSpd : g_fCameraZ += g_fRightZ*fSpd
@@ -1016,13 +1035,13 @@ do
       
       if g_CurDraw <> -1 then        
         if OldDraw <> g_CurDraw then                        
-          var pSubPart = g_tModels( pModel->tParts(g_CurDraw)._1.lModelIndex ).pModel                            
+          var pSubPart = g_tModels( g_pModel->tParts(g_CurDraw)._1.lModelIndex ).pModel                            
           SnapModel( pSubPart , tSnapID )      
           SortSnap( tSnapID )
         end if
       elseif bEditMode then
         if OldDraw <> g_CurDraw then
-          SnapModel( pModel , tSnapID )      
+          SnapModel( g_pModel , tSnapID )      
           SortSnap( tSnapID )
         end if
       end if
@@ -1072,7 +1091,7 @@ do
                  g_CurPart = -1
                  printf(!"g_CurPart = %i    \r",g_CurPart)
                  dim as PartSize tSzTemp
-                 SizeModel( pModel , tSzTemp , g_CurPart )
+                 SizeModel( g_pModel , tSzTemp , g_CurPart )
                  g_tSz = tSzTemp
               else
                  g_CurDraw = -1
@@ -1097,13 +1116,13 @@ do
                  g_CurPart = ((g_CurPart+2) mod (g_PartCount+1))-1
                  printf(!"g_CurPart = %i    \r",g_CurPart)
                  dim as PartSize tSzTemp
-                 SizeModel( pModel , tSzTemp , g_CurPart )
+                 SizeModel( g_pModel , tSzTemp , g_CurPart )
                  g_tSz = tSzTemp
               else
                  var iOrg = g_CurDraw
                  do
                     g_CurDraw = ((g_CurDraw+2) mod (g_DrawCount+1))-1
-                    if g_CurDraw=-1 orelse pModel->tParts(g_CurDraw).bType = 1 orelse g_CurDraw = iOrg then exit do
+                    if g_CurDraw=-1 orelse g_pModel->tParts(g_CurDraw).bType = 1 orelse g_CurDraw = iOrg then exit do
                  loop
                  printf(!"g_CurDraw = %i    \r",g_CurDraw)
               end if
@@ -1112,13 +1131,13 @@ do
                  g_CurPart = ((g_CurPart+g_PartCount+1) mod (g_PartCount+1))-1
                  printf(!"g_CurPart = %i    \r",g_CurPart)
                  dim as PartSize tSzTemp
-                 SizeModel( pModel , tSzTemp , g_CurPart )
+                 SizeModel( g_pModel , tSzTemp , g_CurPart )
                  g_tSz = tSzTemp
               else
                  var iOrg = g_CurDraw
                  do
                     g_CurDraw = ((g_CurDraw+g_DrawCount+1) mod (g_DrawCount+1))-1
-                    if g_CurDraw=-1 orelse pModel->tParts(g_CurDraw).bType = 1 orelse g_CurDraw = iOrg then exit do
+                    if g_CurDraw=-1 orelse g_pModel->tParts(g_CurDraw).bType = 1 orelse g_CurDraw = iOrg then exit do
                  loop
                  printf(!"g_CurDraw = %i    \r",g_CurDraw)
               end if               
@@ -1141,7 +1160,7 @@ do
     
     dFrameCPU = timer-dFrameCPU      
     
-    flip
+    glFinish() : flip
     static as integer iOnce  
     
     'glGetFloatv(GL_MODELVIEW_MATRIX , @tCur.m(0))

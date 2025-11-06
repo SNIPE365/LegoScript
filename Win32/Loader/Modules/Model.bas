@@ -891,7 +891,7 @@ function GenModelDrawArrays( pPart as DATFile ptr , tDraw as ModelDrawArrays, uC
   return tDraw.lPieceCount
    
 end function
-function GenCubeVtx( pVtx as VertexCubeMap ptr, uColor as const ulong, tBound as PartSize ) as long 'byref tBound as const PartSize ) as long
+function GenCubeVtx( pVtx as VertexCubeMap ptr, tBound as PartSize ) as long 'byref tBound as const PartSize ) as long
   dim as Vertex3 p(7) = any
   dim as long i = 0
     
@@ -908,12 +908,12 @@ function GenCubeVtx( pVtx as VertexCubeMap ptr, uColor as const ulong, tBound as
   end with
     
   #macro FACE(a,b,c,d,nx,ny,nz)
-    pVtx[i].tPos = p(a): pVtx[i].tNormal = type(nx,ny,nz): pVtx[i].uColor = uColor: i+=1
-    pVtx[i].tPos = p(b): pVtx[i].tNormal = type(nx,ny,nz): pVtx[i].uColor = uColor: i+=1
-    pVtx[i].tPos = p(c): pVtx[i].tNormal = type(nx,ny,nz): pVtx[i].uColor = uColor: i+=1
-    pVtx[i].tPos = p(a): pVtx[i].tNormal = type(nx,ny,nz): pVtx[i].uColor = uColor: i+=1
-    pVtx[i].tPos = p(c): pVtx[i].tNormal = type(nx,ny,nz): pVtx[i].uColor = uColor: i+=1
-    pVtx[i].tPos = p(d): pVtx[i].tNormal = type(nx,ny,nz): pVtx[i].uColor = uColor: i+=1
+    pVtx[i].tPos = p(a): pVtx[i].tNormal = type(nx,ny,nz): i+=1
+    pVtx[i].tPos = p(b): pVtx[i].tNormal = type(nx,ny,nz): i+=1
+    pVtx[i].tPos = p(c): pVtx[i].tNormal = type(nx,ny,nz): i+=1
+    pVtx[i].tPos = p(a): pVtx[i].tNormal = type(nx,ny,nz): i+=1
+    pVtx[i].tPos = p(c): pVtx[i].tNormal = type(nx,ny,nz): i+=1
+    pVtx[i].tPos = p(d): pVtx[i].tNormal = type(nx,ny,nz): i+=1
   #endmacro
   
   ' +X, -X, +Y, -Y, +Z, -Z

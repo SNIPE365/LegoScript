@@ -114,8 +114,7 @@ sub SetQuadNormal( byRef tQuad as LineType4Struct , ptNormal as Vertex3 ptr = NU
       
    end with
 end sub
-#endif
-
+#else
 sub SetTrigNormal( byref tTrig as LineType3Struct , ptNormal as Vertex3 ptr = NULL )
    with tTrig
       dim as single edge1(3-1), edge2(3-1), normal(3-1)
@@ -219,6 +218,7 @@ sub SetQuadNormal( byref tQuad as LineType4Struct , ptNormal as Vertex3 ptr = NU
       end if
    end with
 end sub
+#endif
 
 #if 0
 sub SetVtxTrigNormal( ptVtx as VertexCubeMap ptr )
@@ -349,6 +349,7 @@ Sub Matrix3x3VectorMultiply(pM As Single Ptr, pV_in As Single Ptr, pV_out As Sin
 End Sub
   #if 1
   Sub CheckAndFlipQuadWinding(ByRef Quad As LineType4Struct , pDummy as single ptr) ', pDesiredNormal As Single Ptr)
+    exit sub
       
       #define pDesiredNormal @g_DesiredNormal(0)
       ' This function checks the winding of the quad (P1, P2, P3, P4)

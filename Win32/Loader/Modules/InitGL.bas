@@ -240,7 +240,7 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    glEnable(GL_TEXTURE_2D)
    
    'glDisable(GL_LINE_SMOOTH)
-   glEnable(GL_LINE_SMOOTH)
+   'glEnable(GL_LINE_SMOOTH)
    'glLineWidth(1.25)
       
    'glEnable(GL_POLYGON_SMOOTH)
@@ -253,10 +253,10 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    'GL_POINT, GL_LINE, and GL_FILL.
    'glEnable( GL_CULL_FACE )
    glDisable( GL_CULL_FACE )
-   'glFrontFace( GL_CCW ): glCullFace(	GL_BACK )
+   glFrontFace( GL_CCW ): glCullFace(	GL_BACK )
    'glFrontFace( GL_CW ): glCullFace( GL_FRONT )
    
-   glFrontFace( GL_CW ): glCullFace( GL_BACK )
+   'glFrontFace( GL_CW ): glCullFace( GL_BACK )
       
    glEnable(GL_POLYGON_OFFSET_FILL)
    glPolygonOffset(1.0, 1/-20)
