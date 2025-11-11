@@ -394,7 +394,9 @@ function LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as 
                         #endif
                         GetFloat( pParm , fLen , "Length" )
                         #ifndef __Tester
-                        if (cint(fLen)*100) <> cint(fLen*100) then printf(!"Warning: float Length (%f)\n", fLen)
+                          #ifdef PrimitiveWarnings
+                            if (cint(fLen)*100) <> cint(fLen*100) then printf(!"Warning: float Length (%f)\n", fLen)
+                          #endif
                         #endif
                         '#if (not defined(__Tester)) andalso defined(__DebugShadowLoad)
                         'printf(!"Shape:(%i)'%s' Rad:%g Len:%g\n",iShapeID,sShape,fRad,fLen)
@@ -572,7 +574,8 @@ end function
 
 type LoadFlagStruct
   bLoadDependency:1 as ubyte
-  bIsPart        :2 as ubyte  
+  bIsPart        :2 as ubyte
+  'bBFC_Inverted  :1 as ubyte
 end type
 
 function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex as long = -1 , tLoadFlags as LoadFlagStruct = type(1) ) as DATFile ptr   
@@ -607,13 +610,15 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
    #endmacro
 
    #define PartsToBytes(_N) (offsetof(DATFile,tParts(0))+(_N)*sizeof(PartStruct))
+      
+   const bCertify=1 , bNoCertify=2 , bInvertNext=4 , bCCW=8
          
    dim as long iLastPart=0 , iLimitParts=-1 , iFailed=0, iLineNum = 1
    dim as long iType = any , iColour = any , iResu = any   
    dim as DATFile ptr pT = NULL 'pointer to the file structure in memory
    dim as long iFilenameOffset=0
    static as long RecursionLevel , iTotalLines , iTotalParts 
-   dim as boolean bIsModel
+   dim as byte bIsModel , bFileFlags = bCCW 
    iTotalLines = 0 : iTotalParts = 0
    RecursionLevel += 1
    
@@ -675,11 +680,17 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
       
       'all types except comments/meta (0) have color as second parameter, so let's read it
       if iType<>0 then
-         iResu = ReadInt( pFile , iColour )
-         CheckError( "Expected colour as second parameter" , " " ) 'failed to read the line type integer?
-         pt->tParts(iLastPart).wColour = iColour 'set the color to current part
-         pt->tParts(iLastPart).bType = iType
-         pFile += iResu 'advancing to the next component
+        iResu = ReadInt( pFile , iColour )
+        CheckError( "Expected colour as second parameter" , " " ) 'failed to read the line type integer?
+        with pt->tParts(iLastPart)
+          .wColour = iColour 'set the color to current part
+          .bType   = iType
+          .bFlags  = 0
+          .bCCW    = iif((bFileFlags and bCCW),1,0) ': if bCCW then puts("bCCW?")
+          'printf(!"initial CCW=%i\n",.bCCW)
+          'printf(!"initial Invert=%i\n",.bInvert)
+        end with
+        pFile += iResu 'advancing to the next component
       end if
       
       #macro NextFloat( _var , _description , _separator... )            
@@ -688,16 +699,39 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
          CheckError( "Expected " _description " parameter" , _separator ) 'failed to read the line type float?
          pFile += iResu
       #endmacro
-                  
+      
       select case iType 'which line type is it?      
       case 0 'ignore if comment OR empty line and advance to next line        
-         dim as string sComment         
-         iResu = ReadToken( pFile , sComment )
-         'print sComment;
-         if ucase(sComment) = "BFC" then            
-            pFile += iResu
-            iResu = ReadToken( pFile , sComment )
-            'puts(sComment)
+         dim sComment as string , bNeedEOL as byte = 0
+         iResu = ReadToken( pFile , sComment )                  
+         if ucase(sComment) = "BFC" then
+          #if 0
+             var pTemp = pFile : NextLine()
+             if pFile[-2] = asc(!"\r") then pFile[-2] = 0 else pFile[-1] = 0
+             printf(!"'%s'\n",pLineStart)
+             if pFile[-2] = 0 then pFile[-2] = asc(!"\r") else pFile[-1] = asc(!"\n")
+             pFile = pTemp
+          #endif           
+          while pFile[iResu]=asc(" ") orelse pFile[iResu]=9
+            pFile += iResu : iResu = ReadToken( pFile , sComment )
+            select case ucase(sComment)
+            case "INVERTNEXT"
+              if (bFileFlags and bInvertNext) then printf("next already inverted??? ")
+              bFileFlags or= bInvertNext
+            case "NOCERTIFY" 
+              if (bFileFlags and (bCertify or bNoCertify)) then puts("duplicatied certification")
+              bFileFlags or= bNoCertify 
+            case "CERTIFY"            
+              if (bFileFlags and (bCertify or bNoCertify)) then puts("duplicatied certification")
+              bFileFlags or= bCertify
+            case "CW"       : bFileFlags and= (not bCCW)
+            case "CCW"      : bFileFlags  or=     (bCCW)
+            case else       : puts("Unknown BFC: '"+sComment+"'")
+            end select
+            'if bNeedEOL=0 then bNeedEOL=1 : printf("BFC: ")
+            'printf("%s ",sComment)
+          wend         
+          if bNeedEOL then putchar(asc(!"\n")): bNeedEOL=0
          elseif ucase(sComment) = "FILE" then            
             dim as string sFile
             pFile += iResu
@@ -761,6 +795,13 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
          end if         
          NextLine() : continue do
       case 1 'line type 1 (ldraw part) '1 <colour> x y z a b c d e f g h i <file>                  
+         'printf(!"including: invert=%i\n",pt->tParts(iLastPart).bInvert)
+         if (bFileFlags and bInvertNext) then 
+           'puts("bInvertNext")
+           pt->tParts(iLastPart).bInvert = 1 : bFileFlags and= (not bInvertNext)
+         else 
+           pt->tParts(iLastPart).bInvert = 0
+         end if
          with pt->tParts(iLastPart)._1            
             NextFloat( .fX , "X (float) as second"     , " " )
             NextFloat( .fY , "Y (float) as third"      , " " )
@@ -796,6 +837,7 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
             CheckEndOfLine()
          end with
       case 2 '2 <colour> x1 y1 z1 x2 y2 z2
+         if (bFileFlags and bInvertNext) then puts("Invert next with a type 2 (line)"): bFileFlags and= (not bInvertNext)
          with pt->tParts(iLastPart)._2            
             NextFloat( .fX1 , "X1 (float) as second"     , " " )
             NextFloat( .fY1 , "Y1 (float) as third"      , " " )
@@ -809,6 +851,7 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
          'check if it's the end of line before continuing
          CheckEndOfLine()
       case 3 '3 <colour> x1 y1 z1 x2 y2 z2 x3 y3 z3
+         if (bFileFlags and bInvertNext) then puts("Invert next with a type 3 (triangle)"): bFileFlags and= (not bInvertNext)
          with pt->tParts(iLastPart)._3            
             NextFloat( .fX1 , "X1 (float) as second"     , " " )
             NextFloat( .fY1 , "Y1 (float) as third"      , " " )
@@ -825,6 +868,7 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
          'check if it's the end of line before continuing
          CheckEndOfLine()
       case 4 '4 <colour> x1 y1 z1 x2 y2 z2 x3 y3 z3 x4 y4 z4
+         if (bFileFlags and bInvertNext) then puts("Invert next with a type 4 (quad)"): bFileFlags and= (not bInvertNext)
          with pt->tParts(iLastPart)._4           
             NextFloat( .fX1 , "X1 (float) as second"     , " " )            
             NextFloat( .fY1 , "Y1 (float) as third"      , " " )
@@ -844,6 +888,7 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
          'check if it's the end of line before continuing
          CheckEndOfLine()
       case 5 '5 <colour> x1 y1 z1 x2 y2 z2 x3 y3 z3 x4 y4 z4
+         if (bFileFlags and bInvertNext) then puts("Invert next with a type 5 (opt line)"): bFileFlags and= (not bInvertNext)
          with pt->tParts(iLastPart)._5
             NextFloat( .fX1 , "X1 (float) as second"     , " " )
             NextFloat( .fY1 , "Y1 (float) as third"      , " " )

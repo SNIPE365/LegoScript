@@ -136,21 +136,26 @@ type ShadowStruct
 end type   
 
 type PartStruct
-   bType      as ubyte   'type ID (line/primitves   
-   union                 'flags
-      bFlags  as ubyte   'optional flags/bitfield???
-   end union   
-   union                 'color/data
-      wColour as ushort
-      wData   as ushort  'data???
-   end union
-   union                 '> type specific data
-      _1 as LineType1Struct
-      _2 as LineType2Struct
-      _3 as LineType3Struct
-      _4 as LineType4Struct
-      _5 as LineType5Struct      
-   end union
+  bType      as ubyte   'type ID (line/primitves)
+  union                 'flags    
+    type
+      bInvert:1 as ubyte  'invert CW/CCW from submodel
+      bNoClip:1 as ubyte  'disable culling
+      bCCW   :1 as ubyte  '0 = CW , 1 = CCW (default)
+    end type
+    bFlags    as ubyte  'optional flags/bitfield???
+  end union   
+  union                 'color/data
+    wColour as ushort
+    wData   as ushort   'not used yet
+  end union
+  union                 '> type specific data
+    _1 as LineType1Struct
+    _2 as LineType2Struct
+    _3 as LineType3Struct
+    _4 as LineType4Struct
+    _5 as LineType5Struct
+  end union
 end type
 
 const fUnused = -1234567
@@ -245,6 +250,11 @@ type ModelDrawArrays
   as VertexStructNoColor ptr pTriangleVtx , pBorderVtx
   as VertexStruct        ptr pColorTriVtx , pTrColTriVtx , pColorBrdVtx  
   as VertexCubeMap       ptr pCubemapVtx
+  
+  lCubeMapIdxCnt  as long : pCubeMapIdx  as long ptr
+  lTriangleIdxCnt as long : pTriangleIdx as long ptr
+  lBorderIdxCnt   as long : pBorderIdx   as long ptr
+  
   as DisplayPiece        ptr pPieces
   
 end type

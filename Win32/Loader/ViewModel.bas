@@ -18,6 +18,7 @@
 '#define ColorizePrimatives
 '#define RenderOptionals
 '#define DebugLoading
+'#define PrimitiveWarnings
        
 #define UseVBO
 #define UseVBOEx
@@ -245,8 +246,8 @@ scope
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\cube10x10x10.ldr"
    'sFile = "C:\Users\greg\Desktop\LS\TLG_Map\TrainStationEntranceA.ldr"
    'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map0\Build\Blocks\B1\Eldon Square.ldr"
-   sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\TestMap2.ldr"
-   'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\Blocks\10232 - Palace Cinema.mpd"
+   'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\TestMap2.ldr"
+   sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\Blocks\10232 - Palace Cinema.mpd"
    'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\Blocks\10255 - Assembly Square.mpd"
    'sFile = "G:\Jogos\LegoScript\examples\10294 - Titanic.mpd"
    'sFile = "C:\Users\greg\Desktop\LS\TLG_Map\FileA.ldr"
@@ -277,7 +278,7 @@ static shared as single g_fYaw = -190.0 , g_fPitch = 0.0 ' Start facing -Z (stan
 static shared as single g_fFrontX,g_fFrontY,g_fFrontZ,g_fRightX,g_fRightY,g_fRightZ
 static shared as single g_fUpX=0.0 , g_fUpY=1.0 , g_fUpZ = 0.0 ' World Up
 
-const cMovementSpeed = 2f , cLookSpeed = 4/20f
+const cMovementSpeed = 2f , cLookSpeed = 4/20f , cWheelDivisor = 16
 const cPI180 = atn(1)/45
 
 sub UpdateCameraVectors()
@@ -315,8 +316,8 @@ dim as boolean bMoveForward , bMoveBackward , bStrafeLeft , bStrafeRight , bMove
 dim shared as single fRotationX = 120 , fRotationY = 20
 dim shared as single fPositionX , fPositionY , fPositionZ , fZoom = -3
 dim shared as long iWheel , iPrevWheel , g_CurDraw = -1
-dim shared as byte g_Vsync=0
-dim shared as boolean bBoundingBox,bViewBorders=true,bLighting=true
+dim shared as byte g_Vsync=2
+dim shared as boolean bBoundingBox,bViewBorders=true,bLighting=true,bCulling=true
 dim shared as boolean bLeftPressed,bRightPressed,bWheelPressed
 dim shared as hwnd hGfxWnd
 dim shared as boolean g_FreeCam = false  
@@ -328,6 +329,7 @@ dim shared as PartSnap tSnapID
 #ifdef UseVBOEx
 static shared as ModelDrawArrays g_tModelArrays
 static shared as GLuint iTriangleVBO,iColorTriVBO,iTrColTriVBO,iBorderVBO,iColorBrdVBO,iCubemapVBO
+static shared as GLuint iCubemapIdxVBO, iTriangleIdxVBO, iBorderIdxVBO
 #endif
 
 function RenderScenery() as ulong
@@ -351,10 +353,16 @@ function RenderScenery() as ulong
             'glColor4ub(255,255,255,255)
             glLoadMatrixf( @tCur.m(0) )
             glBindBuffer(GL_ARRAY_BUFFER, iCubemapVBO )
+            #ifdef iCubemapIdxVBO            
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, iCubemapIdxVBO )
+            #endif
             const cVtxSz = sizeof(VertexCubeMap)
             glVertexPointer(3, GL_FLOAT        , cVtxSz, cast(any ptr,offsetof(VertexCubeMap,tPos   )) )
             glNormalPointer(   GL_FLOAT        , cVtxSz, cast(any ptr,offsetof(VertexCubeMap,tNormal)) )            
           end scope
+          
+          'glPushAttrib(GL_ENABLE_BIT)
+          'glEnable( GL_CULL_FACE )
           
           for I as long = 0 to .lPieceCount-1
             with .pPieces[I]                  
@@ -363,8 +371,9 @@ function RenderScenery() as ulong
               MultMatrix4x4( .tMatView , tCur , .tMatrix )
               'printf(!"Z = %1.1f Rad=%1.1f \r",.tMatView.fPosZ,.pModel->tSize.fRad)
               if .tMatView.fPosZ > (.pModel->tSize.fRad) then continue for              
+              
               #if 1
-              if .tMatView.fPosZ < -50 then                     
+              if .tMatView.fPosZ < -70 then                     
                 #if 0
                   glLoadMatrixf( @.tMatView.m(0) )
                   glColor4ubv( cast(ubyte ptr,@.lBaseColor) )
@@ -373,26 +382,35 @@ function RenderScenery() as ulong
                   end with
                 #else
                   glColor4ubv( cast(ubyte ptr,@.lBaseColor) )
-                  glDrawArrays( GL_TRIANGLES, I*36 , 36 )
+                  #ifdef iCubemapIdxVBO
+                    glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, cast(any ptr,I*36*sizeof(long)) )
+                  #else
+                    glDrawArrays( GL_TRIANGLES, I*36 , 36 )
+                  #endif
                 #endif
                 continue for
               end if
               #endif
-              'if .tMatView.fPosZ < -50 then .bSkipBorder=1
+              if .tMatView.fPosZ < -35 then .bSkipBorder=1
               .bDisplay=1 : uDrawParts += 1
             end with
           next I              
           
+          'glPopAttrib()
+          
+          glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
+          glBindBuffer(GL_ARRAY_BUFFER, 0 )
+          
           #if 1          
           DrawPieces( Triangle , GL_TRIANGLES , false )
-          'DrawPieces( ColorTri , GL_TRIANGLES , true  )
+          DrawPieces( ColorTri , GL_TRIANGLES , true  )
           glEnable( GL_BLEND )
           if bViewBorders then 
             DrawPieces( Border   , GL_LINES   , false )
-            'DrawPieces( ColorBrd , GL_LINES   , true  )
+            DrawPieces( ColorBrd , GL_LINES   , true  )
           end if          
-          'DrawPieces( TransTri , GL_TRIANGLES , false )
-          'DrawPieces( TrColTri , GL_TRIANGLES , true  )
+          DrawPieces( TransTri , GL_TRIANGLES , false )
+          DrawPieces( TrColTri , GL_TRIANGLES , true  )
           glDisableClientState(GL_COLOR_ARRAY)
           glDisableClientState(GL_NORMAL_ARRAY)
           glDisableClientState(GL_VERTEX_ARRAY)
@@ -607,7 +625,7 @@ do
           next N
        else
           print "loading from clipboard"
-          sModel = GetClipboard() 
+          sModel = "" 'GetClipboard() 
           if instr(sModel,".dat") then
              for N as long = 0 to len(sModel)
                 if sModel[N]=13 then sModel[N]=32
@@ -616,7 +634,7 @@ do
              'sModel = _    
              '"1 2 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 NotFound.dat" EOL _
              sModel = _    
-             "1 1 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 91405.dat" EOL
+             "1 1 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 3001.dat" EOL '91405
              
              ' ------------------------------------------------------
              'sModel = _ 'all of lines belo should end with EOL _
@@ -652,6 +670,7 @@ do
   if hGfxWnd=0 then
     hGfxWnd = InitOpenGL()
     if bLighting then glEnable( GL_LIGHTING ) else glDisable( GL_LIGHTING )
+    if bCulling  then glEnable( GL_CULL_FACE ) else glDisable( GL_CULL_FACE )
     glEnable( GL_DEPTH_TEST )
     wglSwapIntervalEXT(g_Vsync)
   end if
@@ -681,20 +700,36 @@ do
     #else
       GenModelDrawArrays( g_pModel , g_tModelArrays )
       #macro CreateVBO( _name )
-        glGenBuffers(1 , @i##_name##VBO)          
+        glGenBuffers(1 , @i##_name##VBO)
+        #ifdef i##_name##IdxVBO
+        glGenBuffers(1 , @i##_name##IdxVBO)
+        #endif
         with g_tModelArrays
           if .p##_name##vtx andalso .l##_name##Cnt then
-            glBindBuffer(GL_ARRAY_BUFFER, i##_name##VBO)          
-            glBufferData(GL_ARRAY_BUFFER, .l##_name##Cnt * sizeof(typeof(*.p##_name##vtx)), .p##_name##vtx , GL_STREAM_DRAW) 'GL_STATIC_DRAW)
-            printf(!"%s = %f1.1mb\n" , #_name , (.l##_name##Cnt * sizeof(typeof(*.p##_name##vtx)))/(1024*1024) )
+            #define vtxSz (.l##_name##Cnt * sizeof(typeof(*.p##_name##vtx)))
+            #define idxSz (.l##_name##IdxCnt * sizeof(typeof(*.p##_name##Idx)))
+            glBindBuffer(GL_ARRAY_BUFFER, i##_name##VBO)
+            glBufferData(GL_ARRAY_BUFFER, vtxSz , .p##_name##vtx , GL_STATIC_DRAW)
+            #ifdef i##_name##IdxVBO
+            glBindBuffer(GL_ARRAY_BUFFER, i##_name##IdxVBO)
+            glBufferData(GL_ARRAY_BUFFER, idxSz , .p##_name##Idx , GL_STATIC_DRAW)
+            printf(!"%s = %1.1fmb (idx=%1.1fkb)\n" , #_name , (vtxSz+idxSz)/(1024*1024) , (idxSz)/(1024) )
+            #else
+            printf(!"%s = %1.1fmb\n" , #_name , (vtxSz)/(1024*1024) )
+            #endif
             free( .p##_name##vtx )
+            #ifdef i##_name##IdxVBO
+            free( .p##_name##Idx )
+            #endif
           end if
         end with
       #endmacro
+      GenerateOptimizedIndexes( g_tModelArrays , Triangle )
       CreateVBO( Triangle )
       CreateVBO( ColorTri )      
       CreateVBO( TrColTri )
-      CreateVBO( Border   )
+      GenerateOptimizedIndexes( g_tModelArrays , Border )
+      CreateVBO( Border   )      
       CreateVBO( ColorBrd )      
     #endif
   #else
@@ -818,20 +853,8 @@ do
         next N
       end with
     next I
-    #if 0
-    scope      
-      dim as long ptr pIndex(255)
-      var iUnique=0 , pVtxOut = pCubeVtx 
-      var pVtxBase = pCubeVtx+I*36;/      
-      for I as long = 0 to .lPieceCount-1
-        with .pPieces[I]                
-          if .pModel = 0 then continue for
-          var fSum = 
-        end with
-      next I
-    #endif
-    
-  end with
+  end with  
+  GenerateOptimizedIndexes( g_tModelArrays , Cubemap )  
   CreateVBO( Cubemap  )
   #endif  
   
@@ -927,7 +950,7 @@ do
     tCur = g_tIdentityMatrix
     'glScalef(1/-20, 1.0/-20, 1/20 )
     'Matrix4x4Scale( tCur , 1/-20 , 1.0/-20 , 1/20 )
-    Matrix4x4Scale( tCur , 1/-20 , 1/-20 , 1/20 )
+    Matrix4x4Scale( tCur , -1/20 , -1/20 , 1/20 )
     
     if g_FreeCam then
       
@@ -1047,7 +1070,7 @@ do
       end if
       
       '// Set light position (0, 0, 0)
-      dim as GLfloat lightPos(...) = {0,0,0, 1.0f}'; // (x, y, z, w), w=1 for positional light
+      dim as GLfloat lightPos(...) = {0,0,0, 1f}'; // (x, y, z, w), w=1 for positional light
       glLightfv(GL_LIGHT0, GL_POSITION, @lightPos(0))
       
       Matrix4x4Translate( tCur , -fPositionX , fPositionY , fPositionZ*(fZoom+4) )
@@ -1068,11 +1091,11 @@ do
         Case fb.EVENT_MOUSE_MOVE         
            var fX = iif( fZoom<0 , e.dx/((fZoom*fZoom)+1) , e.dx*((fZoom*fzoom)+1) )
            var fY = iif( fZoom<0 , e.dy/((fZoom*fZoom)+1) , e.dy*((fZoom*fZoom)+1) )
-           if bLeftPressed  then fRotationX += (e.dx/12) : fRotationY += (e.dy/12)
+           if bLeftPressed  then fRotationX += e.dx*2/sqr(g_zFar) : fRotationY += e.dy*2/sqr(g_zFar)
            if bRightPressed then fPositionX += (fX) * g_zFar/100 : fPositionY += (fY) * g_zFar/100         
         case fb.EVENT_MOUSE_WHEEL
            iWheel = e.z-iPrevWheel
-           fZoom = -3+(-iWheel/64)
+           fZoom = -3+(-iWheel/cWheelDivisor)
            'puts("" & fZoom)
         case fb.EVENT_MOUSE_BUTTON_PRESS
            if e.button = fb.BUTTON_MIDDLE then 
@@ -1103,6 +1126,10 @@ do
            case asc("B")-asc("@") 'Border Toggle
               bViewBorders = not bViewBorders
               printf(!"Borders: %s\n",iif(bViewBorders,"ENABLED","DISABLED"))
+           case asc("C")-asc("@") 'Cull Toggle
+             bCulling = (0=bCulling)
+             printf(!"Culling: %s\n",iif(bCulling,"ENABLED","DISABLED"))
+             if bCulling then glEnable( GL_CULL_FACE ) else glDisable( GL_CULL_FACE )
            case asc("L")-asc("@") 'Light Toggle
               bLighting = not bLighting
               printf(!"Lighting: %s\n",iif(bLighting,"ENABLED","DISABLED"))

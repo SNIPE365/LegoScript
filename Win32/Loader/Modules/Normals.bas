@@ -34,191 +34,105 @@ sub SetLineNormal( byref tLine as LineType2Struct , ptNormal as Vertex3 ptr = NU
       end if
    end with
 end sub
-
-#if 0
 sub SetTrigNormal( byref tTrig as LineType3Struct , ptNormal as Vertex3 ptr = NULL )
-   with tTrig
-      'normalize triangle
-      dim as single edge1(3-1) = any, edge2(3-1) = any, normal(3-1) = any
-
-      'Compute edge vectors
-      edge1(0) = .fX2 - .fX1
-      edge1(1) = .fY2 - .fY1
-      edge1(2) = .fZ2 - .fZ1
-   
-      edge2(0) = .fX3 - .fX1
-      edge2(1) = .fY3 - .fY1
-      edge2(2) = .fZ3 - .fZ1
-   
-      '// Compute normal
-      crossProduct(@edge2(0), @edge1(0) , @normal(0))
-   
-      '// Normalize the normal vector
-      normalize(@normal(0))
-      
-      if ptNormal then
-         ptNormal->fX = normal(0)
-         ptNormal->fY = normal(1)
-         ptNormal->fZ = normal(2)
-      else         
-         glNormal3fv( @normal(0) )
-      end if
-   
-      
-   end with
-end sub   
-sub SetQuadNormal( byRef tQuad as LineType4Struct , ptNormal as Vertex3 ptr = NULL )
-   with tQuad
-      dim as single  edge1(3-1)=any, edge2(3-1)=any, normal(3-1)=any, cc(3-1)=any
-      
-      '// Compute edge vectors for one triangle of the quad (v1, v2, v3)
-      'check with inverse culling
-      edge1(0) = .fX3 - .fX4
-      edge1(1) = .fY3 - .fY4
-      edge1(2) = .fZ3 - .fZ4
-      
-      edge2(0) = .fX2 - .fX4
-      edge2(1) = .fY2 - .fY4
-      edge2(2) = .fZ2 - .fZ4      
-      
-      '// Compute normal for the first triangle
-      crossProduct(@edge2(0),@edge1(0), @normal(0))
-      
-      '// Normalize the normal
-      normalize(@normal(0))
-      
-      'ccw detect
-      'Vector3 aview = subtract(A, camera_position);
-      #define aview edge1      
-      aview(0) = .fX1' - 0
-      aview(1) = .fY1' - 0
-      aview(2) = .fZ1 - 10000 '?
-      var dot = dot_product( @normal(0) , @aview(0) )
-
-      '// If dot product is positive, it's CCW; if negative, it's CW
-      if dot < 0 then
-       'if it's CCW (we're checking for CW, but it's inverted) means it was not inverted
-       'so then calculate the normal the same way as for a triangle
-       SetTrigNormal( *cptr(LineType3Struct ptr,@tQuad) , ptNormal )
-       exit sub
-      end if        
-      
-      if ptNormal then
-         ptNormal->fX = normal(0)
-         ptNormal->fY = normal(1)
-         ptNormal->fZ = normal(2)
-      else
-         '// Set normal for the quad
-         glNormal3fv( @normal(0) )
-      end if      
-      
-   end with
-end sub
-#else
-sub SetTrigNormal( byref tTrig as LineType3Struct , ptNormal as Vertex3 ptr = NULL )
-   with tTrig
-      dim as single edge1(3-1), edge2(3-1), normal(3-1)
-      dim as single center(3-1), tocenter(3-1), dotp
-
-      'Compute edge vectors
-      edge1(0) = .fX2 - .fX1
-      edge1(1) = .fY2 - .fY1
-      edge1(2) = .fZ2 - .fZ1
-
-      edge2(0) = .fX3 - .fX1
-      edge2(1) = .fY3 - .fY1
-      edge2(2) = .fZ3 - .fZ1
-
-      'Compute normal (CCW)
-      crossProduct(@edge2(0), @edge1(0), @normal(0))
-      normalize(@normal(0))
-
+  with tTrig
+    dim as single edge1(3-1)=any, edge2(3-1)=any, normal(3-1)=any
+        
+    'Compute edge vectors
+    edge1(0) = .fX2 - .fX1
+    edge1(1) = .fY2 - .fY1
+    edge1(2) = .fZ2 - .fZ1
+    
+    edge2(0) = .fX3 - .fX1
+    edge2(1) = .fY3 - .fY1
+    edge2(2) = .fZ3 - .fZ1
+    
+    'Compute normal (CCW)
+    crossProduct(@edge2(0), @edge1(0), @normal(0))
+    normalize(@normal(0))
+    
+    #if 0
+      dim as single center(3-1) = any , tocenter(3-1) = any, dotp = any
       'Compute centroid
       center(0) = (.fX1 + .fX2 + .fX3) / 3
       center(1) = (.fY1 + .fY2 + .fY3) / 3
       center(2) = (.fZ1 + .fZ2 + .fZ3) / 3
-
+      
       'Vector from origin to centroid
       tocenter(0) = center(0)
       tocenter(1) = center(1)
       tocenter(2) = center(2)
       normalize(@tocenter(0))
       
-      '.fX1 = 0 : .fY1 = 0 : .fZ1 = 0
-      '.fX2 = 0 : .fY2 = 0 : .fZ2 = 0
-      '.fX3 = 0 : .fY3 = 0 : .fZ3 = 0
-
       'Flip normal if facing inward
       dotp = normal(0)*tocenter(0) + normal(1)*tocenter(1) + normal(2)*tocenter(2)
       if dotp < 0 then
-         normal(0) = -normal(0)
-         normal(1) = -normal(1)
-         normal(2) = -normal(2)
-         'swap .fX2,.fX3 : swap .fY2,.fY3 : swap .fZ2,.fZ3
+        normal(0) = -normal(0)
+        normal(1) = -normal(1)
+        normal(2) = -normal(2)
+        'swap .fX2,.fX3 : swap .fY2,.fY3 : swap .fZ2,.fZ3
       end if
+    #endif
 
-      if ptNormal then
-         ptNormal->fX = normal(0)
-         ptNormal->fY = normal(1)
-         ptNormal->fZ = normal(2)
-      else
-         glNormal3fv(@normal(0))
-      end if
-   end with
+    if ptNormal then
+      *ptNormal = type<vertex3>( normal(0) , normal(1) , normal(2) )
+      'ptNormal->fX = normal(0)
+      'ptNormal->fY = normal(1)
+      'ptNormal->fZ = normal(2)
+    else
+      glNormal3fv(@normal(0))
+    end if
+  end with
 end sub
 sub SetQuadNormal( byref tQuad as LineType4Struct , ptNormal as Vertex3 ptr = NULL )
-   with tQuad
-      dim as single edge1(3-1), edge2(3-1), normal(3-1)
+  with tQuad
+    dim as single edge1(3-1)=any, edge2(3-1)=any, normal(3-1)=any
+    
+    'Compute edges using first 3 vertices
+    edge1(0) = .fX2 - .fX1
+    edge1(1) = .fY2 - .fY1
+    edge1(2) = .fZ2 - .fZ1
+    
+    edge2(0) = .fX3 - .fX1
+    edge2(1) = .fY3 - .fY1
+    edge2(2) = .fZ3 - .fZ1
+    
+    'Compute normal (CCW)
+    crossProduct(@edge2(0), @edge1(0), @normal(0))
+    normalize(@normal(0))
+    
+    #if 0
       dim as single center(3-1), tocenter(3-1), dotp
-
-      'Compute edges using first 3 vertices
-      edge1(0) = .fX2 - .fX1
-      edge1(1) = .fY2 - .fY1
-      edge1(2) = .fZ2 - .fZ1
-
-      edge2(0) = .fX3 - .fX1
-      edge2(1) = .fY3 - .fY1
-      edge2(2) = .fZ3 - .fZ1
-
-      'Compute normal (CCW)
-      crossProduct(@edge2(0), @edge1(0), @normal(0))
-      normalize(@normal(0))
-
       'Centroid (all 4 vertices)
       center(0) = (.fX1 + .fX2 + .fX3 + .fX4) / 4
       center(1) = (.fY1 + .fY2 + .fY3 + .fY4) / 4
       center(2) = (.fZ1 + .fZ2 + .fZ3 + .fZ4) / 4
-
+      
       'Vector from origin to centroid
       tocenter(0) = center(0)
       tocenter(1) = center(1)
       tocenter(2) = center(2)
-      normalize(@tocenter(0))
+      normalize(@tocenter(0))      
       
-      '.fX1 = 0 : .fY1 = 0 : .fZ1 = 0
-      '.fX2 = 0 : .fY2 = 0 : .fZ2 = 0
-      '.fX3 = 0 : .fY3 = 0 : .fZ3 = 0
-      '.fX4 = 0 : .fY4 = 0 : .fZ4 = 0
-
       'Flip normal if inward
       dotp = normal(0)*tocenter(0) + normal(1)*tocenter(1) + normal(2)*tocenter(2)
       if dotp < 0 then
-         normal(0) = -normal(0)
-         normal(1) = -normal(1)
-         normal(2) = -normal(2)
-         'swap .fX2,.fX4 : swap .fY2,.fY4 : swap .fZ2,.fZ4
+        normal(0) = -normal(0)
+        normal(1) = -normal(1)
+        normal(2) = -normal(2)
+        'swap .fX2,.fX4 : swap .fY2,.fY4 : swap .fZ2,.fZ4
       end if
-
-      if ptNormal then
-         ptNormal->fX = normal(0)
-         ptNormal->fY = normal(1)
-         ptNormal->fZ = normal(2)
-      else
-         glNormal3fv(@normal(0))
-      end if
-   end with
+    #endif
+    
+    if ptNormal then
+      *ptNormal = type<vertex3>( normal(0) , normal(1) , normal(2) )
+      'ptNormal->fX = normal(0) : ptNormal->fY = normal(1) : ptNormal->fZ = normal(2)
+    else
+      glNormal3fv(@normal(0))
+    end if
+    
+  end with
 end sub
-#endif
 
 #if 0
 sub SetVtxTrigNormal( ptVtx as VertexCubeMap ptr )
@@ -327,7 +241,7 @@ end sub
   End Sub
 #endif
 
-#if 1
+#if 0
 static shared as single g_DesiredNormal(...) = {0,0,0}
 Sub Matrix3x3VectorMultiply(pM As Single Ptr, pV_in As Single Ptr, pV_out As Single Ptr)
     ' Multiplies a 3-component vector pV_in by the 3x3 rotation/scale part
@@ -403,6 +317,7 @@ End Sub
           swap Quad.fX3 , Quad.fX4
           swap Quad.fY3 , Quad.fY4
           swap Quad.fZ3 , Quad.fZ4
+          
           
           'Print "Winding Flipped (P3 <-> P4 swap)."
       Else

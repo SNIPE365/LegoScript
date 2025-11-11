@@ -253,10 +253,9 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    'GL_POINT, GL_LINE, and GL_FILL.
    'glEnable( GL_CULL_FACE )
    glDisable( GL_CULL_FACE )
-   glFrontFace( GL_CCW ): glCullFace(	GL_BACK )
+   'glFrontFace( GL_CCW ): glCullFace(	GL_BACK )
    'glFrontFace( GL_CW ): glCullFace( GL_FRONT )
-   
-   'glFrontFace( GL_CW ): glCullFace( GL_BACK )
+   glFrontFace( GL_CW ): glCullFace( GL_BACK )
       
    glEnable(GL_POLYGON_OFFSET_FILL)
    glPolygonOffset(1.0, 1/-20)
@@ -269,15 +268,15 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
     '// Set light properties (optional)
     
     '// Ambient light (soft background lighting)
-    dim as GLfloat ambientLight(...) = {0.2f, 0.2f, 0.2f, 1.0f}';  // Low-intensity white ambient light
+    dim as GLfloat ambientLight(...) = {0.01f, 0.01f, 0.01f, 1.0f}';  // Low-intensity white ambient light
     glLightfv(GL_LIGHT0, GL_AMBIENT, @ambientLight(0))
 
     '// Diffuse light (main light that affects the surface)
-    dim as GLfloat diffuseLight(...) = {1.0f/20, 1.0f/20, 1.0f/20, 1.0f}';  // Bright white diffuse light
+    dim as GLfloat diffuseLight(...) = {1.0f/20, 1.0f/20, 1.0f/20, 1f}';  // Bright white diffuse light
     glLightfv(GL_LIGHT0, GL_DIFFUSE, @diffuseLight(0))
 
     '// Specular light (shiny reflections)
-    dim as GLfloat specularLight(...) = {1.0f/20, 1.0f/20, 1.0f/20, 1.0f}'; // White specular light
+    dim as GLfloat specularLight(...) = {1.0f/20, 1.0f/20, 1.0f/20, 1f}'; // White specular light
     glLightfv(GL_LIGHT0, GL_SPECULAR, @specularLight(0))
     
     glEnable(GL_COLOR_MATERIAL)
