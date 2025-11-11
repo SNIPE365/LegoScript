@@ -9,7 +9,7 @@
 #include once "crt.bi"
 #include once "vbcompat.bi"
 
-#define LoadFromSFile
+'#define LoadFromSFile
 '#define __Tester
 
 '#define DebugShadow
