@@ -236,6 +236,7 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    glEnable GL_BLEND
    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
    glAlphaFunc( GL_GREATER , 0.5 )
+   'glEnable(GL_NORMALIZE)
       
    glEnable(GL_TEXTURE_2D)
    
@@ -257,8 +258,8 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    'glFrontFace( GL_CW ): glCullFace( GL_FRONT )
    glFrontFace( GL_CW ): glCullFace( GL_BACK )
       
-   glEnable(GL_POLYGON_OFFSET_FILL)
-   glPolygonOffset(1.0, 1/-20)
+   'glEnable(GL_POLYGON_OFFSET_FILL)
+   'glPolygonOffset(1.0, 1/-20)
    
    '============== light initialization ==============
     glEnable(GL_LIGHTING)
@@ -280,7 +281,7 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
     glLightfv(GL_LIGHT0, GL_SPECULAR, @specularLight(0))
     
     glEnable(GL_COLOR_MATERIAL)
-    glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE)        
+    glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE)
     
     glInitFont()
         

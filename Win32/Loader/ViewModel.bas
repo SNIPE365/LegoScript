@@ -19,9 +19,8 @@
 '#define RenderOptionals
 '#define DebugLoading
 '#define PrimitiveWarnings
-       
+
 #define UseVBO
-#define UseVBOEx
 
 '#ifndef __NoRender
 
@@ -246,8 +245,8 @@ scope
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\cube10x10x10.ldr"
    'sFile = "C:\Users\greg\Desktop\LS\TLG_Map\TrainStationEntranceA.ldr"
    'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map0\Build\Blocks\B1\Eldon Square.ldr"
-   'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\TestMap2.ldr"
-   sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\Blocks\10232 - Palace Cinema.mpd"
+   sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\TestMap2.ldr"
+   'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\Blocks\10232 - Palace Cinema.mpd"
    'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\Blocks\10255 - Assembly Square.mpd"
    'sFile = "G:\Jogos\LegoScript\examples\10294 - Titanic.mpd"
    'sFile = "C:\Users\greg\Desktop\LS\TLG_Map\FileA.ldr"
@@ -326,98 +325,87 @@ dim shared as Matrix4x4 tCur=any, tProj=any, tMat=any
 dim shared as PartSize g_tSz
 dim shared as PartSnap tSnapID  
 
-#ifdef UseVBOEx
+#ifdef UseVBO
 static shared as ModelDrawArrays g_tModelArrays
 static shared as GLuint iTriangleVBO,iColorTriVBO,iTrColTriVBO,iBorderVBO,iColorBrdVBO,iCubemapVBO
-static shared as GLuint iCubemapIdxVBO, iTriangleIdxVBO, iBorderIdxVBO
+static shared as GLuint iCubemapIdxVBO, iBorderIdxVBO', iTriangleIdxVBO
+static shared as long g_uDrawParts , g_uDrawBoxes
 #endif
 
-function RenderScenery() as ulong
+sub RenderScenery()
   
-  dim as long uDrawParts 
+  g_uDrawParts=0 : g_uDrawBoxes=0
   'glDisable( GL_LIGHTING )
   glEnable( GL_DEPTH_TEST )
   if g_CurDraw < 0 then
     'render whole model
-    #ifdef UseVBO
-      #ifndef UseVBOEx
-        DrawColorVBO( iModelVBO , GL_TRIANGLES , iTrianglesCount )
-      #else
-        dim as ulong uLastColor = 0
-        with g_tModelArrays
-          
-          glDisable( GL_BLEND )
-          scope
-            glEnableClientState(GL_VERTEX_ARRAY)
-            glEnableClientState(GL_NORMAL_ARRAY)            
-            'glColor4ub(255,255,255,255)
-            glLoadMatrixf( @tCur.m(0) )
-            glBindBuffer(GL_ARRAY_BUFFER, iCubemapVBO )
-            #ifdef iCubemapIdxVBO            
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, iCubemapIdxVBO )
-            #endif
-            const cVtxSz = sizeof(VertexCubeMap)
-            glVertexPointer(3, GL_FLOAT        , cVtxSz, cast(any ptr,offsetof(VertexCubeMap,tPos   )) )
-            glNormalPointer(   GL_FLOAT        , cVtxSz, cast(any ptr,offsetof(VertexCubeMap,tNormal)) )            
-          end scope
-          
-          'glPushAttrib(GL_ENABLE_BIT)
-          'glEnable( GL_CULL_FACE )
-          
-          for I as long = 0 to .lPieceCount-1
-            with .pPieces[I]                  
-              .bFlags=0 : '.bDisplay=0:.bSkipBorder=0:.bSkipBody=0
-              if .pModel=0 then continue for
-              MultMatrix4x4( .tMatView , tCur , .tMatrix )
-              'printf(!"Z = %1.1f Rad=%1.1f \r",.tMatView.fPosZ,.pModel->tSize.fRad)
-              if .tMatView.fPosZ > (.pModel->tSize.fRad) then continue for              
-              
-              #if 1
-              if .tMatView.fPosZ < -70 then                     
-                #if 0
-                  glLoadMatrixf( @.tMatView.m(0) )
-                  glColor4ubv( cast(ubyte ptr,@.lBaseColor) )
-                  with .pModel->tSize
-                    DrawLimitsCube( .xMin , .xMax , .yMin , .yMax , .zMin , .zMax )
-                  end with
-                #else
-                  glColor4ubv( cast(ubyte ptr,@.lBaseColor) )
-                  #ifdef iCubemapIdxVBO
-                    glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, cast(any ptr,I*36*sizeof(long)) )
-                  #else
-                    glDrawArrays( GL_TRIANGLES, I*36 , 36 )
-                  #endif
-                #endif
-                continue for
-              end if
-              #endif
-              if .tMatView.fPosZ < -35 then .bSkipBorder=1
-              .bDisplay=1 : uDrawParts += 1
-            end with
-          next I              
-          
-          'glPopAttrib()
-          
-          glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
-          glBindBuffer(GL_ARRAY_BUFFER, 0 )
-          
-          #if 1          
-          DrawPieces( Triangle , GL_TRIANGLES , false )
-          DrawPieces( ColorTri , GL_TRIANGLES , true  )
-          glEnable( GL_BLEND )
-          if bViewBorders then 
-            DrawPieces( Border   , GL_LINES   , false )
-            DrawPieces( ColorBrd , GL_LINES   , true  )
-          end if          
-          DrawPieces( TransTri , GL_TRIANGLES , false )
-          DrawPieces( TrColTri , GL_TRIANGLES , true  )
-          glDisableClientState(GL_COLOR_ARRAY)
-          glDisableClientState(GL_NORMAL_ARRAY)
-          glDisableClientState(GL_VERTEX_ARRAY)
+    #ifdef UseVBO      
+      dim as ulong uLastColor = 0
+      with g_tModelArrays
+        
+        glDisable( GL_BLEND )
+        scope
+          glEnableClientState(GL_VERTEX_ARRAY)
+          glEnableClientState(GL_NORMAL_ARRAY)
+          'glColor4ub(255,255,255,255)
+          glLoadMatrixf( @tCur.m(0) )
+          glBindBuffer(GL_ARRAY_BUFFER, iCubemapVBO )
+          #ifdef iCubemapIdxVBO            
+          glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, iCubemapIdxVBO )
           #endif
-          
-        end with
-      #endif
+          const cVtxSz = sizeof(VertexCubeMap)
+          glVertexPointer(3, GL_FLOAT        , cVtxSz, cast(any ptr,offsetof(VertexCubeMap,tPos   )) )
+          glNormalPointer(   GL_FLOAT        , cVtxSz, cast(any ptr,offsetof(VertexCubeMap,tNormal)) )
+        end scope
+        
+        'glPushAttrib(GL_ENABLE_BIT)
+        'glEnable( GL_CULL_FACE )
+        
+        for I as long = 0 to .lPieceCount-1
+          with .pPieces[I]
+            .bFlags=0 : '.bDisplay=0:.bSkipBorder=0:.bSkipBody=0
+            if .pModel=0 then continue for
+            MultMatrix4x4( .tMatView , tCur , .tMatrix )
+            'printf(!"Z = %1.1f Rad=%1.1f \r",.tMatView.fPosZ,.pModel->tSize.fRad)
+            if .tMatView.fPosZ > (.pModel->tSize.fRad) then continue for
+            
+            #if 1
+            if .tMatView.fPosZ < -70 then                                   
+              glColor4ubv( cast(ubyte ptr,@.lBaseColor) ) : g_uDrawBoxes += 1
+              #ifdef iCubemapIdxVBO
+                glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, cast(any ptr,I*36*sizeof(long)) )
+              #else
+                glDrawArrays( GL_TRIANGLES, I*36 , 36 )
+              #endif              
+              continue for
+            end if
+            #endif
+            if .tMatView.fPosZ < -35 then .bSkipBorder=1
+            .bDisplay=1 : g_uDrawParts += 1
+          end with
+        next I              
+        
+        'glPopAttrib()
+        
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
+        glBindBuffer(GL_ARRAY_BUFFER, 0 )
+        
+        #if 1          
+        DrawPieces( Triangle , GL_TRIANGLES , false )
+        DrawPieces( ColorTri , GL_TRIANGLES , true  )
+        glEnable( GL_BLEND )
+        if bViewBorders then 
+          DrawPieces( Border   , GL_LINES   , false )
+          DrawPieces( ColorBrd , GL_LINES   , true  )
+        end if          
+        DrawPieces( TransTri , GL_TRIANGLES , false )
+        DrawPieces( TrColTri , GL_TRIANGLES , true  )
+        glDisableClientState(GL_COLOR_ARRAY)
+        glDisableClientState(GL_NORMAL_ARRAY)
+        glDisableClientState(GL_VERTEX_ARRAY)
+        #endif
+        
+      end with
     #else
        glCallList(	iModel )
     #endif
@@ -425,26 +413,15 @@ function RenderScenery() as ulong
     'render single part
     RenderModel( g_pModel , false , , g_CurDraw )
   end if
-  if bViewBorders then 
-    #ifdef UseVBO         
-       if g_CurDraw<0 then            
-         #ifndef UseVBOEx
-          DrawColorVBO( iBorderVBO , GL_LINES , iBorderCount )
-          #else
-          #endif
-       else
-         #ifndef UseVBOEx
-          glColor4f(.5,.5,.5,.33)
-          DrawVBO( iBorderVBO , GL_LINES , iBorderCount )
-         #else
-         #endif
-       end if
-    #else
-       glCallList(	iBorders-(g_CurDraw>=0) )
-    #endif
-  end if  
-  return uDrawParts
-end function
+  #ifndef UseVBO
+    if bViewBorders then
+      'if g_CurDraw<0 then
+      'else
+      'end if
+      glCallList(	iBorders-(g_CurDraw>=0) )
+    end if
+  #endif
+end sub
 sub RenderOverlay()
   
   glPushAttrib(GL_ENABLE_BIT)
@@ -576,7 +553,7 @@ sub RenderOverlay()
   end if
   
   'glClear GL_DEPTH_BUFFER_BIT                 
-  #define DrawMarker( _X , _Y , _Z ) DrawLimitsCube( (_X)-2,(_X)+2 , (_Y)-2,(_Y)+2 , (_Z)-2,(_Z)+2 )      
+  #define DrawMarker( _X , _Y , _Z ) DrawLimitsCube( (_X)-2,(_X)+2 , (_Y)-2,(_Y)+2 , (_Z)-2,(_Z)+2 )
   'glColor4f(1,.5,.25,.66) : DrawMarker( 0,0,0 )
   'glColor4f(.25,.5,1,.66) : DrawMarker( -50,0,-50 )
   
@@ -592,7 +569,7 @@ do
   for N as long = g_ModelCount-1 to 0 step -1
     FreeModel( g_tModels(N).pModel )
   next N
-  g_sFilenames = chr(0) : g_sFilesToLoad = chr(0)   
+  g_sFilenames = chr(0) : g_sFilesToLoad = chr(0)
   
   #ifdef LoadFromSFile '1 = Load File , 0 = Load From clipboard
     if len(sFile)=0 then sFile=command(1)
@@ -679,59 +656,40 @@ do
   dim as long g_DrawCount = g_pModel->iPartCount
   
   dLoadTIme = timer
-  #ifdef UseVBO   
-    #ifndef UseVBOEx
-      redim as VertexStruct atModelTrigs() , atModelVtxLines()
-      dim as long iTrianglesCount,iBorderCount
-      dim as GLuint iModelVBO, iBorderVBO
-      glGenBuffers(1, @iModelVBO) : glGenBuffers(1, @iBorderVBO)
-       
-      GenArrayModel( g_pModel , atModelTrigs()     , false )
-      iTrianglesCount = ubound(atModelTrigs)+1   
-      glBindBuffer(GL_ARRAY_BUFFER, iModelVBO)
-      glBufferData(GL_ARRAY_BUFFER, iTrianglesCount*sizeof(VertexStruct), @atModelTrigs(0)     , GL_STATIC_DRAW)
-      erase( atModelTrigs )
-         
-      GenArrayModel( g_pModel , atModelVtxLines() , true )
-      iBorderCount = ubound(atModelVtxLines)+1
-      glBindBuffer(GL_ARRAY_BUFFER, iBorderVBO)
-      glBufferData(GL_ARRAY_BUFFER, iBorderCount*sizeof(VertexStruct), @atModelVtxLines(0) , GL_STATIC_DRAW)
-      erase( atModelVtxLines )
-    #else
-      GenModelDrawArrays( g_pModel , g_tModelArrays )
-      #macro CreateVBO( _name )
-        glGenBuffers(1 , @i##_name##VBO)
-        #ifdef i##_name##IdxVBO
-        glGenBuffers(1 , @i##_name##IdxVBO)
-        #endif
-        with g_tModelArrays
-          if .p##_name##vtx andalso .l##_name##Cnt then
-            #define vtxSz (.l##_name##Cnt * sizeof(typeof(*.p##_name##vtx)))
-            #define idxSz (.l##_name##IdxCnt * sizeof(typeof(*.p##_name##Idx)))
-            glBindBuffer(GL_ARRAY_BUFFER, i##_name##VBO)
-            glBufferData(GL_ARRAY_BUFFER, vtxSz , .p##_name##vtx , GL_STATIC_DRAW)
-            #ifdef i##_name##IdxVBO
-            glBindBuffer(GL_ARRAY_BUFFER, i##_name##IdxVBO)
-            glBufferData(GL_ARRAY_BUFFER, idxSz , .p##_name##Idx , GL_STATIC_DRAW)
-            printf(!"%s = %1.1fmb (idx=%1.1fkb)\n" , #_name , (vtxSz+idxSz)/(1024*1024) , (idxSz)/(1024) )
-            #else
-            printf(!"%s = %1.1fmb\n" , #_name , (vtxSz)/(1024*1024) )
-            #endif
-            free( .p##_name##vtx )
-            #ifdef i##_name##IdxVBO
-            free( .p##_name##Idx )
-            #endif
-          end if
-        end with
-      #endmacro
-      GenerateOptimizedIndexes( g_tModelArrays , Triangle )
-      CreateVBO( Triangle )
-      CreateVBO( ColorTri )      
-      CreateVBO( TrColTri )
-      GenerateOptimizedIndexes( g_tModelArrays , Border )
-      CreateVBO( Border   )      
-      CreateVBO( ColorBrd )      
-    #endif
+  #ifdef UseVBO           
+    GenModelDrawArrays( g_pModel , g_tModelArrays )
+    #macro CreateVBO( _name )
+      glGenBuffers(1 , @i##_name##VBO)
+      #ifdef i##_name##IdxVBO
+      glGenBuffers(1 , @i##_name##IdxVBO)
+      #endif
+      with g_tModelArrays
+        if .p##_name##vtx andalso .l##_name##Cnt then
+          #define vtxSz (.l##_name##Cnt * sizeof(typeof(*.p##_name##vtx)))
+          #define idxSz (.l##_name##IdxCnt * sizeof(typeof(*.p##_name##Idx)))
+          glBindBuffer(GL_ARRAY_BUFFER, i##_name##VBO)
+          glBufferData(GL_ARRAY_BUFFER, vtxSz , .p##_name##vtx , GL_STATIC_DRAW)
+          #ifdef i##_name##IdxVBO
+          glBindBuffer(GL_ARRAY_BUFFER, i##_name##IdxVBO)
+          glBufferData(GL_ARRAY_BUFFER, idxSz , .p##_name##Idx , GL_STATIC_DRAW)
+          printf(!"%s = %1.1fmb (idx=%1.1fkb)\n" , #_name , (vtxSz+idxSz)/(1024*1024) , (idxSz)/(1024) )
+          #else
+          printf(!"%s = %1.1fmb\n" , #_name , (vtxSz)/(1024*1024) )
+          #endif
+          free( .p##_name##vtx )
+          #ifdef i##_name##IdxVBO
+          free( .p##_name##Idx )
+          #endif
+        end if
+      end with
+    #endmacro
+    GenerateOptimizedIndexes( g_tModelArrays , Triangle )
+    CreateVBO( Triangle )
+    CreateVBO( ColorTri )
+    CreateVBO( TrColTri )
+    GenerateOptimizedIndexes( g_tModelArrays , Border )
+    CreateVBO( Border   )
+    CreateVBO( ColorBrd )
   #else
     var iModel   = glGenLists( 1 )
     var iBorders = glGenLists( 2 )
@@ -854,9 +812,9 @@ do
       end with
     next I
   end with  
-  GenerateOptimizedIndexes( g_tModelArrays , Cubemap )  
+  GenerateOptimizedIndexes( g_tModelArrays , Cubemap )
   CreateVBO( Cubemap  )
-  #endif  
+  #endif
   
   puts("Load Time: " & timer-dLoadTIme)
   
@@ -919,7 +877,7 @@ do
     'fPositionZ = sqr(fPositionZ)*-40
     'fPositionZ = -.zMax
     
-  end with  
+  end with
   
   glFinish() : flip
     
@@ -928,8 +886,7 @@ do
   dim iFPS as long , dFPS as double = timer
   
   do
-    dFrameGL = timer    
-    dim as ulong uDrawParts
+    dFrameGL = timer
     
     'resize if window size change   
     if IsIconic( hGfxWnd )=0 then
@@ -969,7 +926,7 @@ do
       )
       
       'glPushMatrix()
-      uDrawParts = RenderScenery()
+      RenderScenery()
       'glPopMatrix()
       
       Dim e as fb.EVENT = any
@@ -1056,15 +1013,15 @@ do
        
     else
       
-      if g_CurDraw <> -1 then        
-        if OldDraw <> g_CurDraw then                        
-          var pSubPart = g_tModels( g_pModel->tParts(g_CurDraw)._1.lModelIndex ).pModel                            
-          SnapModel( pSubPart , tSnapID )      
+      if g_CurDraw <> -1 then
+        if OldDraw <> g_CurDraw then
+          var pSubPart = g_tModels( g_pModel->tParts(g_CurDraw)._1.lModelIndex ).pModel
+          SnapModel( pSubPart , tSnapID )
           SortSnap( tSnapID )
         end if
       elseif bEditMode then
         if OldDraw <> g_CurDraw then
-          SnapModel( g_pModel , tSnapID )      
+          SnapModel( g_pModel , tSnapID )
           SortSnap( tSnapID )
         end if
       end if
@@ -1082,7 +1039,7 @@ do
       Matrix4x4RotateY( tCur , tCur , fRotationX*-cPI180 )
       'glRotatef fRotationX , 0   , -1.0 , 0
       
-      uDrawParts = RenderScenery()
+      RenderScenery()
       RenderOverlay()
       
       dim e as fb.EVENT = any
@@ -1092,7 +1049,7 @@ do
            var fX = iif( fZoom<0 , e.dx/((fZoom*fZoom)+1) , e.dx*((fZoom*fzoom)+1) )
            var fY = iif( fZoom<0 , e.dy/((fZoom*fZoom)+1) , e.dy*((fZoom*fZoom)+1) )
            if bLeftPressed  then fRotationX += e.dx*2/sqr(g_zFar) : fRotationY += e.dy*2/sqr(g_zFar)
-           if bRightPressed then fPositionX += (fX) * g_zFar/100 : fPositionY += (fY) * g_zFar/100         
+           if bRightPressed then fPositionX += (fX) * g_zFar/100 : fPositionY += (fY) * g_zFar/100
         case fb.EVENT_MOUSE_WHEEL
            iWheel = e.z-iPrevWheel
            fZoom = -3+(-iWheel/cWheelDivisor)
@@ -1169,14 +1126,14 @@ do
                  printf(!"g_CurDraw = %i    \r",g_CurDraw)
               end if               
            end select
-           select case e.scancode               
+           select case e.scancode
            case fb.SC_F5 : exit do 'reload
            case fb.SC_TAB
               bBoundingBox = not bBoundingBox
            end select
         case fb.EVENT_WINDOW_GOT_FOCUS
          g_bFocus = true
-        case fb.EVENT_WINDOW_LOST_FOCUS         
+        case fb.EVENT_WINDOW_LOST_FOCUS
          g_bFocus = false
         case fb.EVENT_WINDOW_CLOSE
            exit do,do
@@ -1202,13 +1159,15 @@ do
     if abs(dElapsed)>=.25 then
       dFps = timer : dAccCPU = dAccCPU*100/dElapsed : dAccGL  = dElapsed/(dAccGL/(iFPS/dElapsed))
       WindowTitle( _
-        uDrawParts & " of " & g_tModelArrays.lPieceCount & _
+        "P:" & g_uDrawParts & " B:" & g_uDrawBoxes & " H:" & _
+        g_tModelArrays.lPieceCount-(g_uDrawParts+g_uDrawBoxes) & " of " & _
+        g_tModelArrays.lPieceCount & _
         " - Fps: " & cint(dAccGL) & "/" & cint(iFps/dElapsed) & _
         " (" & cint(dAccCPU) & "% CPU)")
       iFps=0 : dAccCPU=0 : dAccGL=0
     else
       'if g_Vsync=0 then SleepEx(1,1)
-      if g_bFocus=0 then SleepEx(50,1)
+      if g_bFocus=0 then SleepEx(100,1)
     end if
     
     if multikey(fb.SC_ESCAPE) then exit do,do

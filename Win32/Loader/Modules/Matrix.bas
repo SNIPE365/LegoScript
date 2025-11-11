@@ -45,7 +45,7 @@ g_tIdentityMatrix.fScaleZ=1  : g_tIdentityMatrix.m(15)=1
 
 dim shared as Matrix4x4 g_tBlankMatrix
 tMatrixStack( 0 ) = g_tIdentityMatrix
-function PushAndMultMatrix( pIn as const single ptr ) as boolean
+private function PushAndMultMatrix( pIn as const single ptr ) as boolean
    var pCur = cast(single ptr,@tMatrixStack(g_CurrentMatrix))
    g_CurrentMatrix += 1
    if g_CurrentMatrix > 1023 then
@@ -68,7 +68,7 @@ function PushAndMultMatrix( pIn as const single ptr ) as boolean
    next row   
    return true
 end function
-function MultCurrentMatrix( pIn as const single ptr ) as boolean
+private function MultCurrentMatrix( pIn as const single ptr ) as boolean
    var pCur = cast(single ptr,@tMatrixStack(g_CurrentMatrix))   
    if g_CurrentMatrix >= 1023 then
       puts("MATRIX STACK OVERFLOW!!!!")
@@ -93,14 +93,14 @@ function MultCurrentMatrix( pIn as const single ptr ) as boolean
    return true
    
 end function
-sub PushIdentityMatrix()
+private sub PushIdentityMatrix()
    g_CurrentMatrix += 1   
    tMatrixStack( g_CurrentMatrix ) = g_tIdentityMatrix 'tMatrixStack( 0 )
 end sub
-sub PopMatrix()
+private sub PopMatrix()
    if g_CurrentMatrix>0 then g_CurrentMatrix -= 1
 end sub   
-sub MultiplyMatrixVector( pVec as single ptr , pMatrix as Matrix4x4 ptr = 0 )
+private sub MultiplyMatrixVector( pVec as single ptr , pMatrix as Matrix4x4 ptr = 0 )
    dim as single fX = pVec[0] , fY = pVec[1] , fZ = pVec[2]
    if pMatrix=0 then pMatrix = @tMatrixStack(g_CurrentMatrix)
    with *pMatrix
@@ -109,7 +109,7 @@ sub MultiplyMatrixVector( pVec as single ptr , pMatrix as Matrix4x4 ptr = 0 )
       pVec[2] = .m(2) * fX + .m(6) * fY + .m(10) * fZ + .m(14)
    end with
 end sub
-function IsMatrixIdentity() as boolean
+private function IsMatrixIdentity() as boolean
    with tMatrixStack( g_CurrentMatrix )
       for N as long = 0 to 15
          if abs(.m(N)-g_tIdentityMatrix.m(N)) > .0001 then return false
@@ -117,7 +117,7 @@ function IsMatrixIdentity() as boolean
    end with
    return true
 end function   
-sub PrintCurrentMatrix()
+private sub PrintCurrentMatrix()
    with tMatrixStack( g_CurrentMatrix )
       var pMat = @.m(0)
       for Y as long = 0 to 3
@@ -131,7 +131,7 @@ end sub
 
 #ifndef __NoRender
 #if 0
-sub glLoadCurrentMatrix()
+private sub glLoadCurrentMatrix()
    'with tMatrixStack(g_CurrentMatrix)
    'glLoadMatrixf( @tMatrixStack(g_CurrentMatrix).m(0) )
    glMultMatrixf( @tMatrixStack(g_CurrentMatrix).m(0) )   
@@ -139,7 +139,7 @@ end sub
 #endif
 #endif
 
-sub MultMatrix4x4WithVector3x3( byref tmOut as Matrix4x4 , tmIn as const Matrix4x4 , pIn as const single ptr )
+private sub MultMatrix4x4WithVector3x3( byref tmOut as Matrix4x4 , tmIn as const Matrix4x4 , pIn as const single ptr )
    var pCur = cast(single ptr,@tmIn)               
    var pOut = cast(single ptr,@tmOut)
    dim as Matrix4x4 tTempIn = any
@@ -161,7 +161,7 @@ end sub
 '#define MultMatrix4x4( _Out , _In , _pMul ) MultMatrix4x4WithVector3x3( _Out , _In , cptr(const single ptr,(_pMul)) )
 ' A safe and correct function for row-major 4x4 matrix multiplication.
 
-sub MultiplyMat4x4WithVec3( byref vOut as Vec4 , m as const Matrix4x4 , v as const Vec3 )
+private sub MultiplyMat4x4WithVec3( byref vOut as Vec4 , m as const Matrix4x4 , v as const Vec3 )
   with m
     vOut.x = .m(0)*v.x + .m(4)*v.y + .m( 8)*v.z + .m(12)'*v.w;
     vOut.y = .m(1)*v.x + .m(5)*v.y + .m( 9)*v.z + .m(13)'*v.w;
@@ -170,7 +170,7 @@ sub MultiplyMat4x4WithVec3( byref vOut as Vec4 , m as const Matrix4x4 , v as con
   end with
 end sub
 
-sub MultMatrix4x4 (byref result as Matrix4x4, byref a as const Matrix4x4, byref b as const Matrix4x4)
+private sub MultMatrix4x4 (byref result as Matrix4x4, byref a as const Matrix4x4, byref b as const Matrix4x4)
   dim as integer i=any, j=any, k=any
   if @result.m(0) = @a.m(0) then
     dim as Matrix4x4 tTemp = any
@@ -198,7 +198,7 @@ sub MultMatrix4x4 (byref result as Matrix4x4, byref a as const Matrix4x4, byref 
 end sub
 
 #if 0
-sub MultMatrix4x4_RowMajor( byref result as Matrix4x4, byref a as const Matrix4x4, byref b as const Matrix4x4)
+private sub MultMatrix4x4_RowMajor( byref result as Matrix4x4, byref a as const Matrix4x4, byref b as const Matrix4x4)
     dim as integer i, j, k
     dim as Matrix4x4 tempResult
     for i = 0 to 3 ' Rows
@@ -211,7 +211,7 @@ sub MultMatrix4x4_RowMajor( byref result as Matrix4x4, byref a as const Matrix4x
     next i
     result = tempResult
 end sub
-sub MultMatrix4x4_ColumnMajor( byref result as Matrix4x4, byref a as const Matrix4x4, byref b as const Matrix4x4)
+private sub MultMatrix4x4_ColumnMajor( byref result as Matrix4x4, byref a as const Matrix4x4, byref b as const Matrix4x4)
     dim as integer i, j, k
     dim as Matrix4x4 tempResult
     for j = 0 to 3 ' Columns of the result
@@ -226,7 +226,7 @@ sub MultMatrix4x4_ColumnMajor( byref result as Matrix4x4, byref a as const Matri
     result = tempResult
 end sub
 #endif
-sub Matrix4x4RotateX( byref tmOut as Matrix4x4 , tmIn as const Matrix4x4 , fAngle as const single )      
+private sub Matrix4x4RotateX( byref tmOut as Matrix4x4 , tmIn as const Matrix4x4 , fAngle as const single )      
    dim as single sMat(15) = { _
       1 ,      0       ,      0      , 0 , _
       0 ,  cos(fAngle) , sin(fAngle) , 0 , _
@@ -235,7 +235,7 @@ sub Matrix4x4RotateX( byref tmOut as Matrix4x4 , tmIn as const Matrix4x4 , fAngl
    }   
    MultMatrix4x4( tmOut , tmIn , *cptr(Matrix4x4 ptr,@sMat(0)) ) 'MultMatrix4x4WithVector3x3( tmOut , tmIn , @sMat(0) )
 end sub
-sub Matrix4x4RotateY( byref tmOut as Matrix4x4 , tmIn as const Matrix4x4 , fAngle as const single )      
+private sub Matrix4x4RotateY( byref tmOut as Matrix4x4 , tmIn as const Matrix4x4 , fAngle as const single )      
    dim as single sMat(15) = { _
       cos(fAngle) , 0 , -sin(fAngle) , 0 , _
           0       , 1 ,     0        , 0 , _
@@ -245,7 +245,7 @@ sub Matrix4x4RotateY( byref tmOut as Matrix4x4 , tmIn as const Matrix4x4 , fAngl
    'MultMatrix4x4WithVector3x3( tmOut , tmIn , @sMat(0) )
    MultMatrix4x4( tmOut , tmIn , *cptr(Matrix4x4 ptr,@sMat(0)) )
 end sub
-sub Matrix4x4RotateZ( byref tmOut as Matrix4x4 , tmIn as const Matrix4x4 , fAngle as const single )      
+private sub Matrix4x4RotateZ( byref tmOut as Matrix4x4 , tmIn as const Matrix4x4 , fAngle as const single )      
    dim as single sMat(15) = { _
       cos(fAngle) , -sin(fAngle) , 0 , 0 , _
       sin(fAngle) ,  cos(fAngle) , 0 , 0 , _
@@ -256,14 +256,14 @@ sub Matrix4x4RotateZ( byref tmOut as Matrix4x4 , tmIn as const Matrix4x4 , fAngl
    MultMatrix4x4( tmOut , tmIn , *cptr(Matrix4x4 ptr,@sMat(0)) )
 end sub
 #if 0
-sub Matrix4x4Translate( byref tmInOut as Matrix4x4 , fDX as const single , fDY as const single , fDZ as const single )
+private sub Matrix4x4Translate( byref tmInOut as Matrix4x4 , fDX as const single , fDY as const single , fDZ as const single )
    var tMat = g_tIdentityMatrix
    tMat.fPosX = fDX : tMat.fPosY = fDY : tMat.fPosZ = fDZ
    'MultMatrix4x4( tmInOut , tMat , tmInOut )
    MultMatrix4x4( tmInOut , tmInOut , tMat )
 end sub
 #else
-sub Matrix4x4Translate( byref tmInOut as Matrix4x4 , fDX as const single , fDY as const single , fDZ as const single )
+private sub Matrix4x4Translate( byref tmInOut as Matrix4x4 , fDX as const single , fDY as const single , fDZ as const single )
   with tmInOut
     .m(12) += .m(0)*fDX + .m(4)*fDY + .m( 8)*fDZ
     .m(13) += .m(1)*fDX + .m(5)*fDY + .m( 9)*fDZ
@@ -271,7 +271,7 @@ sub Matrix4x4Translate( byref tmInOut as Matrix4x4 , fDX as const single , fDY a
   end with
 end sub
 #endif
-sub Matrix4x4Scale( byref tmInOut as Matrix4x4 , fSX as const single , fSY as const single , fSZ as const single )
+private sub Matrix4x4Scale( byref tmInOut as Matrix4x4 , fSX as const single , fSY as const single , fSZ as const single )
   with tmInOut
     .m(0) *= fSX : .m(1) *= fSX : .m( 2) *= fSX : .m( 3) *= fSX
     .m(4) *= fSY : .m(5) *= fSY : .m( 6) *= fSY : .m( 7) *= fSY
@@ -280,7 +280,7 @@ sub Matrix4x4Scale( byref tmInOut as Matrix4x4 , fSX as const single , fSY as co
 end sub
 
 #define _6( _t , _p1 , _p2 , _p3 , _p4 , _p5 , _p6 , _p7 , _p8 , _p9 ) _p1 as _t, _p2 as _t, _p3 as _t, _p4 as _t, _p5 as _t, _p6 as _t, _p7 as _t, _p8 as _t , _p9 as _t
-sub Matrix4x4LookAt( byref tmInOut as Matrix4x4 , _6(const single,eyeX,eyeY,eyeZ,centerX,centerY,centerZ,upX,upY,upZ) )
+private sub Matrix4x4LookAt( byref tmInOut as Matrix4x4 , _6(const single,eyeX,eyeY,eyeZ,centerX,centerY,centerZ,upX,upY,upZ) )
   
   dim as single fx = centerX - eyeX
   dim as single fy = centerY - eyeY
@@ -331,7 +331,7 @@ g_tIdentityMatrix3x3.fScaleX=1  : g_tIdentityMatrix3x3.fScaleY=1
 g_tIdentityMatrix3x3.fScaleZ=1
 
 ' Helper function to multiply two 3x3 matrices and store the result.
-sub MultMatrix3x3(byref tmOut as Matrix3x3, byref tmA as Matrix3x3, byref tmB as Matrix3x3)
+private sub MultMatrix3x3(byref tmOut as Matrix3x3, byref tmA as Matrix3x3, byref tmB as Matrix3x3)
     dim as integer i, j, k
     dim as Matrix3x3 tempMat
 
@@ -345,7 +345,7 @@ sub MultMatrix3x3(byref tmOut as Matrix3x3, byref tmA as Matrix3x3, byref tmB as
     next i
     tmOut = tempMat
 end sub
-function InvertMatrix3x3(byref tmOut as Matrix3x3, byref tmIn as Matrix3x3) as boolean
+private function InvertMatrix3x3(byref tmOut as Matrix3x3, byref tmIn as Matrix3x3) as boolean
 
     dim as single det, invDet
     dim as Matrix3x3 adj
@@ -393,7 +393,7 @@ function InvertMatrix3x3(byref tmOut as Matrix3x3, byref tmIn as Matrix3x3) as b
 end function
 
 ' Rotates a matrix around the X-axis
-sub Matrix3x3RotateX(byref tmOut as Matrix3x3, byref tmIn as Matrix3x3, fAngle as single)
+private sub Matrix3x3RotateX(byref tmOut as Matrix3x3, byref tmIn as Matrix3x3, fAngle as single)
     'dim as single radians = fAngle * (3.14159265 / 180.0)
     dim as single c = cos(fAngle)
     dim as single s = sin(fAngle)
@@ -407,7 +407,7 @@ sub Matrix3x3RotateX(byref tmOut as Matrix3x3, byref tmIn as Matrix3x3, fAngle a
     MultMatrix3x3(tmOut, tmIn, rotateMat)
 end sub
 ' Rotates a matrix around the Y-axis
-sub Matrix3x3RotateY(byref tmOut as Matrix3x3, byref tmIn as Matrix3x3, fAngle as single)
+private sub Matrix3x3RotateY(byref tmOut as Matrix3x3, byref tmIn as Matrix3x3, fAngle as single)
     'dim as single radians = fAngle * (3.14159265 / 180.0)
     dim as single c = cos(fAngle)
     dim as single s = sin(fAngle)
@@ -421,7 +421,7 @@ sub Matrix3x3RotateY(byref tmOut as Matrix3x3, byref tmIn as Matrix3x3, fAngle a
     MultMatrix3x3(tmOut, tmIn, rotateMat)
 end sub
 ' Rotates a matrix around the Z-axis
-sub Matrix3x3RotateZ(byref tmOut as Matrix3x3, byref tmIn as Matrix3x3, fAngle as single)
+private sub Matrix3x3RotateZ(byref tmOut as Matrix3x3, byref tmIn as Matrix3x3, fAngle as single)
     'dim as single radians = fAngle * (3.14159265 / 180.0)
     dim as single c = cos(fAngle)
     dim as single s = sin(fAngle)
@@ -436,7 +436,7 @@ sub Matrix3x3RotateZ(byref tmOut as Matrix3x3, byref tmIn as Matrix3x3, fAngle a
 end sub
 ' Performs a vector-matrix multiplication (V' = M * V)
 ' This rotates a local vector using a parent's matrix
-function Vector3_Transform(byref inVec as Vector3, byref inMat as Matrix3x3) as Vector3
+private function Vector3_Transform(byref inVec as Vector3, byref inMat as Matrix3x3) as Vector3
     dim as Vector3 outVec
 
     outVec.x = inMat.m(0) * inVec.x + inMat.m(1) * inVec.y + inMat.m(2) * inVec.z
@@ -446,14 +446,14 @@ function Vector3_Transform(byref inVec as Vector3, byref inMat as Matrix3x3) as 
     return outVec
 end function
 ' Adds two vectors together (V = A + B)
-sub Vector3_Add(byref vec1 as Vector3, byref vec2 as Vector3)    
+private sub Vector3_Add(byref vec1 as Vector3, byref vec2 as Vector3)    
    with vec1
       .x += vec2.x
       .y += vec2.y
       .z += vec2.z
    end with
 end sub
-function Vector3_AddEx(byref vec1 as Vector3, byref vec2 as Vector3) as Vector3
+private function Vector3_AddEx(byref vec1 as Vector3, byref vec2 as Vector3) as Vector3
     dim as Vector3 outVec
     
     outVec.x = vec1.x + vec2.x
@@ -463,14 +463,14 @@ function Vector3_AddEx(byref vec1 as Vector3, byref vec2 as Vector3) as Vector3
     return outVec
 end function
 ' Subtracts two vectors together (V = A + B)
-sub Vector3_Sub(byref vec1 as Vector3, byref vec2 as Vector3)    
+private sub Vector3_Sub(byref vec1 as Vector3, byref vec2 as Vector3)    
    with vec1
       .x -= vec2.x
       .y -= vec2.y
       .z -= vec2.z
    end with
 end sub
-function Vector3_SubEx(byref vec1 as Vector3, byref vec2 as Vector3) as Vector3
+private function Vector3_SubEx(byref vec1 as Vector3, byref vec2 as Vector3) as Vector3
     dim as Vector3 outVec
     
     outVec.x = vec1.x - vec2.x

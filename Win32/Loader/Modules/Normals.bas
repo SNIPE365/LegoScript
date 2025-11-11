@@ -2,7 +2,7 @@
   #error " Don't compile this one"
 #endif  
 
-sub SetLineNormal( byref tLine as LineType2Struct , ptNormal as Vertex3 ptr = NULL )
+private sub SetLineNormal( byref tLine as LineType2Struct , ptNormal as Vertex3 ptr = NULL )
    with tLine
       '// Compute direction vector of the line
       dim as single direction(3-1)=any
@@ -34,7 +34,7 @@ sub SetLineNormal( byref tLine as LineType2Struct , ptNormal as Vertex3 ptr = NU
       end if
    end with
 end sub
-sub SetTrigNormal( byref tTrig as LineType3Struct , ptNormal as Vertex3 ptr = NULL )
+private sub SetTrigNormal( byref tTrig as LineType3Struct , ptNormal as Vertex3 ptr = NULL )
   with tTrig
     dim as single edge1(3-1)=any, edge2(3-1)=any, normal(3-1)=any
         
@@ -84,7 +84,7 @@ sub SetTrigNormal( byref tTrig as LineType3Struct , ptNormal as Vertex3 ptr = NU
     end if
   end with
 end sub
-sub SetQuadNormal( byref tQuad as LineType4Struct , ptNormal as Vertex3 ptr = NULL )
+private sub SetQuadNormal( byref tQuad as LineType4Struct , ptNormal as Vertex3 ptr = NULL )
   with tQuad
     dim as single edge1(3-1)=any, edge2(3-1)=any, normal(3-1)=any
     
@@ -135,7 +135,7 @@ sub SetQuadNormal( byref tQuad as LineType4Struct , ptNormal as Vertex3 ptr = NU
 end sub
 
 #if 0
-sub SetVtxTrigNormal( ptVtx as VertexCubeMap ptr )
+private sub SetVtxTrigNormal( ptVtx as VertexCubeMap ptr )
   
   dim as Vertex3 tEdge1, tEdge2, tNormal, tCenter
   
@@ -181,7 +181,7 @@ sub SetVtxTrigNormal( ptVtx as VertexCubeMap ptr )
 end sub
 #endif
 
-sub SetVtxTrigNormal( ptVtx as VertexCubeMap ptr )
+private sub SetVtxTrigNormal( ptVtx as VertexCubeMap ptr )
   
   'normalize triangle
   dim as Vertex3 tEdge1=any, tEdge2=any , tNormal = any
@@ -239,164 +239,4 @@ end sub
           v[2] /= length
       End If
   End Sub
-#endif
-
-#if 0
-static shared as single g_DesiredNormal(...) = {0,0,0}
-Sub Matrix3x3VectorMultiply(pM As Single Ptr, pV_in As Single Ptr, pV_out As Single Ptr)
-    ' Multiplies a 3-component vector pV_in by the 3x3 rotation/scale part
-    ' of a 4x4 matrix pM and stores the result in pV_out.
-    ' We assume pM is a 4x4 matrix in column-major order (standard for OpenGL/DirectX).
-    ' Matrix indices:
-    ' | M[0] M[4] M[8] M[12] |
-    ' | M[1] M[5] M[9] M[13] |
-    ' | M[2] M[6] M[10] M[14] |
-    ' | M[3] M[7] M[11] M[15] |
-    
-    Dim As Single x = pV_in[0]
-    Dim As Single y = pV_in[1]
-    Dim As Single z = pV_in[2]
-
-    pV_out[0] = pM[0] * x + pM[4] * y + pM[8] * z
-    pV_out[1] = pM[1] * x + pM[5] * y + pM[9] * z
-    pV_out[2] = pM[2] * x + pM[6] * y + pM[10] * z
-End Sub
-  #if 1
-  Sub CheckAndFlipQuadWinding(ByRef Quad As LineType4Struct , pDummy as single ptr) ', pDesiredNormal As Single Ptr)
-    exit sub
-      
-      #define pDesiredNormal @g_DesiredNormal(0)
-      ' This function checks the winding of the quad (P1, P2, P3, P4)
-      ' by calculating the surface normal and comparing it to a reference
-      ' direction (pDesiredNormal). If the winding is opposite, it flips
-      ' the order by swapping P3 and P4 coordinates.
-  
-      ' Pointers for convenience (P1, P2, P3)
-      Dim As Single P1(0 To 2) = {Quad.fX1, Quad.fY1, Quad.fZ1}
-      Dim As Single P2(0 To 2) = {Quad.fX2, Quad.fY2, Quad.fZ2}
-      Dim As Single P3(0 To 2) = {Quad.fX3, Quad.fY3, Quad.fZ3}
-  
-      ' Vector declarations for vector math
-      Dim As Single VectorA(0 To 2)   ' A = P2 - P1 (Edge vector)
-      Dim As Single VectorB(0 To 2)   ' B = P3 - P1 (Diagonal vector, non-consecutive edge for cross product)
-      Dim As Single Normal(0 To 2)    ' N = A x B (Surface Normal)
-  
-      ' 1. Calculate the two basis vectors for the plane (A and B)
-      ' Vector A = P2 - P1
-      VectorA(0) = P2(0) - P1(0)
-      VectorA(1) = P2(1) - P1(1)
-      VectorA(2) = P2(2) - P1(2)
-  
-      ' Vector B = P3 - P1
-      VectorB(0) = P3(0) - P1(0)
-      VectorB(1) = P3(1) - P1(1)
-      VectorB(2) = P3(2) - P1(2)
-  
-      ' 2. Calculate the surface normal N = A x B
-      CrossProduct(@VectorA(0), @VectorB(0), @Normal(0))
-  
-      ' 3. Normalize the vectors (optional, but ensures consistent dot product interpretation)
-      Normalize(@Normal(0))
-      ' The Desired Normal (pDesiredNormal) should ideally be normalized too, 
-      ' but we only rely on the sign of the dot product.
-  
-      ' 4. Check the Winding Order using the Dot Product
-      ' If Dot(N, DesiredNormal) > 0, the normal faces the desired direction (Correct Winding, e.g., CCW).
-      ' If Dot(N, DesiredNormal) < 0, the normal faces opposite to the desired direction (Wrong Winding, e.g., CW).
-      Dim As Single dotResult = Dot_Product(@Normal(0), pDesiredNormal)
-  
-      If dotResult < 0 Then
-          ' The current winding order (P1, P2, P3) produces a normal
-          ' pointing away from the desired direction. We need to flip it.
-  
-          ' 5. Flip the winding by swapping two adjacent vertices.
-          ' Swapping P3 and P4 changes the winding from (P1, P2, P3, P4) to (P1, P2, P4, P3).
-          
-          Dim As Single tempX, tempY, tempZ
-  
-          swap Quad.fX3 , Quad.fX4
-          swap Quad.fY3 , Quad.fY4
-          swap Quad.fZ3 , Quad.fZ4
-          
-          
-          'Print "Winding Flipped (P3 <-> P4 swap)."
-      Else
-          'Print "Winding OK. Normal matches desired direction."
-      End If
-  End Sub
-  #else
-  Sub CheckAndFlipQuadWinding(ByRef Quad As LineType4Struct, pModelViewMatrix As Single Ptr) ', pLocalNormal As Single Ptr)
-      #define pLocalNormal @g_DesiredNormal(0) 
-      ' This function checks the winding of the quad (P1, P2, P3, P4)
-      ' by calculating the surface normal and comparing it to a dynamically
-      ' transformed desired normal. If the winding is opposite, it flips
-      ' the order by swapping P3 and P4 coordinates.
-  
-      ' NOTE on Normal Transformation: 
-      ' For normals, the correct transformation matrix is the Inverse Transpose 
-      ' of the ModelView Matrix. If your ModelView only contains ROTATION and 
-      ' TRANSLATION (no non-uniform scale or shear), the top-left 3x3 of the 
-      ' ModelView Matrix itself can be used to transform the normal, which 
-      ' is the simplification used here for ease of implementation.
-      
-      ' Local array to hold the Desired Normal in World/View space
-      Dim As Single DesiredNormal(0 To 2)
-  
-      ' 1. Transform the Local Normal using the ModelView Matrix (3x3 part)
-      Matrix3x3VectorMultiply(pModelViewMatrix, pLocalNormal, @DesiredNormal(0))
-      Normalize(@DesiredNormal(0))
-      
-      'Print "Transformed Desired Normal (World/View): ("; DesiredNormal(0); ","; DesiredNormal(1); ","; DesiredNormal(2); ")"
-      
-      ' Pointers for convenience (P1, P2, P3)
-      Dim As Single P1(0 To 2) = {Quad.fX1, Quad.fY1, Quad.fZ1}
-      Dim As Single P2(0 To 2) = {Quad.fX2, Quad.fY2, Quad.fZ2}
-      Dim As Single P3(0 To 2) = {Quad.fX3, Quad.fY3, Quad.fZ3}
-  
-      ' Vector declarations for vector math
-      Dim As Single VectorA(0 To 2)   ' A = P2 - P1
-      Dim As Single VectorB(0 To 2)   ' B = P3 - P1
-      Dim As Single Normal(0 To 2)    ' N = A x B (Surface Normal in World/View space)
-  
-      ' 2. Calculate the two basis vectors for the plane (A and B)
-      VectorA(0) = P2(0) - P1(0)
-      VectorA(1) = P2(1) - P1(1)
-      VectorA(2) = P2(2) - P1(2)
-  
-      VectorB(0) = P3(0) - P1(0)
-      VectorB(1) = P3(1) - P1(1)
-      VectorB(2) = P3(2) - P1(2)
-  
-      ' 3. Calculate the surface normal N = A x B
-      CrossProduct(@VectorA(0), @VectorB(0), @Normal(0))
-      Normalize(@Normal(0))
-      
-      'Print "Calculated Surface Normal: ("; Normal(0); ","; Normal(1); ","; Normal(2); ")"
-  
-      ' 4. Check the Winding Order using the Dot Product
-      ' We compare the calculated N to the dynamically transformed DesiredNormal.
-      Dim As Single dotResult = Dot_Product(@Normal(0), @DesiredNormal(0))
-  
-      If dotResult < 0 Then
-          ' The current winding order produces a normal pointing away 
-          ' from the desired direction. Flip it.
-  
-          ' 5. Flip the winding by swapping P3 and P4 coordinates.
-          'Dim As Single tempX, tempY, tempZ
-          'tempX = Quad.fX3 : Quad.fX3 = Quad.fX4 : Quad.fX4 = tempX
-          'tempY = Quad.fY3 : Quad.fY3 = Quad.fY4 : Quad.fY4 = tempY
-          'tempZ = Quad.fZ3 : Quad.fZ3 = Quad.fZ4 : Quad.fZ4 = tempZ
-                  
-          'Print "Winding Flipped (P3 <-> P4 swap)."
-          
-      Else
-          'Print "Winding OK. Normal matches desired direction."
-    End If
-    
-    swap Quad.fX2 , Quad.fX4
-    swap Quad.fY2 , Quad.fY4
-    swap Quad.fZ2 , Quad.fZ4
-    
-  End Sub
-  #endif
 #endif

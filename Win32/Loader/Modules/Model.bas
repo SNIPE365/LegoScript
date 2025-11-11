@@ -258,7 +258,8 @@ end function
      end with   
   end sub
   
-  #ifndef UseVBOEx
+  #ifdef UseVBO
+    'simple VBO
     function GetModelVertexCount( pPart as DATFile ptr , iBorders as long , lDrawPart as long = -1 , byref lCurPos as long = 0 ) as ulong
                         
        with *pPart
@@ -320,7 +321,7 @@ end function
           for N as long = 0 to .iPartCount-1
                                
              dim as byte bDoDraw = (lDrawPart<0 orelse lDrawPart=N)
-             dim as ulong uColor = any', uEdge = any
+             dim as ulong uColor', uEdge = any
              with .tParts(N)
                 #ifdef DebugPrimitive
                    'printf sIdent+"(" & .bType & ") Color=" & .wColour & " (Current=" & hex(uCurrentColor,8) & ")"
@@ -529,7 +530,7 @@ end function
        return lCurPos
        
     end function
-  #else
+    'Per PART (.dat) VBO
     function AllocateModelDrawArrays( pPart as DATFile ptr , tDraw as ModelDrawArrays , bFlags as byte = 1 ) as boolean
       const bRoot=1 , bNewPart=2 , bPart=4 , bInverted=8 , bColorSet=16
       with *pPart 'include: "andalso .bHasVBO=0"
@@ -1016,7 +1017,8 @@ end function
                 #if _AverageNormals
                 if (SumVtx(pPos,pP)) < 1/100 then
                 #else
-                if (SumVtx(pPos,pP)+SumVtx(pNormal,pN)) < 1/100 then
+                'if (SumVtx(pPos,pP)+SumVtx(pNormal,pN)) < 1/100 then
+                if SumVtx(pPos,pP)<1/100 andalso dot_productV(*pNormal,*pN)>1/100 then
                 #endif
                   'average normals and set index
                   iAvg(pIndex(iIdx2)[N]) += 1
@@ -1059,7 +1061,7 @@ end function
             for I as long = 0 to iUnique-1
               with .p##_Group##Vtx[I].tNormal
                 '.fX /= iAvg(I) : .fY /= iAvg(I) : .fZ /= iAvg(I) 
-                normalize( @.fX )
+                if iAvg(I)>1 then normalize( @.fX )
               end with
             next I
           #endif
@@ -1067,7 +1069,7 @@ end function
         
       end sub
     #endmacro
-    GenerateFunction( CubeMap  , 0 )
+    GenerateFunction( CubeMap  , 1 )
     GenerateFunction( Triangle , 0 )
     GenerateFunction( Border   , 1 )
   #endif
