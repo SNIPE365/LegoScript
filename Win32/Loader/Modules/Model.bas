@@ -953,7 +953,8 @@ end function
       return tDraw.lPieceCount
        
     end function
-    function GenCubeVtx( pVtx as VertexCubeMap ptr, tBound as PartSize ) as long 'byref tBound as const PartSize ) as long
+    'Generate cubes
+    function GenCubeVtx36( pVtx as VertexCubeMap ptr, tBound as PartSize ) as long
       dim as Vertex3 p(7) = any
       dim as long i = 0
         
@@ -989,19 +990,82 @@ end function
       
       return i  ' should be 36
     end function
-    #macro GenerateOptimizedIndexes( _Var , _Group ) 
+    function GenCubeVtxIdx8( pVtx as VertexCubeMap ptr, iVtxStart as long , pIdx as long ptr, iIdxStart as long ,  tBound as PartSize ) as long
+      dim as Vertex3 p(7) = any
+      dim as long i = any
+      
+      ' define cube corners
+      with tBound
+        p(0) = type(.xMin, .yMin, .zMin)
+        p(1) = type(.xMax, .yMin, .zMin)
+        p(2) = type(.xMax, .yMax, .zMin)
+        p(3) = type(.xMin, .yMax, .zMin)
+        p(4) = type(.xMin, .yMin, .zMax)
+        p(5) = type(.xMax, .yMin, .zMax)
+        p(6) = type(.xMax, .yMax, .zMax)
+        p(7) = type(.xMin, .yMax, .zMax)
+      end with
+  
+      ' precomputed averaged normals for each corner
+      ' (sum of connected face normals normalized)
+      static as Vertex3 n(7) = { _
+        type(-0.57735, -0.57735, -0.57735), _  ' (-X,-Y,-Z)
+        type( 0.57735, -0.57735, -0.57735), _  ' (+X,-Y,-Z)
+        type( 0.57735,  0.57735, -0.57735), _  ' (+X,+Y,-Z)
+        type(-0.57735,  0.57735, -0.57735), _  ' (-X,+Y,-Z)
+        type(-0.57735, -0.57735,  0.57735), _  ' (-X,-Y,+Z)
+        type( 0.57735, -0.57735,  0.57735), _  ' (+X,-Y,+Z)
+        type( 0.57735,  0.57735,  0.57735), _  ' (+X,+Y,+Z)
+        type(-0.57735,  0.57735,  0.57735)  _  ' (-X,+Y,+Z)
+      }
+  
+      ' copy vertex positions and normals
+      for i = 0 to 7
+        pVtx[i].tPos = p(i)
+        pVtx[i].tNormal = n(i)
+      next
+  
+      ' define triangles using indices (two per face)
+      static as long faces(35) = { _
+        1,5,6,  1,6,2, _     ' +X
+        4,0,3,  4,3,7, _     ' -X
+        3,2,6,  3,6,7, _     ' +Y
+        4,5,1,  4,1,0, _     ' -Y
+        5,4,7,  5,7,6, _     ' +Z
+        0,1,2,  0,2,3  _     ' -Z
+      }  
+      
+      for i = 0 to 35
+        pIdx[iIdxStart+i] = faces(i)+iVtxStart
+      next
+      'iVtxStart += 8 : iIdxStart += 36
+  
+      return iVtxStart  ' number of vertex
+    end function
+    'optimize vertices
+    #macro GenerateOptimizedIndexes( _Var , _Group , _Group2... ) 
       #ifdef i##_Group##IdxVBO
-        GenerateOptimizedIndexes_##_Group( _Var )
+        GenerateOptimizedIndexes_##_Group##_Group2( _Var )
       #endif
     #endmacro
-    #macro GenerateFunction( _Group , _AverageNormals )
-      sub GenerateOptimizedIndexes_##_Group( tDraw as ModelDrawArrays )    
+    #macro GenerateFunction( _Group , _AverageNormals , _Group2... )
+      #if #_Group2 <> ""
+      sub GenerateOptimizedIndexes_##_Group##_Group2( tDraw as ModelDrawArrays )
+      #else
+      sub GenerateOptimizedIndexes_##_Group( tDraw as ModelDrawArrays )
+      #endif
         with tDraw    
           var dTime = timer
           const cVtxMask = 65536-1 , cAllocGranularity = 32
+          
           redim pIndex(cVtxMask) as long ptr , iIdxCtx(cVtxMask) as long
           redim iAvg(.p##_Group##Vtx-1) as long
+          
+          'allocate indexes for this group of vertex
           .p##_Group##Idx = malloc( .l##_Group##Cnt*sizeof(long) )
+          #if #_Group2 <> ""
+          .p##_Group2##Idx = malloc( .l##_Group2##Cnt*sizeof(long) )
+          #endif
           var iUnique=0 , pVtxOut = .p##_Group##Vtx
           var pVtxBase = .p##_Group##Vtx , pVtxIdx =  .p##_Group##Idx
           for I as long = 0 to .l##_Group##Cnt-1
@@ -1018,7 +1082,7 @@ end function
                 if (SumVtx(pPos,pP)) < 1/100 then
                 #else
                 'if (SumVtx(pPos,pP)+SumVtx(pNormal,pN)) < 1/100 then
-                if SumVtx(pPos,pP)<1/100 andalso dot_productV(*pNormal,*pN)>1/100 then
+                if SumVtx(pPos,pP)<1/100 andalso dot_productV(*pNormal,*pN)>1/10 then
                 #endif
                   'average normals and set index
                   iAvg(pIndex(iIdx2)[N]) += 1
@@ -1033,29 +1097,75 @@ end function
             'no? then add a new vertex, but do we need to reallocate the cluster?
             var pIdx = pIndex(iIdx)
             if (iIDxCtx(iIdx) and (cAllocGranularity-1)) = 0 then 
-              pIdx = realloc( pIdx , (iIDxCtx(iIdx)+cAllocGranularity)*sizeof(long) ) : pIndex(iIdx) = pIdx                    
+              pIdx = realloc( pIdx , (iIDxCtx(iIdx)+cAllocGranularity)*sizeof(long) ) 
+              pIndex(iIdx) = pIdx                    
             end if
             iAvg(iUnique)=1            
             pIdx[ iIDxCtx(iIdx) ] = iUnique : iIdxCtx(iIdx) += 1
-            pVtxIdx[I]=iUnique : pVtxBase[iUnique] = pVtxBase[I]
-            #if _AverageNormals              
-              'var pN2 = @(pVtxBase[iUnique].tNormal)
-              'pN2->fX = sqr(pN2->fX) : pN2->fY = sqr(pN2->fY) : pN2->fZ = sqr(pN2->fZ)
-            #endif            
+            pVtxIdx[I]=iUnique : pVtxBase[iUnique] = pVtxBase[I]            
             iUnique += 1
             
           next I
+          
+          #if #_Group2 <> ""
+            pVtxIdx =  .p##_Group2##Idx
+            var pVtxBase2 = .p##_Group2##Vtx , iUnique2=0            
+            for I as long = 0 to .l##_Group2##Cnt-1
+              if (I and 65535)=0 then printf(!"%i%%\r",(I*100)\.l##_Group2##Cnt)
+              var pPos = @(pVtxBase2[I].tPos) , pNormal = @(pVtxBase2[I].tNormal)
+              var iIdx = (( pPos->fX*pPos->fX + pPos->fY*pPos->fY + pPos->fZ*pPos->fZ )\4) and cVtxMask
+              'is there a vertice near this cluster?
+              for K as long  = -1 to 1
+                var iIdx2 = ((iIdx+K) and cVtxMask)
+                for N as long = 0 to iIDxCtx(iIdx2)-1
+                  var pP = @(pVtxBase[pIndex(iIdx2)[N]].tPos) , pN = @(pVtxBase[pIndex(iIdx2)[N]].tNormal)
+                  #define SumVtx(_Var,_V) (abs(_Var->fX-_V->fX)+abs(_Var->fY-_V->fY)+abs(_Var->fZ-_V->fZ))
+                  ' _AverageNormals
+                  if (SumVtx(pPos,pP)) < 1/100 then                  
+                    'average normals and set index
+                    pVtxIdx[I] = pIndex(iIdx2)[N]
+                    continue for,for,for
+                  end if
+                next N
+              next K              
+              'no? then add a new vertex, but do we need to reallocate the cluster?
+              var pIdx = pIndex(iIdx)
+              if (iIDxCtx(iIdx) and (cAllocGranularity-1)) = 0 then 
+                pIdx = realloc( pIdx , (iIDxCtx(iIdx)+cAllocGranularity)*sizeof(long) ) : pIndex(iIdx) = pIdx                    
+              end if              
+              pIdx[ iIDxCtx(iIdx) ] = iUnique+iUnique2 : iIdxCtx(iIdx) += 1
+              pVtxIdx[I]=iUnique+iUnique2 : pVtxBase[iUnique+iUnique2] = pVtxBase2[I]
+              iUnique2 += 1
+            next I            
+          #endif
+          
           for I as long = 0 to cVtxMask
             if iIdxCtx(I) then
               'printf("%i ",iIdxCtx(I))
               free( pIndex(I) ) : pIndex(I) = 0
             end if
           next I 
+          
           dTime = timer-dTime
-          printf(!"%i Unique Vertices from %i\n", iUnique , .l##_Group##Cnt )
-          printf(!"reduced to %1.1f%% vertices in %ims\n", (iUnique*100)/.l##_Group##Cnt , cint(dTime*1000) )
-          .l##_Group##IdxCnt = .l##_Group##Cnt : .l##_Group##Cnt = iUnique
-          .p##_Group##Vtx = realloc( .p##_Group##Vtx , iUnique*sizeof(*.p##_Group##Vtx) )
+          
+          printf(!"%i Unique " #_Group " Vertices from %i // ", iUnique , .l##_Group##Cnt )
+          #if #_Group2 <> ""
+            if iUnique2=0 then iUnique2=1
+            printf(!"%i " #_Group2 " from %i // ", iUnique2 , .l##_Group2##Cnt )
+            printf(!"(%1.1f%%/%1.1f%% unique) in %ims\n", (iUnique*100)/.l##_Group##Cnt , _
+            (iUnique2*100)/.l##_Group2##Cnt , cint(dTime*1000) )
+          #else
+            printf(!"(%1.1f%% unique) in %ims\n", (iUnique*100)/.l##_Group##Cnt , cint(dTime*1000) )
+          #endif
+          
+          .l##_Group##IdxCnt = .l##_Group##Cnt : .l##_Group##Cnt = iUnique          
+          #if #_Group2 <> ""
+            .p##_Group##Vtx = realloc( .p##_Group##Vtx , (iUnique+iUnique2)*sizeof(*.p##_Group##Vtx) )
+            .l##_Group2##IdxCnt = .l##_Group2##Cnt : .l##_Group##Cnt += iUnique2
+            free( .p##_Group2##Vtx ) : .p##_Group2##Vtx = 0 : .l##_Group2##Cnt=iUnique2            
+          #else
+            .p##_Group##Vtx = realloc( .p##_Group##Vtx , iUnique*sizeof(*.p##_Group##Vtx) )            
+          #endif
           
           #if _AverageNormals
             for I as long = 0 to iUnique-1
@@ -1065,13 +1175,16 @@ end function
               end with
             next I
           #endif
+          
+          
         end with
         
       end sub
     #endmacro
-    GenerateFunction( CubeMap  , 1 )
-    GenerateFunction( Triangle , 0 )
-    GenerateFunction( Border   , 1 )
+    GenerateFunction( CubeMap  , 1 )    
+    GenerateFunction( Triangle , 0 , Border )    
+    GenerateFunction( Triangle , 0 )    
+    'GenerateFunction( Border   , 1 )
   #endif
 
 #endif
@@ -2567,18 +2680,20 @@ end sub
    glDisableClientState(GL_VERTEX_ARRAY)
 #endmacro
 
-#macro DrawPieces( __name , _type , _UseColor )
+#macro DrawPieces( __name , __VBOname , _type , _UseColor )
   #if #__name = "TransTri"
-    _DrawPieces( Triangle , _type , _UseColor , true )
+    _DrawPieces( Triangle , Triangle , _type , _UseColor , true )
   #else
-    _DrawPieces( __name , _type , _UseCOlor , false )
+    _DrawPieces( __name , __VBOname , _type , _UseCOlor , false )
   #endif
 #endmacro
-#macro _DrawPieces( _name , _type , _UseColor , _Transparency )                  
+#macro _DrawPieces( _name , _VBOname , _type , _UseColor , _Transparency )                  
   if .l##_name##Cnt then
-    glBindBuffer(GL_ARRAY_BUFFER, i##_name##VBO )
+    glBindBuffer(GL_ARRAY_BUFFER, i##_VBOname##VBO )
     #ifdef i##_name##IdxVBO      
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, i##_name##IdxVBO )
+    #else
+      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0 )
     #endif    
     #if _UseColor      
       const cVtxSz = sizeof(VertexStruct)

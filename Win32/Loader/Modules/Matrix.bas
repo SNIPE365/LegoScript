@@ -479,3 +479,30 @@ private function Vector3_SubEx(byref vec1 as Vector3, byref vec2 as Vector3) as 
     
     return outVec
 end function
+
+private sub BuildNormalMatrix( byref tmIn as Matrix4x4, byref tmOut as Matrix3x3 )
+    ' M() = 16 elements of 4x4 modelview (column-major, OpenGL style)
+    ' N() = 9 elements (3x3) to receive the inverse-transposed matrix
+
+    dim as single a00 = tmIn.M(0), a01 = tmIn.M(4), a02 = tmIn.M(8)
+    dim as single a10 = tmIn.M(1), a11 = tmIn.M(5), a12 = tmIn.M(9)
+    dim as single a20 = tmIn.M(2), a21 = tmIn.M(6), a22 = tmIn.M(10)
+
+    ' Compute determinant
+    dim as single det = a00*(a11*a22 - a12*a21) - a01*(a10*a22 - a12*a20) + a02*(a10*a21 - a11*a20)
+    if det = 0 then det = 1e-9
+    det = 1.0 / det
+
+    ' Compute inverse and transpose in one go
+    tmOut.M(0) =  (a11*a22 - a12*a21) * det
+    tmOut.M(1) =  (a12*a20 - a10*a22) * det
+    tmOut.M(2) =  (a10*a21 - a11*a20) * det
+
+    tmOut.M(3) =  (a02*a21 - a01*a22) * det
+    tmOut.M(4) =  (a00*a22 - a02*a20) * det
+    tmOut.M(5) =  (a01*a20 - a00*a21) * det
+
+    tmOut.M(6) =  (a01*a12 - a02*a11) * det
+    tmOut.M(7) =  (a02*a10 - a00*a12) * det
+    tmOut.M(8) =  (a00*a11 - a01*a10) * det
+end sub

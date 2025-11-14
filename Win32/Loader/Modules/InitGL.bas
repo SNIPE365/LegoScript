@@ -195,7 +195,7 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    'screencontrol( fb.SET_GL_DEPTH_BITS , 24 )
    'screencontrol( fb.SET_GL_COLOR_BITS , 32 )
    
-   screenres 1,8192,32,,fb.GFX_OPENGL' or fb.GFX_MULTISAMPLE      
+   screenres 1,4096,32,,fb.GFX_OPENGL' or fb.GFX_MULTISAMPLE      
    Gfx.Resize(ScrWid,ScrHei)
    flip
    dim as HWND hwndGFX
@@ -223,7 +223,7 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    
    '' ReSizeGLScene
    ResizeOpengGL( ScrWid , ScrHei )   
-   glLoadIdentity                                   '' Reset The Modelview Matrix
+   glLoadIdentity()                                 '' Reset The Modelview Matrix
    
    '' All Setup For OpenGL Goes Here
    glShadeModel GL_SMOOTH                           '' Enable Smooth Shading
@@ -240,7 +240,7 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
       
    glEnable(GL_TEXTURE_2D)
    
-   'glDisable(GL_LINE_SMOOTH)
+   glDisable(GL_LINE_SMOOTH)
    'glEnable(GL_LINE_SMOOTH)
    'glLineWidth(1.25)
       
@@ -251,6 +251,7 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    
    
    'glPolygonMode( GL_FRONT_AND_BACK , GL_LINE )
+   glPolygonMode( GL_BACK , GL_LINE )
    'GL_POINT, GL_LINE, and GL_FILL.
    'glEnable( GL_CULL_FACE )
    glDisable( GL_CULL_FACE )

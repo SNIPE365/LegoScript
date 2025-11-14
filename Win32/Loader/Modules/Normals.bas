@@ -134,6 +134,15 @@ private sub SetQuadNormal( byref tQuad as LineType4Struct , ptNormal as Vertex3 
   end with
 end sub
 
+private sub TransformNormal(  byref tNormal as Vertex3 , tMatIn as const Matrix3x3 )
+  dim as single x = tNormal.fX, y = tNormal.fY, z = tNormal.fZ
+  tNormal.fX = tMatIn.M(0)*x + tMatIn.M(3)*y + tMatIn.M(6)*z
+  tNormal.fY = tMatIn.M(1)*x + tMatIn.M(4)*y + tMatIn.M(7)*z
+  tNormal.fZ = tMatIn.M(2)*x + tMatIn.M(5)*y + tMatIn.M(8)*z
+  
+  Normalize( @tNormal.fX )
+end sub
+
 #if 0
 private sub SetVtxTrigNormal( ptVtx as VertexCubeMap ptr )
   

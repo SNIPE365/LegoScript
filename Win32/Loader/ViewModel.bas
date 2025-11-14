@@ -1,5 +1,5 @@
 #define __Main "ViewModel.bas"
-#cmdline "-gen gcc -fpu sse -O 3 -Wc '-Ofast -march=native' -Wl '--large-address-aware'"
+#cmdline "-g -gen gcc -fpu sse -O 3 -Wc '-Ofast -march=native' -Wl '--large-address-aware'"
 
 #if __FB_DEBUG__
   #include "MyTDT\Exceptions.bas"
@@ -38,60 +38,64 @@
 #include "win\mmsystem.bi"
 TimeBeginPeriod(1)
 
-' TODO: load extra info from STUDIO.io collision files parse 9 as "special bounding" boxes
-' TODO: we need now the full polygon collision to detect better if the bounding boxes collide
-' TODO: change the collision bounding boxes, to line markers that extend outside the model
-' TODO: handle the case where viewing a part file instead of a model file (as subparts shouldnt be checked for collision)
-' TODO: models with submodels shouldnt ignore the collision when it's a submodel (need to detect when?)
-' TODO: (20/03/2025) fix invalid matrices back to identity ones
-
-'https://www.melkert.net/LDCad/tech/meta
-
-'TODO: check shadow library format, Load and parse them??
-   'Continue parsing of shadow library (must include files)
-   'parse the named parameters of each type of snap information
-   'seems that only cylindrical ones will be important for now
-   'Male being stud... Female being clutches (detect aliases? to account for others?)   
-
-'TODO: !! check matrix orientation multiplication !!!
-
-'TODO: add studs from the DAT file (in SizeModel function)
-'TODO: rename SizeModel function to GetModelInfo (to calculate size,studs,clutches,etc...)
-'TODO: list studs/clutches/axles, their positions and normal vectors
-'TODO: can we match studs/clutches/axles from sub primatives? (only studs and aliases?)
-'TODO: Length of shadow must be multiplied by matrix (Y=mat[4]), and duplicates must be ignored!
-
-'???? Should All PinHoles add also an AxleHole? ???? (as they add a clutch)
-
-'--------------------------------  NOTES: ------------------------------------
-'STUDS     are normally defined on it's own (each stud have an included shadow entry)
-'CLUTCHES  are normally defined on the main part shadow library (using GRIDS)
-'ALIASES   "ID='aStud'" must be "F" designations wtihout using grids... or by subpart name?? (we are researching this)
-'PINHOLES  ID='connhole'" must be "F" , Slide=true? (any clutch with slide?)
-'BARHOLES  must be "F" , Slide=false , [caps=None](hollow otherwise semi-hollow) , sec=R 4
-
-'barhole hollow
-'<[gender=F] [caps=none] [secs=R 4 12] [pos=0 8 0]>
-'barhole semi-hollow
-'<[gender=F] [caps=one] [secs=R 4 4] [pos=0 -4 0] [ori=-1 0 0 0 -1 0 0 0 1] [grid=C 2 1 40 0]>
-'stud2a (used on the semi-hollow/hollow
-'[ID=studO] [gender=M] [caps=one] [secs=R 6 4]>
-
-'---- for aliases ---
-
-'stud3 (studs or aliases? used on "2431.dat"
-'<[id=stud3] [gender=M] [caps=one] [secs=R 4 4] [scale=YOnly]>
-
-'-----------------------------------------------------------------------------
+#if 0
+  ' TODO: load extra info from STUDIO.io collision files parse 9 as "special bounding" boxes
+  ' TODO: we need now the full polygon collision to detect better if the bounding boxes collide
+  ' TODO: change the collision bounding boxes, to line markers that extend outside the model
+  ' TODO: handle the case where viewing a part file instead of a model file (as subparts shouldnt be checked for collision)
+  ' TODO: models with submodels shouldnt ignore the collision when it's a submodel (need to detect when?)
+  ' TODO: (20/03/2025) fix invalid matrices back to identity ones
+  
+  'https://www.melkert.net/LDCad/tech/meta
+  
+  'TODO: check shadow library format, Load and parse them??
+     'Continue parsing of shadow library (must include files)
+     'parse the named parameters of each type of snap information
+     'seems that only cylindrical ones will be important for now
+     'Male being stud... Female being clutches (detect aliases? to account for others?)   
+  
+  'TODO: !! check matrix orientation multiplication !!!
+  
+  'TODO: add studs from the DAT file (in SizeModel function)
+  'TODO: rename SizeModel function to GetModelInfo (to calculate size,studs,clutches,etc...)
+  'TODO: list studs/clutches/axles, their positions and normal vectors
+  'TODO: can we match studs/clutches/axles from sub primatives? (only studs and aliases?)
+  'TODO: Length of shadow must be multiplied by matrix (Y=mat[4]), and duplicates must be ignored!
+  
+  '???? Should All PinHoles add also an AxleHole? ???? (as they add a clutch)
+  
+  '--------------------------------  NOTES: ------------------------------------
+  'STUDS     are normally defined on it's own (each stud have an included shadow entry)
+  'CLUTCHES  are normally defined on the main part shadow library (using GRIDS)
+  'ALIASES   "ID='aStud'" must be "F" designations wtihout using grids... or by subpart name?? (we are researching this)
+  'PINHOLES  ID='connhole'" must be "F" , Slide=true? (any clutch with slide?)
+  'BARHOLES  must be "F" , Slide=false , [caps=None](hollow otherwise semi-hollow) , sec=R 4
+  
+  'barhole hollow
+  '<[gender=F] [caps=none] [secs=R 4 12] [pos=0 8 0]>
+  'barhole semi-hollow
+  '<[gender=F] [caps=one] [secs=R 4 4] [pos=0 -4 0] [ori=-1 0 0 0 -1 0 0 0 1] [grid=C 2 1 40 0]>
+  'stud2a (used on the semi-hollow/hollow
+  '[ID=studO] [gender=M] [caps=one] [secs=R 6 4]>
+  
+  '---- for aliases ---
+  
+  'stud3 (studs or aliases? used on "2431.dat"
+  '<[id=stud3] [gender=M] [caps=one] [secs=R 4 4] [scale=YOnly]>
+  
+  '-----------------------------------------------------------------------------
+    
+  'pinhole
+  '{SNAP_CYL} - <[id=connhole] [gender=F] [caps=none] [secs=R 8 2   R 6 16   R 8 2] [center=true] [slide=true]>
+  'not pinhole
+  '{SNAP_CYL} - <[gender=F] [caps=none] [secs=R 6 6   A 6 6   R 4 16] [slide=true] [pos=0 24 0]>
+  
+  '3044a 'Regx for good files = ^1.*\.dat
+#endif
 
 var sPath = environ("userprofile")+"\Desktop\LDCAD\"
 dim as string sFile
-'pinhole
-'{SNAP_CYL} - <[id=connhole] [gender=F] [caps=none] [secs=R 8 2   R 6 16   R 8 2] [center=true] [slide=true]>
-'not pinhole
-'{SNAP_CYL} - <[gender=F] [caps=none] [secs=R 6 6   A 6 6   R 4 16] [slide=true] [pos=0 24 0]>
 
-'3044a 'Regx for good files = ^1.*\.dat
 scope 
    'sFile = "3023.dat"
    'sFile = "3626cp0p.dat"
@@ -245,8 +249,8 @@ scope
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\cube10x10x10.ldr"
    'sFile = "C:\Users\greg\Desktop\LS\TLG_Map\TrainStationEntranceA.ldr"
    'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map0\Build\Blocks\B1\Eldon Square.ldr"
-   sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\TestMap2.ldr"
-   'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\Blocks\10232 - Palace Cinema.mpd"
+   'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\TestMap2.ldr"
+   sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\Blocks\10232 - Palace Cinema.mpd"
    'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\Blocks\10255 - Assembly Square.mpd"
    'sFile = "G:\Jogos\LegoScript\examples\10294 - Titanic.mpd"
    'sFile = "C:\Users\greg\Desktop\LS\TLG_Map\FileA.ldr"
@@ -328,7 +332,7 @@ dim shared as PartSnap tSnapID
 #ifdef UseVBO
 static shared as ModelDrawArrays g_tModelArrays
 static shared as GLuint iTriangleVBO,iColorTriVBO,iTrColTriVBO,iBorderVBO,iColorBrdVBO,iCubemapVBO
-static shared as GLuint iCubemapIdxVBO, iBorderIdxVBO', iTriangleIdxVBO
+static shared as GLuint iCubemapIdxVBO, iTriangleIdxVBO, iBorderIdxVBO
 static shared as long g_uDrawParts , g_uDrawBoxes
 #endif
 
@@ -380,7 +384,8 @@ sub RenderScenery()
               continue for
             end if
             #endif
-            if .tMatView.fPosZ < -35 then .bSkipBorder=1
+            if bCulling=0 then .bSkipBorder = 1
+            'if .tMatView.fPosZ < -50 then .bSkipBorder=1
             .bDisplay=1 : g_uDrawParts += 1
           end with
         next I              
@@ -391,15 +396,21 @@ sub RenderScenery()
         glBindBuffer(GL_ARRAY_BUFFER, 0 )
         
         #if 1          
-        DrawPieces( Triangle , GL_TRIANGLES , false )
-        DrawPieces( ColorTri , GL_TRIANGLES , true  )
+        DrawPieces( Triangle , Triangle , GL_TRIANGLES , false )
+        DrawPieces( ColorTri , ColorTri , GL_TRIANGLES , true  )
         glEnable( GL_BLEND )
-        if bViewBorders then 
-          DrawPieces( Border   , GL_LINES   , false )
-          DrawPieces( ColorBrd , GL_LINES   , true  )
+        if bViewBorders then           
+          glDisableClientState(GL_NORMAL_ARRAY)
+          #ifdef iBorderIdxVBO
+          DrawPieces( Border   , Triangle , GL_LINES   , false )
+          #else
+          DrawPieces( Border   , Border , GL_LINES   , false )
+          #endif
+          DrawPieces( ColorBrd , ColorBrd , GL_LINES   , true  )
+          glEnableClientState(GL_NORMAL_ARRAY)
         end if          
-        DrawPieces( TransTri , GL_TRIANGLES , false )
-        DrawPieces( TrColTri , GL_TRIANGLES , true  )
+        DrawPieces( TransTri , TransTri , GL_TRIANGLES , false )
+        DrawPieces( TrColTri , TrColTri , GL_TRIANGLES , true  )
         glDisableClientState(GL_COLOR_ARRAY)
         glDisableClientState(GL_NORMAL_ARRAY)
         glDisableClientState(GL_VERTEX_ARRAY)
@@ -658,12 +669,12 @@ do
   dLoadTIme = timer
   #ifdef UseVBO           
     GenModelDrawArrays( g_pModel , g_tModelArrays )
-    #macro CreateVBO( _name )
-      glGenBuffers(1 , @i##_name##VBO)
-      #ifdef i##_name##IdxVBO
-      glGenBuffers(1 , @i##_name##IdxVBO)
-      #endif
+    #macro CreateVBO( _name )      
       with g_tModelArrays
+        if .l##_name##Cnt then glGenBuffers(1 , @i##_name##VBO)
+        #ifdef i##_name##IdxVBO
+        glGenBuffers(1 , @i##_name##IdxVBO)
+        #endif
         if .p##_name##vtx andalso .l##_name##Cnt then
           #define vtxSz (.l##_name##Cnt * sizeof(typeof(*.p##_name##vtx)))
           #define idxSz (.l##_name##IdxCnt * sizeof(typeof(*.p##_name##Idx)))
@@ -680,15 +691,29 @@ do
           #ifdef i##_name##IdxVBO
           free( .p##_name##Idx )
           #endif
+        else          
+          #ifdef i##_name##IdxVBO            
+            if .l##_name##IdxCnt then
+              #define vtxSz (.l##_name##Cnt * sizeof(typeof(*.p##_name##vtx)))
+              #define idxSz (.l##_name##IdxCnt * sizeof(typeof(*.p##_name##Idx)))
+              glBindBuffer(GL_ARRAY_BUFFER, i##_name##IdxVBO)
+              glBufferData(GL_ARRAY_BUFFER, idxSz , .p##_name##Idx , GL_STATIC_DRAW)
+              printf(!"%s = %1.1fmb (idx=%1.1fkb)\n" , #_name , (vtxSz+idxSz)/(1024*1024) , (idxSz)/(1024) )          
+            end if
+          #endif
         end if
       end with
     #endmacro
+    #ifdef iBorderIdxVBO
+    GenerateOptimizedIndexes( g_tModelArrays , Triangle , Border )
+    #else
     GenerateOptimizedIndexes( g_tModelArrays , Triangle )
+    #endif
     CreateVBO( Triangle )
     CreateVBO( ColorTri )
     CreateVBO( TrColTri )
-    GenerateOptimizedIndexes( g_tModelArrays , Border )
-    CreateVBO( Border   )
+    'GenerateOptimizedIndexes( g_tModelArrays , Border )
+    CreateVBO( Border   )    
     CreateVBO( ColorBrd )
   #else
     var iModel   = glGenLists( 1 )
@@ -765,11 +790,18 @@ do
   
   'Get size of each piece (CheckCollisionModel is doing it right)
   'TODO: check what's wrong with SizeModel()
-  #if 1
+  '#define GenerateCubesWithIndexes 'broken :(
   with g_tModelArrays
     dim as long lUnique        
+    .pCubemapIdx = malloc( .lCubemapCnt*sizeof(long) )
     var pCubeVtx = .pCubemapVtx , lCount = .lPieceCount
+    #ifdef GenerateCubesWithIndexes
+    var pCubeIdx = .pCubemapIdx , lCubeIdx = -36 , lCubeVtx = -8      
+    #endif      
     for I as long = 0 to .lPieceCount-1
+      #ifdef GenerateCubesWithIndexes
+      lCubeVtx+=8 : lCubeIdx += 36
+      #endif
       with .pPieces[I]                
         if .pModel = 0 then continue for
         if isBadReadPtr(.pModel,offsetof(DATFile,tParts(0))) then 
@@ -799,22 +831,42 @@ do
           lUnique += 1
         end if
         
+        #ifdef GenerateCubesWithIndexes
+        var pVtxBase = pCubeVtx+lCubeVtx
+        #else
         var pVtxBase = pCubeVtx+I*36
+        #endif
         'printf(!"%i of %i > %p\n",I,lCount-1,pVtxBase)
-        GenCubeVtx( pVtxBase , .pModel->tSize )
-        for N as long = 0 to 35
-          MultiplyMatrixVector( @pVtxBase[N].tPos.fX , @.tMatrix )
-          'MultiplyMatrixVector( @pVtxBase[N].tNormal.fX , @.tMatrix )
-        next N
-        for N as long = 0 to 35 step 3
-          SetVtxTrigNormal( pVtxBase+N )
-        next N
+        
+        #ifdef GenerateCubesWithIndexes
+          GenCubeVtxIdx8( pVtxBase , lCubeVtx , pCubeIdx , lCubeidx , .pModel->tSize )
+          dim as Matrix3x3 tNormalMatrix = any 
+          BuildNormalMatrix( .tMatrix , tNormalMatrix )
+          for N as long = 0 to 7
+            MultiplyMatrixVector( @pVtxBase[N].tPos.fX , @.tMatrix )
+            TransformNormal( pVtxBase[N].tNormal , tNormalMatrix )
+          next N
+        #else
+          GenCubeVtx36( pVtxBase , .pModel->tSize )
+          for N as long = 0 to 35
+            MultiplyMatrixVector( @pVtxBase[N].tPos.fX , @.tMatrix )              
+          next N
+          for N as long = 0 to 35 step 3
+            SetVtxTrigNormal( pVtxBase+N )
+          next N
+        #endif          
+        
       end with
-    next I
-  end with  
-  GenerateOptimizedIndexes( g_tModelArrays , Cubemap )
-  CreateVBO( Cubemap  )
+    next I      
+    #ifdef GenerateCubesWithIndexes
+    .lCubemapCnt = lCubeVtx : .lCubeMapIdxCnt = lCubeidx
+    .pCubemapVtx = realloc( .pCubemapVtx , .lCubemapCnt*sizeof( VertexCubeMap ) )
+    #endif      
+  end with
+  #ifndef GenerateCubesWithIndexes
+    GenerateOptimizedIndexes( g_tModelArrays , Cubemap )
   #endif
+  CreateVBO( Cubemap  )
   
   puts("Load Time: " & timer-dLoadTIme)
   
@@ -909,6 +961,37 @@ do
     'Matrix4x4Scale( tCur , 1/-20 , 1.0/-20 , 1/20 )
     Matrix4x4Scale( tCur , -1/20 , -1/20 , 1/20 )
     
+    #macro ControlKeys()
+      select case e.ascii
+      case 13                'Toggle mode
+        g_FreeCam = not g_FreeCam
+        if g_FreeCam then
+          if g_bLocked then setmouse ,,,false
+        else
+          setmouse ,,,g_bLocked
+          dim as long lDummy=any : GetMouseDelta(lDummy,lDummy)
+        end if
+      case asc("B")-asc("@") 'Border Toggle
+        bViewBorders = not bViewBorders
+        printf(!"Borders: %s\n",iif(bViewBorders,"ENABLED","DISABLED"))
+      case asc("C")-asc("@") 'Cull Toggle
+        bCulling = (0=bCulling)
+        printf(!"Culling: %s\n",iif(bCulling,"ENABLED","DISABLED"))
+        if bCulling then glEnable( GL_CULL_FACE ) else glDisable( GL_CULL_FACE )
+      case asc("L")-asc("@") 'Light Toggle
+        bLighting = not bLighting
+        printf(!"Lighting: %s\n",iif(bLighting,"ENABLED","DISABLED"))
+        if bLighting then glEnable(GL_LIGHTING) else glDIsable(GL_LIGHTING)
+      case asc("V")-asc("@") 'Vsync Toggle
+        g_Vsync = ((g_Vsync+1) mod 3)
+        printf(!"Vsync Frames = %i\n",g_VSync)
+        wglSwapIntervalEXT(g_Vsync)             
+      end select
+      select case e.scancode
+      case fb.SC_F5     : exit do 'reload
+      end select
+    #endmacro
+    
     if g_FreeCam then
       
       if g_bNeedUpdate then g_bNeedUpdate=false : UpdateCameraVectors()   
@@ -963,27 +1046,14 @@ do
       case fb.EVENT_MOUSE_BUTTON_RELEASE
          g_bLocked = false : setmouse ,,,g_bLocked
       case fb.EVENT_KEY_PRESS
+         
+         ControlKeys()
+         
          select case e.ascii
-         case 13
-            g_FreeCam = not g_FreeCam
-            if g_bLocked then setmouse ,,,false
-         case 8: 
-            g_fCameraX = 0 : g_fCameraY = 0 : g_fCameraZ = 0
+         case 8: g_fCameraX = 0 : g_fCameraY = 0 : g_fCameraZ = 0
          'case 8: if g_bLocked then g_bLocked = false : setmouse ,,,g_bLocked
-         case asc("B")-asc("@") 'Border Toggle
-          bViewBorders = not bViewBorders
-          printf(!"Borders: %s\n",iif(bViewBorders,"ENABLED","DISABLED"))
-         case asc("L")-asc("@") 'Light Toggle
-            bLighting = not bLighting
-            printf(!"Lighting: %s\n",iif(bLighting,"ENABLED","DISABLED"))
-            if bLighting then glEnable(GL_LIGHTING) else glDIsable(GL_LIGHTING)
-         case asc("V")-asc("@") 'Vsync Toggle
-           g_Vsync = ((g_Vsync+1) mod 3)
-           printf(!"Vsync Frames = %i\n",g_VSync)
-           wglSwapIntervalEXT(g_Vsync)             
-          end select
-         select case e.scancode
-         case fb.SC_F5     : exit do 'reload
+         end select
+         select case e.scancode         
          case fb.SC_W      : bMoveForward  = true
          case fb.SC_S      : bMoveBackward = true
          case fb.SC_A      : bStrafeLeft   = true
@@ -1065,36 +1135,21 @@ do
            if e.button = fb.BUTTON_LEFT   then bLeftPressed  = false
            if e.button = fb.BUTTON_RIGHT  then bRightPressed = false      
         case fb.EVENT_KEY_PRESS
+           
+           ControlKeys()
+           
            select case e.ascii
            case 8
-              if bBoundingBox then
-                 g_CurPart = -1
-                 printf(!"g_CurPart = %i    \r",g_CurPart)
-                 dim as PartSize tSzTemp
-                 SizeModel( g_pModel , tSzTemp , g_CurPart )
-                 g_tSz = tSzTemp
-              else
-                 g_CurDraw = -1
-                 printf(!"g_CurDraw = %i    \r",g_CurDraw)
-              end if               
-           case 13: 
-              g_FreeCam = not g_FreeCam : setmouse ,,,g_bLocked
-              dim as long lDummy=any : GetMouseDelta(lDummy,lDummy)
-           case asc("B")-asc("@") 'Border Toggle
-              bViewBorders = not bViewBorders
-              printf(!"Borders: %s\n",iif(bViewBorders,"ENABLED","DISABLED"))
-           case asc("C")-asc("@") 'Cull Toggle
-             bCulling = (0=bCulling)
-             printf(!"Culling: %s\n",iif(bCulling,"ENABLED","DISABLED"))
-             if bCulling then glEnable( GL_CULL_FACE ) else glDisable( GL_CULL_FACE )
-           case asc("L")-asc("@") 'Light Toggle
-              bLighting = not bLighting
-              printf(!"Lighting: %s\n",iif(bLighting,"ENABLED","DISABLED"))
-              if bLighting then glEnable(GL_LIGHTING) else glDIsable(GL_LIGHTING)
-           case asc("V")-asc("@") 'Vsync Toggle
-             g_Vsync = ((g_Vsync+1) mod 3)
-             printf(!"Vsync Frames = %i\n",g_VSync)
-             wglSwapIntervalEXT(g_Vsync)
+            if bBoundingBox then
+               g_CurPart = -1
+               printf(!"g_CurPart = %i    \r",g_CurPart)
+               dim as PartSize tSzTemp
+               SizeModel( g_pModel , tSzTemp , g_CurPart )
+               g_tSz = tSzTemp
+            else
+               g_CurDraw = -1
+               printf(!"g_CurDraw = %i    \r",g_CurDraw)
+            end if
            case asc("="),asc("+")
               if bBoundingBox then
                  g_CurPart = ((g_CurPart+2) mod (g_PartCount+1))-1
@@ -1126,11 +1181,11 @@ do
                  printf(!"g_CurDraw = %i    \r",g_CurDraw)
               end if               
            end select
-           select case e.scancode
-           case fb.SC_F5 : exit do 'reload
-           case fb.SC_TAB
-              bBoundingBox = not bBoundingBox
+           
+           select case e.scancode           
+           case fb.SC_TAB: bBoundingBox = not bBoundingBox
            end select
+           
         case fb.EVENT_WINDOW_GOT_FOCUS
          g_bFocus = true
         case fb.EVENT_WINDOW_LOST_FOCUS
