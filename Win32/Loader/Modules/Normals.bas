@@ -79,7 +79,7 @@ private sub SetTrigNormal( byref tTrig as LineType3Struct , ptNormal as Vertex3 
       'ptNormal->fX = normal(0)
       'ptNormal->fY = normal(1)
       'ptNormal->fZ = normal(2)
-    else
+    else      
       glNormal3fv(@normal(0))
     end if
   end with

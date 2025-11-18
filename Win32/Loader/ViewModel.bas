@@ -1,5 +1,7 @@
 #define __Main "ViewModel.bas"
-#cmdline "-g -gen gcc -fpu sse -O 3 -Wc '-Ofast -march=native' -Wl '--large-address-aware'"
+#cmdline "-gen gcc -fpu sse -O 3 -Wc '-Ofast -march=native' -Wl '--large-address-aware'"
+
+#include "windows.bi"
 
 #if __FB_DEBUG__
   #include "MyTDT\Exceptions.bas"
@@ -243,21 +245,26 @@ scope
    'sFile = sPath+"LDraw\models\pyramid.ldr"
    'sFile = sPath+"\examples\8891-towTruck.mpd"
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\5510.mpd"
-   'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\examples\5510.mpd"
+   'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\examples\5510.mpd" '5521,5533,5540,5541,5542
+   'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\examples\5542.mpd" 
    'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\examples\8851.mpd"
    'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\LDraw\models\pyramid.ldr"
+   'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\LDraw\models\car.ldr"
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\cube10x10x10.ldr"
    'sFile = "C:\Users\greg\Desktop\LS\TLG_Map\TrainStationEntranceA.ldr"
    'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map0\Build\Blocks\B1\Eldon Square.ldr"
    'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\TestMap2.ldr"
-   sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\Blocks\10232 - Palace Cinema.mpd"
+   'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\Blocks\10232 - Palace Cinema.mpd"
    'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\Blocks\10255 - Assembly Square.mpd"
+   'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\Blocks\8418_mini_loader.mpd"
+   sFile = "G:\Jogos\LegoScript-main\examples\TLG_Map\Precolored\player\player.ldr"
    'sFile = "G:\Jogos\LegoScript\examples\10294 - Titanic.mpd"
    'sFile = "C:\Users\greg\Desktop\LS\TLG_Map\FileA.ldr"
    'sFile = "light.dat"
    'sFile = "3001.dat" 
    'sFile = "F:\10294 - Titanic.mpd"
    'sFile = "4070.dat" '4070 , 87087 , 26604 , 47905 , 4733 , 30414
+   'sFile = "G:\Jogos\LegoScript-main\examples\cube\cube.ldr"
 end scope
 scope 
    #if 0
@@ -267,6 +274,7 @@ scope
    "15587.dat" '?????   
    "15625.dat" "18870.dat" 'probabily slab
    #endif
+   'sFile = "3819.dat"
    'sFile = "2356.dat" '"4070.dat"
    '"2441.dat","2612.dat","2628.dat","2629.dat","27261.dat","2726c01.dat","2726c02.dat","274.dat","289.dat","30036.dat","30042.dat","30065.dat","30157b.dat","30234.dat","30303.dat","30303pa0.dat","30527c01.dat","30527c02.dat","30527c03.dat","32739.dat","33088.dat","33121.dat","33122.dat","33286.dat","35327.dat","35473.dat","36840.dat","37720a.dat","3788.dat","3960.dat","3960p01.dat","3960p02.dat","3960p03.dat","3960p04.dat","3960p05.dat","3960p06.dat","3960p07.dat","3960p08.dat","3960p09.dat","3960p0a.dat","3960p0b.dat","3960p0c.dat","3960p0d.dat","3960p0e.dat","3960p0f.dat","3960p0g.dat","3960p0h.dat","3960p0i.dat","3960pa0.dat","3960pa1.dat","3960pb0.dat","3960pb1.dat","3960pb2.dat","3960pb3.dat","3960pb4.dat","3960pb5.dat","3960pb9.dat","3960pbc.dat","3960pf1.dat","3960pf2.dat","3960ph0.dat","3960pm0.dat","3960ps1.dat","3960ps2.dat","3960ps3.dat","3960ps4.dat","3960ps5.dat","3960ps6.dat","3960ps7.dat","3960ps8.dat","3960psb.dat","3960psc.dat","3960pse.dat","3960pv1.dat","3960pv2.dat","3960pv3.dat","3960pv4.dat","3960px1.dat","3960px2.dat","3960px3.dat","39611.dat","40687.dat","4093.dat","4093a.dat","4093ad01.dat","4093b.dat","4093c.dat","41680.dat","41855.dat","4211.dat","4212a.dat","42409.dat","4270181.dat","4285.dat","4285a.dat","4285b.dat","43898.dat","43898p01.dat","43898p02.dat","43898pa1.dat","43898pa2.dat","43898ps1.dat","43898ps2.dat","43898px1.dat","43898px2.dat","44375.dat","44375a.dat","44375aps1.dat","44375aps2.dat","44375aps3.dat","44375b.dat","44375bp01.dat","44375bp03.dat","44375bpa0.dat","44375bps0.dat","44375bps1.dat","44375bps2.dat","44375p01.dat","44375p02.dat","4488.dat","44882.dat","45677.dat","45677d01.dat","45677ds1.dat","45729.dat","4590.dat","4616992.dat","47456.dat","47457.dat","4750.dat","4771a.dat","50949.dat","52031.dat","52031d01.dat","52031d02.dat","52031d03.dat","52031d50.dat","52031d51.dat","52037.dat","5306.dat","54093.dat","56640.dat","56641.dat","58124c01.dat","58124c02.dat","60212.dat","63082.dat","64570.dat","65138.dat","6584.dat","6625c01.dat","66789.dat","66790.dat","66792.dat","71752.dat","72132.dat","73832.dat","74166.dat","79743.dat","85975.dat","87609.dat","90001.dat","90001p01.dat","91049.dat","92088.dat","92338-f2.dat","92339.dat","92340.dat","93541.dat","98263.dat","98281.dat","98383.dat","99206.dat","99780.dat","20952p02.dat","2612.dat","2628.dat","2629.dat","30157b.dat","30303.dat","30303pa0.dat","3263.dat","33088.dat","3960p0g.dat","3960p0h.dat","3960ph0.dat","3960ps9.dat","40687.dat","4093ad01.dat","43898p03.dat","43898p04.dat","44375bp02.dat","44375bp03.dat","44375bp04.dat","44375bp05.dat","44375bp06.dat","44375bp07.dat","44375bps2.dat","45677d02.dat","45677d03.dat","45677d04.dat","45677d05.dat","45677d06.dat","45677ds1.dat","45677dy0.dat","47456.dat","52031d01.dat","52031d03.dat","52031d04.dat","52031d05.dat","5306.dat","65138.dat","65468d.dat","71752.dat","72132.dat","73832.dat","74166.dat","79743.dat","89681.dat","90001c01.dat","90001c01p01.dat","90001p01.dat","92338-f2.dat","93541.dat","99206.dat","u9541.dat",   
 end scope
@@ -334,11 +342,16 @@ static shared as ModelDrawArrays g_tModelArrays
 static shared as GLuint iTriangleVBO,iColorTriVBO,iTrColTriVBO,iBorderVBO,iColorBrdVBO,iCubemapVBO
 static shared as GLuint iCubemapIdxVBO, iTriangleIdxVBO, iBorderIdxVBO
 static shared as long g_uDrawParts , g_uDrawBoxes
+#else
+static shared as long g_iModels , g_iBorders
 #endif
 
 sub RenderScenery()
   
+  #ifdef UseVBO
   g_uDrawParts=0 : g_uDrawBoxes=0
+  #endif
+  
   'glDisable( GL_LIGHTING )
   glEnable( GL_DEPTH_TEST )
   if g_CurDraw < 0 then
@@ -392,9 +405,6 @@ sub RenderScenery()
         
         'glPopAttrib()
         
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
-        glBindBuffer(GL_ARRAY_BUFFER, 0 )
-        
         #if 1          
         DrawPieces( Triangle , Triangle , GL_TRIANGLES , false )
         DrawPieces( ColorTri , ColorTri , GL_TRIANGLES , true  )
@@ -416,20 +426,23 @@ sub RenderScenery()
         glDisableClientState(GL_VERTEX_ARRAY)
         #endif
         
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
+        glBindBuffer(GL_ARRAY_BUFFER, 0 )
+        
       end with
     #else
-       glCallList(	iModel )
+       glCallList(	g_iModels )
     #endif
   else
     'render single part
-    RenderModel( g_pModel , false , , g_CurDraw )
+    RenderModel( g_pModel , 0 , , g_CurDraw )
   end if
   #ifndef UseVBO
     if bViewBorders then
       'if g_CurDraw<0 then
       'else
       'end if
-      glCallList(	iBorders-(g_CurDraw>=0) )
+      glCallList(	g_iBorders-(g_CurDraw>=0) )
     end if
   #endif
 end sub
@@ -621,8 +634,10 @@ do
           else 'if there isnt a model in the clipboard, then load this:
              'sModel = _    
              '"1 2 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 NotFound.dat" EOL _
-             sModel = _    
-             "1 1 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 3001.dat" EOL '91405
+             sModel = _
+             "1 1 -50.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 3818.dat" EOL _ '91405
+             _ '"0 BFC INVERTNEXT" EOL _
+             "1 1 50.000000 0.000000 0.000000  1 0 0 0 1 0 0 0 1 3819.dat" EOL '3818 / 3819
              
              ' ------------------------------------------------------
              'sModel = _ 'all of lines belo should end with EOL _
@@ -687,9 +702,9 @@ do
           #else
           printf(!"%s = %1.1fmb\n" , #_name , (vtxSz)/(1024*1024) )
           #endif
-          free( .p##_name##vtx )
+          MyDeallocVertex( .p##_name##vtx )
           #ifdef i##_name##IdxVBO
-          free( .p##_name##Idx )
+          MyDeallocIndex( .p##_name##Idx )
           #endif
         else          
           #ifdef i##_name##IdxVBO            
@@ -716,17 +731,20 @@ do
     CreateVBO( Border   )    
     CreateVBO( ColorBrd )
   #else
-    var iModel   = glGenLists( 1 )
-    var iBorders = glGenLists( 2 )
-    glNewList( iModel ,  GL_COMPILE ) 'GL_COMPILE_AND_EXECUTE
-    RenderModel( g_pModel , false )
-    glEndList()   
-    glNewList( iBorders ,  GL_COMPILE )
-    RenderModel( g_pModel , true )
-    glEndList()
-    glNewList( iBorders+1 ,  GL_COMPILE )
-    RenderModel( g_pModel , true , , -2 )
-    glEndList()
+    scope
+      const bBorders=32
+      g_iModels  = glGenLists( 1 )
+      g_iBorders = glGenLists( 2 )
+      glNewList( g_iModels ,  GL_COMPILE ) 'GL_COMPILE_AND_EXECUTE
+      RenderModel( g_pModel , 0 )
+      glEndList()   
+      glNewList( g_iBorders ,  GL_COMPILE )
+      RenderModel( g_pModel , bBorders )
+      glEndList()
+      glNewList( g_iBorders+1 ,  GL_COMPILE )
+      RenderModel( g_pModel , bBorders , , -2 )
+      glEndList()
+    end scope
   #endif   
   
   'getchar()
@@ -783,7 +801,7 @@ do
   end with
 
   redim as PartCollisionBox atCollision()
-  #if 0
+  #ifndef UseVBO
   CheckCollisionModel( g_pModel , atCollision() )
   #endif  
   printf(!"Parts: %i , Collisions: %i \n",g_PartCount,ubound(atCollision)\2)
@@ -791,82 +809,85 @@ do
   'Get size of each piece (CheckCollisionModel is doing it right)
   'TODO: check what's wrong with SizeModel()
   '#define GenerateCubesWithIndexes 'broken :(
-  with g_tModelArrays
-    dim as long lUnique        
-    .pCubemapIdx = malloc( .lCubemapCnt*sizeof(long) )
-    var pCubeVtx = .pCubemapVtx , lCount = .lPieceCount
-    #ifdef GenerateCubesWithIndexes
-    var pCubeIdx = .pCubemapIdx , lCubeIdx = -36 , lCubeVtx = -8      
-    #endif      
-    for I as long = 0 to .lPieceCount-1
+  
+  #ifdef UseVBO
+    with g_tModelArrays
+      dim as long lUnique        
+      .pCubemapIdx = MyAllocIndex( .lCubemapCnt*sizeof(long) )
+      var pCubeVtx = .pCubemapVtx , lCount = .lPieceCount
       #ifdef GenerateCubesWithIndexes
-      lCubeVtx+=8 : lCubeIdx += 36
-      #endif
-      with .pPieces[I]                
-        if .pModel = 0 then continue for
-        if isBadReadPtr(.pModel,offsetof(DATFile,tParts(0))) then 
-          puts(I & " BAD?") : .pModel = 0 : continue for
-        end if        
-        if .pModel->bHasSize=0 then
-          #if 0
-          with .pModel->tSize
-            printf(!"%5i: xMin=%1.1f , yMin=%1.1f , zMin=%1.1f , xMax=%1.1f , yMax=%1.1f , zMax=%1.1f\n" , _
-            lUnique , .xMin , .yMin , .zMin , .xMax , .yMax , .zMax )
-          end with
-          #endif
-          .pModel->bHasSize=1 : SizeModel( .pModel , .pModel->tSize )
-          
-          with .pModel->tSize            
-            .fRad = 0
-            if abs(.xMin) > .fRad then .fRad = abs(.xMin)
-            if abs(.yMin) > .fRad then .fRad = abs(.yMin)
-            if abs(.zMin) > .fRad then .fRad = abs(.zMin)
-            if abs(.xMax) > .fRad then .fRad = abs(.xMax)
-            if abs(.yMax) > .fRad then .fRad = abs(.yMax)
-            if abs(.xMax) > .fRad then .fRad = abs(.zMax)
-            .fRad /= 19
-            'printf(!"%5i: fRad=%1.1f xMin=%1.1f , yMin=%1.1f , zMin=%1.1f , xMax=%1.1f , yMax=%1.1f , zMax=%1.1f\n" , _
-            'lUnique , .fRad , .xMin , .yMin , .zMin , .xMax , .yMax , .zMax )
-          end with
-          lUnique += 1
-        end if
-        
+      var pCubeIdx = .pCubemapIdx , lCubeIdx = -36 , lCubeVtx = -8      
+      #endif      
+      for I as long = 0 to .lPieceCount-1
         #ifdef GenerateCubesWithIndexes
-        var pVtxBase = pCubeVtx+lCubeVtx
-        #else
-        var pVtxBase = pCubeVtx+I*36
+        lCubeVtx+=8 : lCubeIdx += 36
         #endif
-        'printf(!"%i of %i > %p\n",I,lCount-1,pVtxBase)
-        
-        #ifdef GenerateCubesWithIndexes
-          GenCubeVtxIdx8( pVtxBase , lCubeVtx , pCubeIdx , lCubeidx , .pModel->tSize )
-          dim as Matrix3x3 tNormalMatrix = any 
-          BuildNormalMatrix( .tMatrix , tNormalMatrix )
-          for N as long = 0 to 7
-            MultiplyMatrixVector( @pVtxBase[N].tPos.fX , @.tMatrix )
-            TransformNormal( pVtxBase[N].tNormal , tNormalMatrix )
-          next N
-        #else
-          GenCubeVtx36( pVtxBase , .pModel->tSize )
-          for N as long = 0 to 35
-            MultiplyMatrixVector( @pVtxBase[N].tPos.fX , @.tMatrix )              
-          next N
-          for N as long = 0 to 35 step 3
-            SetVtxTrigNormal( pVtxBase+N )
-          next N
-        #endif          
-        
-      end with
-    next I      
-    #ifdef GenerateCubesWithIndexes
-    .lCubemapCnt = lCubeVtx : .lCubeMapIdxCnt = lCubeidx
-    .pCubemapVtx = realloc( .pCubemapVtx , .lCubemapCnt*sizeof( VertexCubeMap ) )
-    #endif      
-  end with
-  #ifndef GenerateCubesWithIndexes
-    GenerateOptimizedIndexes( g_tModelArrays , Cubemap )
+        with .pPieces[I]                
+          if .pModel = 0 then continue for
+          if isBadReadPtr(.pModel,offsetof(DATFile,tParts(0))) then 
+            puts(I & " BAD?") : .pModel = 0 : continue for
+          end if        
+          if .pModel->bHasSize=0 then
+            #if 0
+            with .pModel->tSize
+              printf(!"%5i: xMin=%1.1f , yMin=%1.1f , zMin=%1.1f , xMax=%1.1f , yMax=%1.1f , zMax=%1.1f\n" , _
+              lUnique , .xMin , .yMin , .zMin , .xMax , .yMax , .zMax )
+            end with
+            #endif
+            .pModel->bHasSize=1 : SizeModel( .pModel , .pModel->tSize )
+            
+            with .pModel->tSize            
+              .fRad = 0
+              if abs(.xMin) > .fRad then .fRad = abs(.xMin)
+              if abs(.yMin) > .fRad then .fRad = abs(.yMin)
+              if abs(.zMin) > .fRad then .fRad = abs(.zMin)
+              if abs(.xMax) > .fRad then .fRad = abs(.xMax)
+              if abs(.yMax) > .fRad then .fRad = abs(.yMax)
+              if abs(.xMax) > .fRad then .fRad = abs(.zMax)
+              .fRad /= 19
+              'printf(!"%5i: fRad=%1.1f xMin=%1.1f , yMin=%1.1f , zMin=%1.1f , xMax=%1.1f , yMax=%1.1f , zMax=%1.1f\n" , _
+              'lUnique , .fRad , .xMin , .yMin , .zMin , .xMax , .yMax , .zMax )
+            end with
+            lUnique += 1
+          end if
+          
+          #ifdef GenerateCubesWithIndexes
+          var pVtxBase = pCubeVtx+lCubeVtx
+          #else
+          var pVtxBase = pCubeVtx+I*36
+          #endif
+          'printf(!"%i of %i > %p\n",I,lCount-1,pVtxBase)
+          
+          #ifdef GenerateCubesWithIndexes
+            GenCubeVtxIdx8( pVtxBase , lCubeVtx , pCubeIdx , lCubeidx , .pModel->tSize )
+            dim as Matrix3x3 tNormalMatrix = any 
+            BuildNormalMatrix( .tMatrix , tNormalMatrix )
+            for N as long = 0 to 7
+              MultiplyMatrixVector( @pVtxBase[N].tPos.fX , @.tMatrix )
+              TransformNormal( pVtxBase[N].tNormal , tNormalMatrix )
+            next N
+          #else
+            GenCubeVtx36( pVtxBase , .pModel->tSize )
+            for N as long = 0 to 35
+              MultiplyMatrixVector( @pVtxBase[N].tPos.fX , @.tMatrix )              
+            next N
+            for N as long = 0 to 35 step 3
+              SetVtxTrigNormal( pVtxBase+N )
+            next N
+          #endif          
+          
+        end with
+      next I      
+      #ifdef GenerateCubesWithIndexes
+      .lCubemapCnt = lCubeVtx : .lCubeMapIdxCnt = lCubeidx
+      .pCubemapVtx = MyReallocVertex( .pCubemapVtx , .lCubemapCnt*sizeof( VertexCubeMap ) )
+      #endif      
+    end with
+    #ifndef GenerateCubesWithIndexes
+      GenerateOptimizedIndexes( g_tModelArrays , Cubemap )
+    #endif
+    CreateVBO( Cubemap  )
   #endif
-  CreateVBO( Cubemap  )
   
   puts("Load Time: " & timer-dLoadTIme)
   
@@ -957,9 +978,14 @@ do
     glClear GL_COLOR_BUFFER_BIT OR GL_DEPTH_BUFFER_BIT
     glLoadIdentity()
     tCur = g_tIdentityMatrix
-    'glScalef(1/-20, 1.0/-20, 1/20 )
-    'Matrix4x4Scale( tCur , 1/-20 , 1.0/-20 , 1/20 )
-    Matrix4x4Scale( tCur , -1/20 , -1/20 , 1/20 )
+    
+    #ifdef UseVBO
+      Matrix4x4Scale( tCur , -1/20 , -1/20 , 1/20 )
+    #else
+      glScalef(-1/20, -1/20, 1/20 )
+      'Matrix4x4Scale( tCur , 1/-20 , 1.0/-20 , 1/20 )
+    #endif
+    
     
     #macro ControlKeys()
       select case e.ascii
@@ -1100,17 +1126,19 @@ do
       dim as GLfloat lightPos(...) = {0,0,0, 1f}'; // (x, y, z, w), w=1 for positional light
       glLightfv(GL_LIGHT0, GL_POSITION, @lightPos(0))
       
-      Matrix4x4Translate( tCur , -fPositionX , fPositionY , fPositionZ*(fZoom+4) )
-      'glTranslatef( -fPositionX , fPositionY , fPositionZ*(fZoom+4) ) '*(fZoom+4) ) '80*fZoom ) '/-5)
-      ''glTranslatef( 0 , 0 , -80*(fZoom+4) )
+      #ifdef UseVBO
+        Matrix4x4Translate( tCur , -fPositionX , fPositionY , fPositionZ*(fZoom+4) )
+        Matrix4x4RotateX( tCur , tCur , fRotationY*-cPI180 )
+        Matrix4x4RotateY( tCur , tCur , fRotationX*-cPI180 )
+      #else
+        glTranslatef( -fPositionX , fPositionY , fPositionZ*(fZoom+4) ) '*(fZoom+4) ) '80*fZoom ) '/-5)
+        ''glTranslatef( 0 , 0 , -80*(fZoom+4) )
+        glRotatef fRotationX , 0   , -1.0 , 0
+        glRotatef fRotationY , -1.0 , 0.0 , 0
+      #endif      
       
-      Matrix4x4RotateX( tCur , tCur , fRotationY*-cPI180 )
-      'glRotatef fRotationY , -1.0 , 0.0 , 0
-      Matrix4x4RotateY( tCur , tCur , fRotationX*-cPI180 )
-      'glRotatef fRotationX , 0   , -1.0 , 0
-      
-      RenderScenery()
-      RenderOverlay()
+      RenderScenery()      
+      'RenderOverlay()
       
       dim e as fb.EVENT = any
       while (ScreenEvent(@e))
@@ -1213,12 +1241,18 @@ do
     var dElapsed = (timer-dFps) : iFps += 1
     if abs(dElapsed)>=.25 then
       dFps = timer : dAccCPU = dAccCPU*100/dElapsed : dAccGL  = dElapsed/(dAccGL/(iFPS/dElapsed))
-      WindowTitle( _
-        "P:" & g_uDrawParts & " B:" & g_uDrawBoxes & " H:" & _
-        g_tModelArrays.lPieceCount-(g_uDrawParts+g_uDrawBoxes) & " of " & _
-        g_tModelArrays.lPieceCount & _
-        " - Fps: " & cint(dAccGL) & "/" & cint(iFps/dElapsed) & _
-        " (" & cint(dAccCPU) & "% CPU)")
+      #ifdef UseVBO
+        WindowTitle( _
+          "P:" & g_uDrawParts & " B:" & g_uDrawBoxes & " H:" & _
+          g_tModelArrays.lPieceCount-(g_uDrawParts+g_uDrawBoxes) & " of " & _
+          g_tModelArrays.lPieceCount & _
+          " - Fps: " & cint(dAccGL) & "/" & cint(iFps/dElapsed) & _
+          " (" & cint(dAccCPU) & "% CPU)")
+      #else
+        WindowTitle( _          
+          " Fps: " & cint(dAccGL) & "/" & cint(iFps/dElapsed) & _
+          " (" & cint(dAccCPU) & "% CPU)")
+      #endif
       iFps=0 : dAccCPU=0 : dAccGL=0
     else
       'if g_Vsync=0 then SleepEx(1,1)

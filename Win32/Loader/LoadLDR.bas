@@ -19,14 +19,12 @@
 '#define DebugLoading
 #define IgnoreMissingDependencies
 
-const cScale = 1'/20
-
 #include once "Include\Structs.bas"
 #include once "Include\PartPaths.bas"
 
 'dim shared as string g_sLog
 dim shared as string g_sFilenames,g_sFilesToLoad
-dim shared as long g_ModelCount , g_LoadQuality = 1 'normal
+dim shared as long g_ModelCount , g_LoadQuality = 2 'normal
 redim shared as ModelList g_tModels(0)
 
 g_sFilenames = chr(0)
@@ -36,9 +34,45 @@ g_sFilesToLoad = chr(0)
   #define GiveUp(_N) sleep: end (_N)
 #endif
 
+'#define MyAlloc(_N) malloc(_N)
+'#define MyRealloc(_P,_N) iif(_P,realloc(_P,_N),malloc(_N))
+'#define MyDealloc(_P) free(_P)
+
+static shared as any ptr g_hHeapModel , g_hHeapShadow , g_hHeapVertex , g_hHeapIndex , g_hHeapData , g_hHeapTemp
+g_hHeapModel  = HeapCreate( HEAP_GENERATE_EXCEPTIONS , 1024*1024*16 , 0 )
+g_hHeapShadow = HeapCreate( HEAP_GENERATE_EXCEPTIONS , 1024*1024*1  , 0 )
+g_hHeapVertex = HeapCreate( HEAP_GENERATE_EXCEPTIONS , 1024*1024*64 , 0 )
+g_hHeapIndex  = HeapCreate( HEAP_GENERATE_EXCEPTIONS , 1024*1024*32 , 0 )
+g_hHeapData   = HeapCreate( HEAP_GENERATE_EXCEPTIONS , 1024*1024*1 , 0 )
+g_hHeapTemp   = HeapCreate( HEAP_GENERATE_EXCEPTIONS , 1024*1024*16 , 0 )
+
+#define MyAllocModel(_N) HeapAlloc( g_hHeapModel , HEAP_ZERO_MEMORY , _N  )
+#define MyReallocModel(_P,_N) iif(_P,HeapReAlloc( g_hHeapModel ,HEAP_ZERO_MEMORY,_P,_N),MyAllocModel(_N))
+#define MyDeallocModel(_P) HeapFree( g_hHeapModel , 0 , _P )
+
+#define MyAllocShadow(_N) HeapAlloc( g_hHeapShadow , HEAP_ZERO_MEMORY , _N  )
+#define MyReallocShadow(_P,_N) iif(_P,HeapReAlloc( g_hHeapShadow ,HEAP_ZERO_MEMORY,_P,_N),MyAllocShadow(_N))
+#define MyDeallocShadow(_P) HeapFree( g_hHeapShadow , 0 , _P )
+
+#define MyAllocVertex(_N) HeapAlloc( g_hHeapVertex , HEAP_ZERO_MEMORY , _N  )
+#define MyReallocVertex(_P,_N) iif(_P,HeapReAlloc( g_hHeapVertex ,HEAP_ZERO_MEMORY,_P,_N),MyAllocVertex(_N))
+#define MyDeallocVertex(_P) HeapFree( g_hHeapVertex , 0 , _P )
+
+#define MyAllocIndex(_N) HeapAlloc( g_hHeapIndex , HEAP_ZERO_MEMORY , _N  )
+#define MyReallocIndex(_P,_N) iif(_P,HeapReAlloc( g_hHeapIndex ,HEAP_ZERO_MEMORY,_P,_N),MyAllocIndex(_N))
+#define MyDeallocIndex(_P) HeapFree( g_hHeapIndex , 0 , _P )
+
+#define MyAllocData(_N) HeapAlloc( g_hHeapData , HEAP_ZERO_MEMORY , _N  )
+#define MyReallocData(_P,_N) iif(_P,HeapReAlloc( g_hHeapData ,HEAP_ZERO_MEMORY,_P,_N),MyAllocData(_N))
+#define MyDeallocData(_P) HeapFree( g_hHeapData , 0 , _P )
+
+#define MyAllocTemp(_N) HeapAlloc( g_hHeapTemp , HEAP_ZERO_MEMORY , _N  )
+#define MyReallocTemp(_P,_N) iif(_P,HeapReAlloc( g_hHeapTemp ,HEAP_ZERO_MEMORY,_P,_N),MyAllocTemp(_N))
+#define MyDeallocTemp(_P) HeapFree( g_hHeapTemp , 0 , _P )
+
 #include "Modules\ParserFunctions.bas"
 
-function LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long = 0) as boolean
+function LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as long = 0) as boolean  
    
    #macro CheckError(_s , _separator... )
       #if len( #_separator )
@@ -157,7 +191,7 @@ function LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as 
                ReadLine( pFile , sType )
                dim as string sName,sParms
                pPart->iShadowCount += 1
-               dim as ShadowStruct ptr pNew = realloc( pPart->paShadow ,  sizeof(ShadowStruct)*pPart->iShadowCount )
+               dim as ShadowStruct ptr pNew = MyReallocShadow( pPart->paShadow ,  sizeof(ShadowStruct)*pPart->iShadowCount )
                if pNew = 0 then
                   iResu=-1
                   CheckError("Out of memory")
@@ -319,7 +353,7 @@ function LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as 
                #endif
                dim as string sName,sParms
                pPart->iShadowCount += 1
-               dim as ShadowStruct ptr pNew = realloc( pPart->paShadow ,  sizeof(ShadowStruct)*pPart->iShadowCount )
+               dim as ShadowStruct ptr pNew = MyReallocShadow( pPart->paShadow ,  sizeof(ShadowStruct)*pPart->iShadowCount )
                if pNew = 0 then
                   iResu=-1
                   CheckError("Out of memory")
@@ -635,14 +669,20 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
    'puts "load model: '" & sFilename & "'"
          
    do
-      if iLastPart > iLimitParts then 'allocate more entries if necessary
-         iLimitParts += 4096 'we increase the allocation every N parts         
-         var pNew = cptr(DATFile ptr , reallocate( pT , PartsToBytes(iLimitParts+1) ))
+      if iLastPart > iLimitParts then 'all0cate more entries if necessary
+         iLimitParts += 4096 'we increase the all0cation every N parts         
+         'if iLimitParts > 4095 then puts("too many parts? " & iLimitParts )
+         var iAllocSz = PartsToBytes((iLimitParts)+1)         
+         
+         'var iMax = HeapCompact( g_hHeap , 0 )
+         'printf(!"pT=%p Sz=%ikb Max=%ikb\n",pT,cuint(iAllocSz\1024),cuint(iMax\1024))
+         
+         var pNew = cptr(DATFile ptr , MyReallocModel( pT , iAllocSz ))
          if pNew=NULL then 
-            puts "Failed to allocate memory to load file"
+            printf(!"Failed to allocate %1.1fmb of memory to load file\n",iAllocSz/(1024*1024))
             iFailed = 1 : exit do 'gives up
          end if
-         if pT=NULL then 'first allocation
+         if pT=NULL then 'first all0cation
             pT = pNew            
             clear *pNew , 0 , offsetof( DATFile , tParts(0) )
             'add to list
@@ -926,13 +966,13 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
    'clean-up
    if iFailed then 'clean-up in case of faillure
       puts("Faillure?"):GiveUp(1)
-      if pT then deallocate(pT): pT=NULL 'deallocate previous buffer
+      if pT then MyDeallocModel(pT): pT=NULL 'deall0cate previous buffer
    else         
       'print sFilename,iLastPart
       g_tModels(iModelIndex).pModel = pT
       g_tModels(iModelIndex).iFilenameOffset = iFilenameOffset
       pT->iPartCount = iLastPart
-      pT = reallocate( pT , PartsToBytes(pT->iPartCount) )
+      pT = MyReallocModel( pT , PartsToBytes(pT->iPartCount) )
       iTotalLines += iLineNum : iTotalParts += pT->iPartCount
       if RecursionLevel=0 then 'finished loading everything         
          'print "Files List: "+g _sFilenames
@@ -1015,11 +1055,11 @@ sub FreeModel( byref pPart as DATFile ptr )
          end if         
          .iFilenameOffset = - 1 : .pModel = 0
       end with      
-      if .paShadow then deallocate(.paShadow) : .paShadow = 0      
-      if .pData    then deallocate(.pData)    : .pData    = 0   
+      if .paShadow then MyDeallocShadow(.paShadow) : .paShadow = 0      
+      if .pData    then MyDeallocData(.pData)      : .pData    = 0   
       .iModelIndex = -1
    end with   
-   Deallocate( pPart ) : pPart = NULL   
+   MyDeallocModel( pPart ) : pPart = NULL   
 end sub   
 
 #define EOL !"\n"

@@ -57,8 +57,13 @@ function GetPartName( pPart as DATFile ptr ) as string
 end function
 
 #ifndef __NoRender
-  sub RenderModel( pPart as DATFile ptr , iBorders as long , uCurrentColor as ulong = &h70605040 , lDrawPart as long = -1 , uCurrentEdge as ulong = 0 DebugPrimParm )
+  sub RenderModel( pPart as DATFile ptr , bFlags as long , uCurrentColor as ulong = &h70605040 , lDrawPart as long = -1 , uCurrentEdge as ulong = 0 DebugPrimParm )
      if uCurrentColor = &h70605040 then uCurrentColor = g_Colours(c_Blue) : uCurrentEdge = g_EdgeColours(c_Blue)
+     
+     'const bRoot=1 , bNewPart=2 , bPart=4 , bColorSet=16 
+     const bInverted=8 , bBorders=32
+     
+     #define iBorders (bFlags and bBorders)
      
      var uEdge = uCurrentEdge
      static as integer iOnce
@@ -74,7 +79,9 @@ end function
                  'printf sIdent+"(" & .bType & ") Color=" & .wColour & " (Current=" & hex(uCurrentColor,8) & ")"
                  'sle ep
               #endif
-                          
+              
+              var bNeedInvert = iif(bFlags and bInverted,.bCCW=0,.bCCW) 
+              var bFlags2 = bFlags              
               if .wColour = c_Main_Colour then 'inherit
                  uColor = uCurrentColor ': uEdge = uCurrentEdge
               elseif .wColour <> c_Edge_Colour then
@@ -103,9 +110,18 @@ end function
                  'uEdge = rgb(rnd*255,rnd*255,rnd*255)
                  uEdge = ((uColor and &hFEFEFE) shr 1) or (uColor and &hFF000000)
                  'g_EdgeColours(.wColour)
+                 
+                 if .bInvert then bFlags2 xor= bInverted
                  var T1 = ._1
                  with T1
                     if bDoDraw then
+                      
+                      dim as single det = _
+                        .fA * (.fE * .fI - .fH * .fF) - _
+                        .fB * (.fD * .fI - .fG * .fF) + _
+                        .fC * (.fD * .fH - .fG * .fE)
+                      if det < 0 then bFlags2 xor= bInverted
+                      
                        var pSubPart = g_tModels(.lModelIndex).pModel
                        var sName = *cptr(zstring ptr,strptr(g_sFilenames)+g_tModels(.lModelIndex).iFilenameOffset+6)
                                             
@@ -122,10 +138,10 @@ end function
                        'MultiplyMatrixVector( @.fX ) 
                     
                        dim as single fMatrix(15) = { _
-                         .fA*cScale , .fD*cScale , .fG*cScale , 0 , _ 'X scale ,    ?    ,    ?    
-                         .fB*cScale , .fE*cScale , .fH*cScale , 0 , _ '  ?     , Y Scale ,    ?    
-                         .fC*cScale , .fF*cScale , .fI*cScale , 0 , _ '  ?     ,    ?    , Z Scale 
-                         .fX*cScale , .fY*cScale , .fZ*cScale , 1 }   ' X Pos  ,  Y Pos  ,  Z Pos  
+                         .fA , .fD , .fG , 0 , _ 'X scale ,    ?    ,    ?    
+                         .fB , .fE , .fH , 0 , _ '  ?     , Y Scale ,    ?    
+                         .fC , .fF , .fI , 0 , _ '  ?     ,    ?    , Z Scale 
+                         .fX , .fY , .fZ , 1 }   ' X Pos  ,  Y Pos  ,  Z Pos  
                        
                        'if sName = "axle.dat" then fMatrix(4) *= 2
                        PushAndMultMatrix( @fMatrix(0) )
@@ -140,7 +156,7 @@ end function
                        end if
                        #endif
                        
-                       RenderModel( pSubPart , iBorders , uColor , iif(lDrawPart=-2,-2,-1) , uEdge DebugPrimIdent )
+                       RenderModel( pSubPart , bFlags2 , uColor , iif(lDrawPart=-2,-2,-1) , uEdge DebugPrimIdent )
                        PopMatrix()
                     end if                  
                  end with               
@@ -169,13 +185,20 @@ end function
                     end if
                                       
                     glBegin GL_LINES                  
-                    glVertex3f .fX1*cScale , .FY1*cScale , .fZ1*cScale
-                    glVertex3f .fX2*cScale , .FY2*cScale , .fZ2*cScale
+                    glVertex3f .fX1 , .FY1 , .fZ1
+                    glVertex3f .fX2 , .FY2 , .fZ2
                     glEnd
                  end with
               case 3
                  if iBorders orelse bDoDraw=0 then continue for
-                 var T3 = ._3               
+                 var T3 = ._3
+                 
+                 if bNeedInvert then
+                  swap T3.fX2 , T3.fX3
+                  swap T3.fY2 , T3.fY3
+                  swap T3.fZ2 , T3.fZ3
+                end if
+                 
                  MultiplyMatrixVector( @T3.fX1 ) 
                  MultiplyMatrixVector( @T3.fX2 )
                  MultiplyMatrixVector( @T3.fX3 )
@@ -192,16 +215,23 @@ end function
                                                                           
                     glBegin GL_TRIANGLES                  
                     'glNormal3f( rnd , rnd , rnd )
-                    glVertex3f .fX1*cScale , .FY1*cScale , .fZ1*cScale 
+                    glVertex3f .fX1 , .FY1 , .fZ1 
                     'glNormal3f( rnd , rnd , rnd )
-                    glVertex3f .fX2*cScale , .FY2*cScale , .fZ2*cScale
+                    glVertex3f .fX2 , .FY2 , .fZ2
                     'glNormal3f( rnd , rnd , rnd )
-                    glVertex3f .fX3*cScale, .FY3*cScale , .fZ3*cScale 
+                    glVertex3f .fX3, .FY3 , .fZ3 
                     glEnd
                  end with
               case 4               
                  if iBorders orelse bDoDraw=0 then continue for
-                 var T4 = ._4               
+                 var T4 = ._4   
+                                  
+                if bNeedInvert then
+                  swap T4.fX2 , T4.fX4
+                  swap T4.fY2 , T4.fY4
+                  swap T4.fZ2 , T4.fZ4
+                end if
+                 
                  MultiplyMatrixVector( @T4.fX1 ) 
                  MultiplyMatrixVector( @T4.fX2 )
                  MultiplyMatrixVector( @T4.fX3 )
@@ -219,10 +249,10 @@ end function
                     
                     glColor4ubv( cast(ubyte ptr,@uColor) )                  
                     glBegin GL_QUADS
-                    glVertex3f .fX1*cScale , .FY1*cScale , .fZ1*cScale 
-                    glVertex3f .fX2*cScale , .FY2*cScale , .fZ2*cScale
-                    glVertex3f .fX3*cScale , .FY3*cScale , .fZ3*cScale 
-                    glVertex3f .fX4*cScale , .FY4*cScale , .fZ4*cScale
+                    glVertex3f .fX1 , .FY1 , .fZ1 
+                    glVertex3f .fX2 , .FY2 , .fZ2
+                    glVertex3f .fX3 , .FY3 , .fZ3 
+                    glVertex3f .fX4 , .FY4 , .fZ4
                     glEnd
                  end with
               case 5
@@ -371,10 +401,10 @@ end function
                          'MultiplyMatrixVector( @.fX ) 
                       
                          dim as single fMatrix(15) = { _
-                           .fA*cScale , .fD*cScale , .fG*cScale , 0 , _ 'X scale ,    ?    ,    ?    
-                           .fB*cScale , .fE*cScale , .fH*cScale , 0 , _ '  ?     , Y Scale ,    ?    
-                           .fC*cScale , .fF*cScale , .fI*cScale , 0 , _ '  ?     ,    ?    , Z Scale 
-                           .fX*cScale , .fY*cScale , .fZ*cScale , 1 }   ' X Pos  ,  Y Pos  ,  Z Pos  
+                           .fA , .fD , .fG , 0 , _ 'X scale ,    ?    ,    ?    
+                           .fB , .fE , .fH , 0 , _ '  ?     , Y Scale ,    ?    
+                           .fC , .fF , .fI , 0 , _ '  ?     ,    ?    , Z Scale 
+                           .fX , .fY , .fZ , 1 }   ' X Pos  ,  Y Pos  ,  Z Pos  
                          
                          'if sName = "axle.dat" then fMatrix(4) *= 2
                          PushAndMultMatrix( @fMatrix(0) )
@@ -409,8 +439,8 @@ end function
                       #endif
                       
                       aVertex(lCurPos).uColor = ((uEdge shr iif(lDrawPart=-2,2,0)) and &hFF000000) or (uEdge and &hFFFFFF)                                                      
-                      aVertex(lCurPos  ).tPos    = type(.fX1*cScale,.fY1*cScale,.fZ1*cScale)
-                      aVertex(lCurPos+1).tPos    = type(.fX2*cScale,.fY2*cScale,.fZ2*cScale)
+                      aVertex(lCurPos  ).tPos    = type(.fX1,.fY1,.fZ1)
+                      aVertex(lCurPos+1).tPos    = type(.fX2,.fY2,.fZ2)
                       aVertex(lCurPos+1).tNormal = aVertex(lCurPos).tNormal
                       aVertex(lCurPos+1).uColor  = aVertex(lCurPos).uColor
                       
@@ -433,11 +463,11 @@ end function
                       #endif
                       
                       aVertex(lCurPos).uColor = uColor
-                      aVertex(lCurPos  ).tPos    = type(.fX1*cScale,.fY1*cScale,.fZ1*cScale)
-                      aVertex(lCurPos+1).tPos    = type(.fX2*cScale,.fY2*cScale,.fZ2*cScale)
+                      aVertex(lCurPos  ).tPos    = type(.fX1,.fY1,.fZ1)
+                      aVertex(lCurPos+1).tPos    = type(.fX2,.fY2,.fZ2)
                       aVertex(lCurPos+1).tNormal = aVertex(lCurPos).tNormal
                       aVertex(lCurPos+1).uColor  = aVertex(lCurPos).uColor                  
-                      aVertex(lCurPos+2).tPos    = type(.fX3*cScale,.fY3*cScale,.fZ3*cScale)
+                      aVertex(lCurPos+2).tPos    = type(.fX3,.fY3,.fZ3)
                       aVertex(lCurPos+2).tNormal = aVertex(lCurPos).tNormal
                       aVertex(lCurPos+2).uColor  = aVertex(lCurPos).uColor                  
                       
@@ -464,20 +494,20 @@ end function
                       #endif
                       
                       aVertex(lCurPos  ).uColor = uColor
-                      aVertex(lCurPos  ).tPos    = type(.fX1*cScale,.fY1*cScale,.fZ1*cScale)
-                      aVertex(lCurPos+1).tPos    = type(.fX2*cScale,.fY2*cScale,.fZ2*cScale)
+                      aVertex(lCurPos  ).tPos    = type(.fX1,.fY1,.fZ1)
+                      aVertex(lCurPos+1).tPos    = type(.fX2,.fY2,.fZ2)
                       aVertex(lCurPos+1).tNormal = aVertex(lCurPos).tNormal
                       aVertex(lCurPos+1).uColor  = aVertex(lCurPos).uColor                  
-                      aVertex(lCurPos+2).tPos    = type(.fX3*cScale,.fY3*cScale,.fZ3*cScale)
+                      aVertex(lCurPos+2).tPos    = type(.fX3,.fY3,.fZ3)
                       aVertex(lCurPos+2).tNormal = aVertex(lCurPos).tNormal
                       aVertex(lCurPos+2).uColor  = aVertex(lCurPos).uColor                  
-                      aVertex(lCurPos+3).tPos    = type(.fX1*cScale,.fY1*cScale,.fZ1*cScale)                  
+                      aVertex(lCurPos+3).tPos    = type(.fX1,.fY1,.fZ1)                  
                       aVertex(lCurPos+3).tNormal = aVertex(lCurPos).tNormal
                       aVertex(lCurPos+3).uColor  = aVertex(lCurPos).uColor                  
-                      aVertex(lCurPos+4).tPos    = type(.fX3*cScale,.fY3*cScale,.fZ3*cScale)
+                      aVertex(lCurPos+4).tPos    = type(.fX3,.fY3,.fZ3)
                       aVertex(lCurPos+4).tNormal = aVertex(lCurPos).tNormal
                       aVertex(lCurPos+4).uColor  = aVertex(lCurPos).uColor                  
-                      aVertex(lCurPos+5).tPos    = type(.fX4*cScale,.fY4*cScale,.fZ4*cScale)
+                      aVertex(lCurPos+5).tPos    = type(.fX4,.fY4,.fZ4)
                       aVertex(lCurPos+5).tNormal = aVertex(lCurPos).tNormal
                       aVertex(lCurPos+5).uColor  = aVertex(lCurPos).uColor                  
                       
@@ -597,11 +627,11 @@ end function
       end with      
       if (bFlags and bRoot) then
         with tDraw      
-          #define Init( _Member ) .p##_Member##Vtx = iif(.l##_Member##Cnt,malloc(.l##_Member##cnt * sizeof(typeof(*.p##_Member##Vtx))),NULL)
+          #define Init( _Member ) .p##_Member##Vtx = iif(.l##_Member##Cnt,MyAllocVertex(.l##_Member##cnt * sizeof(typeof(*.p##_Member##Vtx))),NULL)
           .lCubemapCnt = .lPieceCount*36 '6 faces * 2 triangles * 3 vertices
           Init( Triangle ) : Init( Cubemap )  : Init( Border )
           Init( ColorTri ) : Init( TrColTri ) : Init( ColorBrd )      
-          .pPieces  = iif( .lPieceCount , malloc( sizeof(typeof(*.pPieces)) * (.lPieceCount) ) , NULL )
+          .pPieces  = iif( .lPieceCount , MyAllocIndex( sizeof(typeof(*.pPieces)) * (.lPieceCount) ) , NULL )
         end with
       end if    
       return true
@@ -665,7 +695,7 @@ end function
         for N as long = 0 to .iPartCount-1
           dim as ulong uColor = any
           with .tParts(N)
-            var wColour = .wColour , bNeedInvert = iif(bFlags and bInverted,.bCCW=0,.bCCW)            
+            var wColour = .wColour , bNeedInvert = iif(bFlags and bInverted,.bCCW=0,.bCCW)
             var bFlags2 = bFlags          
             if (.bType=2 orelse .bType=5) then
               uColor = uCurrentColor 'rem nothing
@@ -701,7 +731,7 @@ end function
                   .fA * (.fE * .fI - .fH * .fF) - _
                   .fB * (.fD * .fI - .fG * .fF) + _
                   .fC * (.fD * .fH - .fG * .fE)
-                if det < 0 then bFlags2 xor= bInverted                  
+                if det < 0 then bFlags2 xor= bInverted
                 
                 'printf(!"Including inv=%i det=%1.1f '%s'\n",bInv,det , _
                 '*cptr(zstring ptr,strptr(g_sFilenames)+g_tModels(.lModelIndex).iFilenameOffset+6) )
@@ -716,10 +746,10 @@ end function
                 #endif                             
                 'MultiplyMatrixVector( @.fX )
                 dim as single fMatrix(15) = { _
-                 .fA*cScale , .fD*cScale , .fG*cScale , 0 , _ 'X scale ,    ?    ,    ?    
-                 .fB*cScale , .fE*cScale , .fH*cScale , 0 , _ '  ?     , Y Scale ,    ?    
-                 .fC*cScale , .fF*cScale , .fI*cScale , 0 , _ '  ?     ,    ?    , Z Scale 
-                 .fX*cScale , .fY*cScale , .fZ*cScale , 1 }   ' X Pos  ,  Y Pos  ,  Z Pos  
+                 .fA , .fD , .fG , 0 , _ 'X scale ,    ?    ,    ?    
+                 .fB , .fE , .fH , 0 , _ '  ?     , Y Scale ,    ?    
+                 .fC , .fF , .fI , 0 , _ '  ?     ,    ?    , Z Scale 
+                 .fX , .fY , .fZ , 1 }   ' X Pos  ,  Y Pos  ,  Z Pos  
                 'if sName = "axle.dat" then fMatrix(4) *= 2
                 PushAndMultMatrix( @fMatrix(0) )                
                 
@@ -743,16 +773,16 @@ end function
                 
                 if wColour = c_Edge_Colour then 'andalso (bFlags2 and bColorSet)=0 then
                   var pVtx = tDraw.pBorderVtx+tDraw.lBorderCnt : tDraw.lBorderCnt += 2
-                  pVtx[0].tPos    = type(.fX1*cScale,.fY1*cScale,.fZ1*cScale)              
+                  pVtx[0].tPos    = type(.fX1,.fY1,.fZ1)              
                   pVtx[0].tNormal = tNormal
-                  pVtx[1].tPos    = type(.fX2*cScale,.fY2*cScale,.fZ2*cScale)
+                  pVtx[1].tPos    = type(.fX2,.fY2,.fZ2)
                   pVtx[1].tNormal = pVtx[0].tNormal              
                 else
                   var pVtx = tDraw.pColorBrdVtx+tDraw.lColorBrdCnt : tDraw.lColorBrdCnt += 2                                        
-                  pVtx[0].tPos    = type(.fX1*cScale,.fY1*cScale,.fZ1*cScale)
+                  pVtx[0].tPos    = type(.fX1,.fY1,.fZ1)
                   pVtx[0].tNormal = tNormal
                   pVtx[0].uColor = uEdge or &hFF000000 '((uEdge shr 2) and &hFF000000) or (uEdge and &hFFFFFF)
-                  pVtx[1].tPos    = type(.fX2*cScale,.fY2*cScale,.fZ2*cScale)
+                  pVtx[1].tPos    = type(.fX2,.fY2,.fZ2)
                   pVtx[1].tNormal = tNormal
                   pVtx[1].uColor  = pVtx[0].uColor
                 end if
@@ -785,21 +815,21 @@ end function
                 #endif            
                 if wColour = c_Main_Colour then 'if (bFlags2 and bColorSet)=0 then
                   var pVtx = tDraw.pTriangleVtx+tDraw.lTriangleCnt : tDraw.lTriangleCnt += 3
-                  pVtx[0].tPos    = type(.fX1*cScale,.fY1*cScale,.fZ1*cScale)
+                  pVtx[0].tPos    = type(.fX1,.fY1,.fZ1)
                   pVtx[0].tNormal = tNormal              
-                  pVtx[1].tPos    = type(.fX2*cScale,.fY2*cScale,.fZ2*cScale)
+                  pVtx[1].tPos    = type(.fX2,.fY2,.fZ2)
                   pVtx[1].tNormal = tNormal              
-                  pVtx[2].tPos    = type(.fX3*cScale,.fY3*cScale,.fZ3*cScale)
+                  pVtx[2].tPos    = type(.fX3,.fY3,.fZ3)
                   pVtx[2].tNormal = tNormal              
                 else
                   var pVtx = tDraw.pColorTriVtx+tDraw.lColorTriCnt : tDraw.lColorTriCnt += 3              
-                  pVtx[0].tPos    = type(.fX1*cScale,.fY1*cScale,.fZ1*cScale)
+                  pVtx[0].tPos    = type(.fX1,.fY1,.fZ1)
                   pVtx[0].tNormal = tNormal
                   pVtx[0].uColor  = uColor
-                  pVtx[1].tPos    = type(.fX2*cScale,.fY2*cScale,.fZ2*cScale)
+                  pVtx[1].tPos    = type(.fX2,.fY2,.fZ2)
                   pVtx[1].tNormal = tNormal
                   pVtx[1].uColor  = uColor
-                  pVtx[2].tPos    = type(.fX3*cScale,.fY3*cScale,.fZ3*cScale)
+                  pVtx[2].tPos    = type(.fX3,.fY3,.fZ3)
                   pVtx[2].tNormal = tNormal
                   pVtx[2].uColor  = uColor
                 end if            
@@ -839,36 +869,36 @@ end function
                 
                 if wColour = c_Main_Colour then 'if (bFlags2 and bColorSet)=0 then
                   var pVtx = tDraw.pTriangleVtx+tDraw.lTriangleCnt : tDraw.lTriangleCnt += 6
-                  pVtx[0].tPos    = type(.fX1*cScale,.fY1*cScale,.fZ1*cScale)
+                  pVtx[0].tPos    = type(.fX1,.fY1,.fZ1)
                   pVtx[0].tNormal = tNormal
-                  pVtx[1].tPos    = type(.fX2*cScale,.fY2*cScale,.fZ2*cScale)
+                  pVtx[1].tPos    = type(.fX2,.fY2,.fZ2)
                   pVtx[1].tNormal = tNormal
-                  pVtx[2].tPos    = type(.fX3*cScale,.fY3*cScale,.fZ3*cScale)
+                  pVtx[2].tPos    = type(.fX3,.fY3,.fZ3)
                   pVtx[2].tNormal = tNormal
-                  pVtx[3].tPos    = type(.fX1*cScale,.fY1*cScale,.fZ1*cScale)
+                  pVtx[3].tPos    = type(.fX1,.fY1,.fZ1)
                   pVtx[3].tNormal = tNormal
-                  pVtx[4].tPos    = type(.fX3*cScale,.fY3*cScale,.fZ3*cScale)
+                  pVtx[4].tPos    = type(.fX3,.fY3,.fZ3)
                   pVtx[4].tNormal = tNormal
-                  pVtx[5].tPos    = type(.fX4*cScale,.fY4*cScale,.fZ4*cScale)
+                  pVtx[5].tPos    = type(.fX4,.fY4,.fZ4)
                   pVtx[5].tNormal = tNormal              
                 else
                   var pVtx = tDraw.pColorTriVtx+tDraw.lColorTriCnt : tDraw.lColorTriCnt += 6
                   pVtx[0].uColor  = uColor
-                  pVtx[0].tPos    = type(.fX1*cScale,.fY1*cScale,.fZ1*cScale)
+                  pVtx[0].tPos    = type(.fX1,.fY1,.fZ1)
                   pVtx[0].tNormal = tNormal
-                  pVtx[1].tPos    = type(.fX2*cScale,.fY2*cScale,.fZ2*cScale)
+                  pVtx[1].tPos    = type(.fX2,.fY2,.fZ2)
                   pVtx[1].tNormal = tNormal
                   pVtx[1].uColor  = uColor
-                  pVtx[2].tPos    = type(.fX3*cScale,.fY3*cScale,.fZ3*cScale)
+                  pVtx[2].tPos    = type(.fX3,.fY3,.fZ3)
                   pVtx[2].tNormal = tNormal
                   pVtx[2].uColor  = uColor
-                  pVtx[3].tPos    = type(.fX1*cScale,.fY1*cScale,.fZ1*cScale)
+                  pVtx[3].tPos    = type(.fX1,.fY1,.fZ1)
                   pVtx[3].tNormal = tNormal
                   pVtx[3].uColor  = uColor
-                  pVtx[4].tPos    = type(.fX3*cScale,.fY3*cScale,.fZ3*cScale)
+                  pVtx[4].tPos    = type(.fX3,.fY3,.fZ3)
                   pVtx[4].tNormal = tNormal
                   pVtx[4].uColor  = uColor
-                  pVtx[5].tPos    = type(.fX4*cScale,.fY4*cScale,.fZ4*cScale)
+                  pVtx[5].tPos    = type(.fX4,.fY4,.fZ4)
                   pVtx[5].tNormal = tNormal
                   pVtx[5].uColor  = uColor
                 end if
@@ -1062,16 +1092,17 @@ end function
           redim iAvg(.p##_Group##Vtx-1) as long
           
           'allocate indexes for this group of vertex
-          .p##_Group##Idx = malloc( .l##_Group##Cnt*sizeof(long) )
+          .p##_Group##Idx = MyAllocIndex( .l##_Group##Cnt*sizeof(long) )
           #if #_Group2 <> ""
-          .p##_Group2##Idx = malloc( .l##_Group2##Cnt*sizeof(long) )
+          .p##_Group2##Idx = MyAllocIndex( .l##_Group2##Cnt*sizeof(long) )
           #endif
           var iUnique=0 , pVtxOut = .p##_Group##Vtx
           var pVtxBase = .p##_Group##Vtx , pVtxIdx =  .p##_Group##Idx
           for I as long = 0 to .l##_Group##Cnt-1
             if (I and 65535)=0 then printf(!"%i%%\r",(I*100)\.l##_Group##Cnt)
             var pPos = @(pVtxBase[I].tPos) , pNormal = @(pVtxBase[I].tNormal)
-            var iIdx = (( pPos->fX*pPos->fX + pPos->fY*pPos->fY + pPos->fZ*pPos->fZ )\4) and cVtxMask
+            var iSum = ( pPos->fX*pPos->fX + pPos->fY*pPos->fY + pPos->fZ*pPos->fZ )
+            var iIdx = cint(iSum*17) and cVtxMask
             'is there a vertice near this cluster?
             for K as long  = -1 to 1
               var iIdx2 = ((iIdx+K) and cVtxMask)
@@ -1079,10 +1110,10 @@ end function
                 var pP = @(pVtxBase[pIndex(iIdx2)[N]].tPos) , pN = @(pVtxBase[pIndex(iIdx2)[N]].tNormal)
                 #define SumVtx(_Var,_V) (abs(_Var->fX-_V->fX)+abs(_Var->fY-_V->fY)+abs(_Var->fZ-_V->fZ))
                 #if _AverageNormals
-                if (SumVtx(pPos,pP)) < 1/100 then
+                if (SumVtx(pPos,pP)) < 1/256 then
                 #else
                 'if (SumVtx(pPos,pP)+SumVtx(pNormal,pN)) < 1/100 then
-                if SumVtx(pPos,pP)<1/100 andalso dot_productV(*pNormal,*pN)>1/10 then
+                if SumVtx(pPos,pP) < 1/256 andalso dot_productV(*pNormal,*pN)>1/10 then
                 #endif
                   'average normals and set index
                   iAvg(pIndex(iIdx2)[N]) += 1
@@ -1097,7 +1128,7 @@ end function
             'no? then add a new vertex, but do we need to reallocate the cluster?
             var pIdx = pIndex(iIdx)
             if (iIDxCtx(iIdx) and (cAllocGranularity-1)) = 0 then 
-              pIdx = realloc( pIdx , (iIDxCtx(iIdx)+cAllocGranularity)*sizeof(long) ) 
+              pIdx = MyReallocTemp( pIdx , (iIDxCtx(iIdx)+cAllocGranularity)*sizeof(long) ) 
               pIndex(iIdx) = pIdx                    
             end if
             iAvg(iUnique)=1            
@@ -1131,7 +1162,7 @@ end function
               'no? then add a new vertex, but do we need to reallocate the cluster?
               var pIdx = pIndex(iIdx)
               if (iIDxCtx(iIdx) and (cAllocGranularity-1)) = 0 then 
-                pIdx = realloc( pIdx , (iIDxCtx(iIdx)+cAllocGranularity)*sizeof(long) ) : pIndex(iIdx) = pIdx                    
+                pIdx = MyReallocTemp( pIdx , (iIDxCtx(iIdx)+cAllocGranularity)*sizeof(long) ) : pIndex(iIdx) = pIdx                    
               end if              
               pIdx[ iIDxCtx(iIdx) ] = iUnique+iUnique2 : iIdxCtx(iIdx) += 1
               pVtxIdx[I]=iUnique+iUnique2 : pVtxBase[iUnique+iUnique2] = pVtxBase2[I]
@@ -1142,7 +1173,7 @@ end function
           for I as long = 0 to cVtxMask
             if iIdxCtx(I) then
               'printf("%i ",iIdxCtx(I))
-              free( pIndex(I) ) : pIndex(I) = 0
+              MyDeallocTemp( pIndex(I) ) : pIndex(I) = 0
             end if
           next I 
           
@@ -1160,11 +1191,11 @@ end function
           
           .l##_Group##IdxCnt = .l##_Group##Cnt : .l##_Group##Cnt = iUnique          
           #if #_Group2 <> ""
-            .p##_Group##Vtx = realloc( .p##_Group##Vtx , (iUnique+iUnique2)*sizeof(*.p##_Group##Vtx) )
+            .p##_Group##Vtx = MyReallocVertex( .p##_Group##Vtx , (iUnique+iUnique2)*sizeof(*.p##_Group##Vtx) )
             .l##_Group2##IdxCnt = .l##_Group2##Cnt : .l##_Group##Cnt += iUnique2
-            free( .p##_Group2##Vtx ) : .p##_Group2##Vtx = 0 : .l##_Group2##Cnt=iUnique2            
+            MyDeallocVertex( .p##_Group2##Vtx ) : .p##_Group2##Vtx = 0 : .l##_Group2##Cnt=iUnique2            
           #else
-            .p##_Group##Vtx = realloc( .p##_Group##Vtx , iUnique*sizeof(*.p##_Group##Vtx) )            
+            .p##_Group##Vtx = MyReallocVertex( .p##_Group##Vtx , iUnique*sizeof(*.p##_Group##Vtx) )            
           #endif
           
           #if _AverageNormals
@@ -1226,10 +1257,10 @@ sub SizeModel( pPart as DATFile ptr , tSize as PartSize , iPartWanted as long = 
                   var pSubPart = g_tModels(.lModelIndex).pModel
                   var sName = *cptr(zstring ptr,strptr(g_sFilenames)+g_tModels(.lModelIndex).iFilenameOffset+6)
                   dim as single fMatrix(15) = { _
-                    .fA*cScale , .fD*cScale , .fG*cScale , 0 , _
-                    .fB*cScale , .fE*cScale , .fH*cScale , 0 , _
-                    .fC*cScale , .fF*cScale , .fI*cScale , 0 , _
-                    .fX*cScale , .fY*cScale , .fZ*cScale , 1 }                                      
+                    .fA , .fD , .fG , 0 , _
+                    .fB , .fE , .fH , 0 , _
+                    .fC , .fF , .fI , 0 , _
+                    .fX , .fY , .fZ , 1 }                                      
                   PushAndMultMatrix( @fMatrix(0) )                   
                   
                   #if 0
@@ -1369,10 +1400,10 @@ sub CheckCollisionModel( pPart as DATFile ptr , atCollision() as PartCollisionBo
                   var pSubPart = g_tModels(.lModelIndex).pModel
                   'var sName = *cptr(zstring ptr,strptr(g_sFilenames)+g_tModels(.lModelIndex).iFilenameOffset+6)                  
                   dim as single fMatrix(15) = { _
-                    .fA*cScale , .fD*cScale , .fG*cScale , 0 , _
-                    .fB*cScale , .fE*cScale , .fH*cScale , 0 , _
-                    .fC*cScale , .fF*cScale , .fI*cScale , 0 , _
-                    .fX*cScale , .fY*cScale , .fZ*cScale , 1 }
+                    .fA , .fD , .fG , 0 , _
+                    .fB , .fE , .fH , 0 , _
+                    .fC , .fF , .fI , 0 , _
+                    .fX , .fY , .fZ , 1 }
                   PushAndMultMatrix( @fMatrix(0) )
                   'TODO maybe i can keep using SizeModel here right? is there any advantage?
                   'SizeModel( pSubPart , atCollision() , pRoot )
@@ -1484,7 +1515,7 @@ sub SnapAddStud( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) )
    with tSnap      
       for N as long = 0 to iCnt-1
         .lStudCnt += 1
-        .pStud = reallocate(.pStud,sizeof(tPV)*.lStudCnt)
+        .pStud = MyReallocData(.pStud,sizeof(tPV)*.lStudCnt)
         .pStud[.lStudCnt-1] = tPV        
       next N
    end with
@@ -1493,7 +1524,7 @@ sub SnapAddClutch( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) 
    with tSnap
       for N as long = 0 to iCnt-1
         .lClutchCnt += 1
-        .pClutch = reallocate(.pClutch,sizeof(tPV)*.lClutchCnt)
+        .pClutch = MyReallocData(.pClutch,sizeof(tPV)*.lClutchCnt)
         .pClutch[.lClutchCnt-1] = tPV        
       next N
    end with

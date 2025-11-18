@@ -185,7 +185,7 @@ sub ResizeOpengGL( ScrWid as long , ScrHei as long )
    glViewport 0, 0, ScrWid, ScrHei                  '' Reset The Current Viewport
    glMatrixMode GL_PROJECTION                       '' Select The Projection Matrix
    glLoadIdentity                                   '' Reset The Projection Matrix
-   gluPerspective 45.0, ScrWid/ScrHei, 1, 1000.0*cScale   '' Calculate The Aspect Ratio Of The Window
+   gluPerspective 45.0, ScrWid/ScrHei, 1, 1000.0    '' Calculate The Aspect Ratio Of The Window
    glMatrixMode GL_MODELVIEW                        '' Select The Modelview Matrix
 end sub
 
@@ -251,7 +251,8 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    
    
    'glPolygonMode( GL_FRONT_AND_BACK , GL_LINE )
-   glPolygonMode( GL_BACK , GL_LINE )
+   'glPolygonMode( GL_BACK , GL_LINE )
+   
    'GL_POINT, GL_LINE, and GL_FILL.
    'glEnable( GL_CULL_FACE )
    glDisable( GL_CULL_FACE )
@@ -272,13 +273,18 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
     '// Ambient light (soft background lighting)
     dim as GLfloat ambientLight(...) = {0.01f, 0.01f, 0.01f, 1.0f}';  // Low-intensity white ambient light
     glLightfv(GL_LIGHT0, GL_AMBIENT, @ambientLight(0))
-
+    
+    '#ifdef UseVBO
+      dim as GLfloat diffuseLight(...) = {1.0f/20, 1.0f/20, 1.0f/20, 1f}';  // Bright white diffuse light
+      dim as GLfloat specularLight(...) = {1.0f/20, 1.0f/20, 1.0f/20, 1f}'; // White specular light
+    '#else
+    '  dim as GLfloat diffuseLight(...) = {1.0f, 1.0f, 1.0f, 1f}';  // Bright white diffuse light
+    '  dim as GLfloat specularLight(...) = {1.0f, 1.0f, 1.0, 1f}'; // White specular light
+    '#endif
+    
     '// Diffuse light (main light that affects the surface)
-    dim as GLfloat diffuseLight(...) = {1.0f/20, 1.0f/20, 1.0f/20, 1f}';  // Bright white diffuse light
     glLightfv(GL_LIGHT0, GL_DIFFUSE, @diffuseLight(0))
-
-    '// Specular light (shiny reflections)
-    dim as GLfloat specularLight(...) = {1.0f/20, 1.0f/20, 1.0f/20, 1f}'; // White specular light
+    '// Specular light (shiny reflections)    
     glLightfv(GL_LIGHT0, GL_SPECULAR, @specularLight(0))
     
     glEnable(GL_COLOR_MATERIAL)
