@@ -260,8 +260,8 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    'glFrontFace( GL_CW ): glCullFace( GL_FRONT )
    glFrontFace( GL_CW ): glCullFace( GL_BACK )
       
-   'glEnable(GL_POLYGON_OFFSET_FILL)
-   'glPolygonOffset(1.0, 1/-20)
+   glEnable(GL_POLYGON_OFFSET_FILL)
+   glPolygonOffset(1.0, 1/-20)
    
    '============== light initialization ==============
     glEnable(GL_LIGHTING)

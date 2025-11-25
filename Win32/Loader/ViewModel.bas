@@ -1,5 +1,5 @@
 #define __Main "ViewModel.bas"
-#cmdline "-gen gcc -fpu sse -O 3 -Wc '-Ofast -march=native' -Wl '--large-address-aware'"
+'#cmdline "-gen gcc -fpu sse -O 3 -Wc '-Ofast -march=native' -Wl '--large-address-aware'"
 
 #include "windows.bi"
 
@@ -253,11 +253,11 @@ scope
    'sFile = "C:\Users\greg\Desktop\LDCAD\examples\cube10x10x10.ldr"
    'sFile = "C:\Users\greg\Desktop\LS\TLG_Map\TrainStationEntranceA.ldr"
    'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map0\Build\Blocks\B1\Eldon Square.ldr"
-   'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\TestMap2.ldr"
+   sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\TestMap2.ldr"
    'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\Blocks\10232 - Palace Cinema.mpd"
    'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\Blocks\10255 - Assembly Square.mpd"
    'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\Blocks\8418_mini_loader.mpd"
-   sFile = "G:\Jogos\LegoScript-main\examples\TLG_Map\Precolored\player\player.ldr"
+   'sFile = "G:\Jogos\LegoScript-main\examples\TLG_Map\Precolored\player\player.ldr"
    'sFile = "G:\Jogos\LegoScript\examples\10294 - Titanic.mpd"
    'sFile = "C:\Users\greg\Desktop\LS\TLG_Map\FileA.ldr"
    'sFile = "light.dat"
@@ -340,7 +340,7 @@ dim shared as PartSnap tSnapID
 #ifdef UseVBO
 static shared as ModelDrawArrays g_tModelArrays
 static shared as GLuint iTriangleVBO,iColorTriVBO,iTrColTriVBO,iBorderVBO,iColorBrdVBO,iCubemapVBO
-static shared as GLuint iCubemapIdxVBO, iTriangleIdxVBO, iBorderIdxVBO
+'static shared as GLuint iCubemapIdxVBO, iBorderIdxVBO, iTriangleIdxVBO
 static shared as long g_uDrawParts , g_uDrawBoxes
 #else
 static shared as long g_iModels , g_iBorders
@@ -684,6 +684,18 @@ do
   dLoadTIme = timer
   #ifdef UseVBO           
     GenModelDrawArrays( g_pModel , g_tModelArrays )
+    #if 0
+      with g_tModelArrays
+        printf(!"My Pieces %i\n",.lPieceCount)
+        for I as long = 0 to .lPieceCount-1
+          with .pPieces[I]
+            var p = @.tMatrix
+            printf(!"#%i - %p %3i,%3i,%3i '%s'\n", _ 
+            I,.pModel,cint(p->fPosX),cint(p->fPosY),cint(p->fPosZ),GetPartName(.pModel))
+          end with
+        next I
+      end with
+    #endif
     #macro CreateVBO( _name )      
       with g_tModelArrays
         if .l##_name##Cnt then glGenBuffers(1 , @i##_name##VBO)
@@ -809,7 +821,7 @@ do
   'Get size of each piece (CheckCollisionModel is doing it right)
   'TODO: check what's wrong with SizeModel()
   '#define GenerateCubesWithIndexes 'broken :(
-  
+    
   #ifdef UseVBO
     with g_tModelArrays
       dim as long lUnique        
@@ -979,11 +991,9 @@ do
     glLoadIdentity()
     tCur = g_tIdentityMatrix
     
-    #ifdef UseVBO
-      Matrix4x4Scale( tCur , -1/20 , -1/20 , 1/20 )
-    #else
-      glScalef(-1/20, -1/20, 1/20 )
-      'Matrix4x4Scale( tCur , 1/-20 , 1.0/-20 , 1/20 )
+    Matrix4x4Scale( tCur , -1/20 , -1/20 , 1/20 )
+    #ifndef UseVBO
+      glScalef(-1/20, -1/20, 1/20 )      
     #endif
     
     
@@ -1033,6 +1043,10 @@ do
         fTargetX  , fTargetY  , fTargetZ  , _  ' Look Target (P + D)
         g_fUpX    , g_fUpY    , g_fUpZ      _  ' World Up Vector
       )
+      
+      #ifndef UseVBO
+      glLoadMatrixf( @tCur.m(0) )
+      #endif
       
       'glPushMatrix()
       RenderScenery()
@@ -1134,7 +1148,7 @@ do
         glTranslatef( -fPositionX , fPositionY , fPositionZ*(fZoom+4) ) '*(fZoom+4) ) '80*fZoom ) '/-5)
         ''glTranslatef( 0 , 0 , -80*(fZoom+4) )
         glRotatef fRotationX , 0   , -1.0 , 0
-        glRotatef fRotationY , -1.0 , 0.0 , 0
+        glRotatef fRotationY , 1.0 , 0.0 , 0
       #endif      
       
       RenderScenery()      

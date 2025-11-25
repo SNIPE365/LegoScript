@@ -129,15 +129,7 @@ private sub PrintCurrentMatrix()
    end with
 end sub
 
-#ifndef __NoRender
-#if 0
-private sub glLoadCurrentMatrix()
-   'with tMatrixStack(g_CurrentMatrix)
-   'glLoadMatrixf( @tMatrixStack(g_CurrentMatrix).m(0) )
-   glMultMatrixf( @tMatrixStack(g_CurrentMatrix).m(0) )   
-end sub
-#endif
-#endif
+#define glLoadCurrentMatrix() glLoadMatrixf( @tMatrixStack(g_CurrentMatrix).m(0) )
 
 private sub MultMatrix4x4WithVector3x3( byref tmOut as Matrix4x4 , tmIn as const Matrix4x4 , pIn as const single ptr )
    var pCur = cast(single ptr,@tmIn)               

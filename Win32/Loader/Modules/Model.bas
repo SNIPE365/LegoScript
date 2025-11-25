@@ -290,6 +290,7 @@ end function
   
   #ifdef UseVBO
     'simple VBO
+    #if 0
     function GetModelVertexCount( pPart as DATFile ptr , iBorders as long , lDrawPart as long = -1 , byref lCurPos as long = 0 ) as ulong
                         
        with *pPart
@@ -560,14 +561,23 @@ end function
        return lCurPos
        
     end function
+    #endif
     'Per PART (.dat) VBO
     function AllocateModelDrawArrays( pPart as DATFile ptr , tDraw as ModelDrawArrays , bFlags as byte = 1 ) as boolean
       const bRoot=1 , bNewPart=2 , bPart=4 , bInverted=8 , bColorSet=16
       with *pPart 'include: "andalso .bHasVBO=0"
-        if .bIsUnique andalso .bHasCNT=0 then .bHasCNT=1 : bFlags or= (bNewPart or bPart)
         
-        for N as long = 0 to .iPartCount-1
-          'if .bIsUnique then puts("-------------------------")
+        'if .bIsUnique then printf(!"Included=%i '%s'\n",(bFlags and bPart),GetPartName(pPart))
+        
+        'if a part is unique propagate it's addition to the VBO
+        if (bFlags and bPart)=0 andalso .bIsUnique then 
+          'don't need to process again if already processed
+          tDraw.lPieceCount += 1 : if .bGotAlloc then return true
+          bFlags or= (bNewPart or bPart) : .bGotAlloc=1 : tDraw.lUniquePieces += 1
+          'printf( !"--------------------- Unique: ['%s'] -------------------- \n",GetPartName(pPart) )
+        end if
+        
+        for N as long = 0 to .iPartCount-1          
           var bFlags2 = bFlags
           with .tParts(N)
             if (.bType=2 orelse .bType=5) then
@@ -577,8 +587,6 @@ end function
               if .wColour <> c_Main_Colour then bFlags2 or= bColorSet
               'printf("[%i]",cint(.wColour))
             end if
-            
-            
             select case .bType
             case 1 'include
               with ._1
@@ -618,12 +626,6 @@ end function
             end select
           end with
         next N
-        if .bIsUnique then
-          tDraw.lPieceCount += 1 
-          if (bFlags and bNewPart) then 
-            tDraw.lUniquePieces += 1 : bFlags and= (not (bNewPart or bPart))            
-          end if
-        end if    
       end with      
       if (bFlags and bRoot) then
         with tDraw      
@@ -638,7 +640,8 @@ end function
     end function
     function GenModelDrawArrays( pPart as DATFile ptr , tDraw as ModelDrawArrays, uCurrentColor as ulong = 0, uCurrentEdge as ulong = 0 , bFlags as byte = 1 ) as ulong
       const bRoot=1 , bNewPart=2 , bPart=4 , bInverted=8 , bColorSet=16
-      static as long _lTriangleCnt , _lColorTriCnt , _lBorderCnt , _lTransTriCnt , _lTrColTriCnt , _lColorBrdCnt , _lPieceCount
+      static as long _lTriangleCnt , _lColorTriCnt , _lBorderCnt , _lTransTriCnt 
+      static as long _lTrColTriCnt , _lColorBrdCnt , _lPieceCount
       
       if (bFlags and bRoot) then
         AllocateModelDrawArrays( pPart , tDraw )        
@@ -646,14 +649,12 @@ end function
           puts("Number of Pieces: " & .lPieceCount & " Unique: " & .lUniquePieces)        
           puts("Vtx Tri: " & .lTriangleCnt & " , Vtx CTri: " & .lColorTriCnt & _
           " , Vtx Brd: " & .lBorderCnt & " , Vtx CBrd: " & .lColorBrdCnt )
-            
           puts ((.lPieceCount*sizeof(DisplayPiece)+ _
             .lTriangleCnt*sizeof(VertexStructNoColor)+ _
             .lBorderCnt*sizeof(VertexStructNoColor) + _
             .lColorTriCnt*sizeof(VertexStruct)+ _
             .lColorBrdCnt*sizeof(VertexStruct) ) _
             +1023)\1024 & "kb"
-            
         end with
         with tDraw 'store temp counts and reset for re-count
           _lTriangleCnt = .lTriangleCnt : _lColorTriCnt = .lColorTriCnt 
@@ -670,25 +671,30 @@ end function
       var uEdge = uCurrentEdge  
              
       with *pPart    
-        'if it's a unique piece then start storing a new piece
-        if .bIsUnique then       
+        
+        if (bFlags and bPart)=0 andalso .bIsUnique then bFlags or= (bNewPart or bPart)
+        '  printf( !"--------------------- Unique: ['%s'] -------------------- \n",GetPartName(pPart) )
+        'end if
+        
+        'if it's a piece then start storing a new piece
+        if (bFlags and bNewPart) then       
           with tDraw.pPieces[tDraw.lPieceCount]        
             .pModel  = pPart
             .tMatrix = tCurrentMatrix()
             .lBaseColor = uCurrentColor
             .lBaseEdge  = uCurrentEdge
           end with
-          if .bHasCNT then
-            .bHasCNT = 0 : .bHasVBO = 1 : bFlags or= (bNewPart or bPart)
-            with .tVBO          
-              .lTriangleOff = tDraw.lTriangleCnt
-              .lColorTriOff = tDraw.lColorTriCnt
-              '.lTransTriOff = tDraw.lTransTriCnt 
-              .lTrColTriOff = tDraw.lTrColTriCnt 
-              .lBorderOff   = tDraw.lBorderCnt   
-              .lColorBrdOff = tDraw.lColorBrdCnt 
-            end with
-          end if
+          'if it's a unique (new part) then add it to the VBO
+          if .bGotAlloc=0 then tDraw.lPieceCount += 1 : return tDraw.lPieceCount
+          .bGotAlloc=0 : .bHasVBO = 1
+          with .tVBO          
+            .lTriangleOff = tDraw.lTriangleCnt
+            .lColorTriOff = tDraw.lColorTriCnt
+            '.lTransTriOff = tDraw.lTransTriCnt 
+            .lTrColTriOff = tDraw.lTrColTriCnt 
+            .lBorderOff   = tDraw.lBorderCnt   
+            .lColorBrdOff = tDraw.lColorBrdCnt 
+          end with
           PushIdentityMatrix()
         end if
         
@@ -751,8 +757,7 @@ end function
                  .fC , .fF , .fI , 0 , _ '  ?     ,    ?    , Z Scale 
                  .fX , .fY , .fZ , 1 }   ' X Pos  ,  Y Pos  ,  Z Pos  
                 'if sName = "axle.dat" then fMatrix(4) *= 2
-                PushAndMultMatrix( @fMatrix(0) )                
-                
+                PushAndMultMatrix( @fMatrix(0) )
                 'if (((bFlags and (bPart or bInverted)) xor bInv) and bInverted) then puts("include inverted!")
                 GenModelDrawArrays( pSubPart , tDraw, uColor , uEdge , bFlags2 )
                 PopMatrix()        
@@ -947,22 +952,19 @@ end function
             end select
           end with
         next N
-        
-        if .bIsUnique then
-          if (bFlags and bNewPart) then
-            bFlags and= (not (bNewPart or bPart))
-            with .tVBO
-              .lTriangleCnt = tDraw.lTriangleCnt-.lTriangleOff
-              .lColorTriCnt = tDraw.lColorTriCnt-.lColorTriOff
-              '.lTransTriCnt = tDraw.lTransTriCnt-.lTransTriOff
-              .lTrColTriCnt = tDraw.lTrColTriCnt-.lTrColTriOff
-              .lBorderCnt   = tDraw.lBorderCnt  -.lBorderOff
-              .lColorBrdCnt = tDraw.lBorderCnt  -.lColorBrdOff
-            end with
-          end if
-          PopMatrix()
+                
+        if (bFlags and bNewPart) then
+          with .tVBO
+            .lTriangleCnt = tDraw.lTriangleCnt-.lTriangleOff
+            .lColorTriCnt = tDraw.lColorTriCnt-.lColorTriOff
+            '.lTransTriCnt = tDraw.lTransTriCnt-.lTransTriOff
+            .lTrColTriCnt = tDraw.lTrColTriCnt-.lTrColTriOff
+            .lBorderCnt   = tDraw.lBorderCnt  -.lBorderOff
+            .lColorBrdCnt = tDraw.lBorderCnt  -.lColorBrdOff
+          end with
           tDraw.lPieceCount += 1
-        end if    
+          PopMatrix()
+        end if
         
       end with
       
