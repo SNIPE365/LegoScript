@@ -1,7 +1,7 @@
 '******************************************************************
 namespace Viewer
 
-   #define UseVBO
+   '#define UseVBO
 
    dim shared as byte g_LoadFile = 0
    dim shared as string g_sGfxFile , g_sFileName

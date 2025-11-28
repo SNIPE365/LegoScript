@@ -1,5 +1,5 @@
 #define __Main "ViewModel.bas"
-'#cmdline "-gen gcc -fpu sse -O 3 -Wc '-Ofast -march=native' -Wl '--large-address-aware'"
+#cmdline "-gen gcc -fpu sse -O 3 -Wc '-Ofast -march=native' -Wl '--large-address-aware'"
 
 #include "windows.bi"
 
@@ -231,40 +231,50 @@ scope
    'sFile = sPath+"\LDraw\parts\3461.dat"     'height should be 20 not 24, width and depth is fine (24 both on part/subparts)
 end scope
 scope
-   'sFile = sPath+"\LDraw\p\stud4.dat"
-   'sFile = sPath+"\LDraw\p\4-4edge.dat"
-   
-   'sFile = sPath+"LDraw\models\car.ldr"
-   'sFile = sPath+"\examples\5580.mpd"
-   'sFile = exePath+"\..\Collision.ldr"
-   
-   'sFile = sPath+"LDraw\digital-bricks.de parts not in LDRAW\12892.dat"
-   
-   'crashing due to fallback additions
-   '#include "CrashTest.bi"
-   'sFile = sPath+"LDraw\models\pyramid.ldr"
-   'sFile = sPath+"\examples\8891-towTruck.mpd"
-   'sFile = "C:\Users\greg\Desktop\LDCAD\examples\5510.mpd"
-   'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\examples\5510.mpd" '5521,5533,5540,5541,5542
-   'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\examples\5542.mpd" 
-   'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\examples\8851.mpd"
-   'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\LDraw\models\pyramid.ldr"
-   'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\LDraw\models\car.ldr"
-   'sFile = "C:\Users\greg\Desktop\LDCAD\examples\cube10x10x10.ldr"
-   'sFile = "C:\Users\greg\Desktop\LS\TLG_Map\TrainStationEntranceA.ldr"
-   'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map0\Build\Blocks\B1\Eldon Square.ldr"
-   sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\TestMap2.ldr"
-   'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\Blocks\10232 - Palace Cinema.mpd"
-   'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\Blocks\10255 - Assembly Square.mpd"
-   'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\Blocks\8418_mini_loader.mpd"
-   'sFile = "G:\Jogos\LegoScript-main\examples\TLG_Map\Precolored\player\player.ldr"
-   'sFile = "G:\Jogos\LegoScript\examples\10294 - Titanic.mpd"
-   'sFile = "C:\Users\greg\Desktop\LS\TLG_Map\FileA.ldr"
-   'sFile = "light.dat"
-   'sFile = "3001.dat" 
-   'sFile = "F:\10294 - Titanic.mpd"
-   'sFile = "4070.dat" '4070 , 87087 , 26604 , 47905 , 4733 , 30414
-   'sFile = "G:\Jogos\LegoScript-main\examples\cube\cube.ldr"
+ 'sFile = sPath+"\LDraw\p\stud4.dat"
+ 'sFile = sPath+"\LDraw\p\4-4edge.dat"
+ 
+ 'sFile = sPath+"LDraw\models\car.ldr"
+ 'sFile = sPath+"\examples\5580.mpd"
+ 'sFile = exePath+"\..\Collision.ldr"
+ 
+ 'sFile = sPath+"LDraw\digital-bricks.de parts not in LDRAW\12892.dat"
+ 
+ 'crashing due to fallback additions
+ '#include "CrashTest.bi"
+ 'sFile = sPath+"LDraw\models\pyramid.ldr"
+ 'sFile = sPath+"\examples\8891-towTruck.mpd"
+ 'sFile = "C:\Users\greg\Desktop\LDCAD\examples\5510.mpd"
+ 'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\examples\5510.mpd" '5521,5533,5540,5541,5542
+ 'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\examples\5542.mpd" 
+ 'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\examples\8851.mpd"
+ 'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\LDraw\models\pyramid.ldr"
+ 'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\LDraw\models\car.ldr"
+ 'sFile = "C:\Users\greg\Desktop\LDCAD\examples\cube10x10x10.ldr"
+ 'sFile = "C:\Users\greg\Desktop\LS\TLG_Map\TrainStationEntranceA.ldr"
+ 'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map0\Build\Blocks\B1\Eldon Square.ldr"   
+ 'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\TestMap2.ldr"
+ 'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\Blocks\10190-1 Market Street.ldr"   
+ 'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\Blocks\10232 - Palace Cinema.mpd"
+ 'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\Blocks\10255 - Assembly Square.mpd"
+ 'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\Blocks\8418_mini_loader.mpd"
+ 'sFile = "G:\Jogos\LegoScript-main\examples\TLG_Map\Precolored\player\player.ldr"
+ 'sFile = "G:\Jogos\LegoScript\examples\10294 - Titanic.mpd"
+ 'sFile = "C:\Users\greg\Desktop\LS\TLG_Map\FileA.ldr"
+ 'sFile = "light.dat"
+ 'sFile = "3001.dat"
+ 'sFile = "F:\10294 - Titanic.mpd"
+ 'sFile = "4070.dat" '4070 , 87087 , 26604 , 47905 , 4733 , 30414
+ 'sFile = "G:\Jogos\LegoScript-main\examples\cube\cube.ldr"
+ 
+  #if 0 ' >>> FOR TEXTURES >>>
+    sFile = "39266p03.dat"
+    0 !TEXMAP START PLANAR -50 0 10 50 0 10 -50 48 10 39266p02.png
+    0 !: 4 16 50 0 -10 -50 0 -10 -50 48 -10 50 48 -10
+    0 !TEXMAP FALLBACK
+    4 16 50 0 -10 -50 0 -10 -50 48 -10 50 48 -10
+  #endif
+  
 end scope
 scope 
    #if 0
@@ -340,7 +350,7 @@ dim shared as PartSnap tSnapID
 #ifdef UseVBO
 static shared as ModelDrawArrays g_tModelArrays
 static shared as GLuint iTriangleVBO,iColorTriVBO,iTrColTriVBO,iBorderVBO,iColorBrdVBO,iCubemapVBO
-'static shared as GLuint iCubemapIdxVBO, iBorderIdxVBO, iTriangleIdxVBO
+static shared as GLuint iCubemapIdxVBO, iBorderIdxVBO, iTriangleIdxVBO
 static shared as long g_uDrawParts , g_uDrawBoxes
 #else
 static shared as long g_iModels , g_iBorders
@@ -632,12 +642,14 @@ do
                 if sModel[N]=13 then sModel[N]=32
              next N
           else 'if there isnt a model in the clipboard, then load this:
+             sModel = _    
+             "1 2 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 39266p03.dat" EOL
+             
              'sModel = _    
              '"1 2 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 NotFound.dat" EOL _
-             sModel = _
-             "1 1 -50.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 3818.dat" EOL _ '91405
-             _ '"0 BFC INVERTNEXT" EOL _
-             "1 1 50.000000 0.000000 0.000000  1 0 0 0 1 0 0 0 1 3819.dat" EOL '3818 / 3819
+             'sModel = _
+             '"1 1 -50.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 3818.dat" EOL _ '91405
+             '"1 1 50.000000 0.000000 0.000000  1 0 0 0 1 0 0 0 1 3819.dat" EOL '3818 / 3819
              
              ' ------------------------------------------------------
              'sModel = _ 'all of lines belo should end with EOL _

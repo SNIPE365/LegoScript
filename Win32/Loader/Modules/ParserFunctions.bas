@@ -5,113 +5,114 @@
 static shared as double g_TotalLoadFileTime
 
 function ReadHex( pFile as ubyte ptr , byref iInt as long ) as long
-   dim as long iResu = 0, iRead, iHasDigits=0   
-   do      
-      select case pFile[iRead]
-      case asc("0") to asc("9")      'add a digit to the number
-         iResu=iResu*16+(pFile[iRead]-asc("0"))
-         iHasDigits = 1
-      case asc("a") to asc("f")
-         iResu=iResu*16+(pFile[iRead]-asc("a")+10)
-         iHasDigits = 1
-      case asc("A") to asc("F")
-         iResu=iResu*16+(pFile[iRead]-asc("A")+10)
-         iHasDigits = 1
-      case asc(" "),9                'skip spaces/tab
-         if iHasDigits then exit do
-      case asc(!"\r")               'skip the \r in case EOL is \r\n
-         rem nothing to do here
-      case asc(!"\n"),0  'if it's EOL/EOF then we assume it was read 0
-         iHasDigits = 1 : exit do      
-      case else
-         exit do
-      end select 
-      iRead += 1
-   loop   
-   'we're done processing digits, but did we read a number at all?
-   if iHasDigits=0 then iInt=pFile[iRead] : return -1
-   iInt = iResu
-   return iRead
+  dim as long iResu = 0, iRead, iHasDigits=0   
+  do      
+    select case pFile[iRead]
+    case asc("0") to asc("9")      'add a digit to the number
+      iResu=iResu*16+(pFile[iRead]-asc("0"))
+      iHasDigits = 1
+    case asc("a") to asc("f")
+      iResu=iResu*16+(pFile[iRead]-asc("a")+10)
+      iHasDigits = 1
+    case asc("A") to asc("F")
+      iResu=iResu*16+(pFile[iRead]-asc("A")+10)
+      iHasDigits = 1
+    case asc(" "),9                'skip spaces/tab
+      if iHasDigits then exit do
+    case asc(!"\r")               'skip the \r in case EOL is \r\n
+      rem nothing to do here
+    case asc(!"\n"),0  'if it's EOL/EOF then we assume it was read 0
+      iHasDigits = 1 : exit do      
+    case else
+      exit do
+    end select 
+    iRead += 1
+  loop   
+  'we're done processing digits, but did we read a number at all?
+  if iHasDigits=0 then iInt=pFile[iRead] : return -1
+  iInt = iResu
+  return iRead
 end function
 function ReadInt( pFile as ubyte ptr , byref iInt as long ) as long
-   dim as long iResu = 0, iRead, iHasDigits=0, iSign=1   
-   do
-      select case pFile[iRead]
-      case asc("0") to asc("9")      'add a digit to the number
-         iResu=iResu*10+(pFile[iRead]-asc("0"))
-         iHasDigits = 1
-      case asc(" "),9                'skip spaces/tab
-         if iHasDigits then exit do
-      case asc(!"\r")               'skip the \r in case EOL is \r\n
-         rem nothing to do here
-      case asc(!"\n"),0  'if it's EOL/EOF then we assume it was read 0
-         iHasDigits = 1 : exit do
-      case asc("-")
-         if iSign=1 andalso iHasDigits=0 then iSign=-1 else exit do
-      case asc("x"),asc("X")
-         if iHasDigits andalso iResu=0 andalso iSign=1 then 
-            iResu = ReadHex( pFile+iRead+1 , iInt )            
-            if iResu <> 7 orelse (iInt shr 24)<>2 then return -1 'failed to read hex colour
-            return iResu+iRead+1
-         end if
-         exit do
-      case else
-         exit do
-      end select 
-      iRead += 1
-   loop   
-   'we're done processing digits, but did we read a number at all?
-   if iHasDigits=0 then iInt=pFile[iRead] : return -1
-   iInt = iResu*iSign
-   return iRead
+  dim as long iResu = 0, iRead, iHasDigits=0, iSign=1   
+  do
+    select case pFile[iRead]
+    case asc("0") to asc("9")      'add a digit to the number
+      iResu=iResu*10+(pFile[iRead]-asc("0"))
+      iHasDigits = 1
+    case asc(" "),9                'skip spaces/tab
+      if iHasDigits then exit do
+    case asc(!"\r")               'skip the \r in case EOL is \r\n
+      rem nothing to do here
+    case asc(!"\n"),0  'if it's EOL/EOF then we assume it was read 0
+      iHasDigits = 1 : exit do
+    case asc("-")
+      if iSign=1 andalso iHasDigits=0 then iSign=-1 else exit do
+    case asc("x"),asc("X")
+      if iHasDigits andalso iResu=0 andalso iSign=1 then 
+        iResu = ReadHex( pFile+iRead+1 , iInt )            
+        if iResu <> 7 orelse (iInt shr 24)<>2 then return -1 'failed to read hex colour
+        return iResu+iRead+1
+      end if
+      exit do
+    case else
+      exit do
+    end select 
+    iRead += 1
+  loop   
+  'we're done processing digits, but did we read a number at all?
+  if iHasDigits=0 then iInt=pFile[iRead] : return -1
+  iInt = iResu*iSign
+  return iRead
 end function
 function ReadFloat( pFile as ubyte ptr , byref fFloat as single ) as long
-   dim as long iResu=0,iDecimal=0,iDecMask=1,iRead, iHasDigits=0,iHasDot,iSign=1   
-   do
-      select case pFile[iRead]
-      case asc("0") to asc("9")      'add a digit to the number
-         if iHasDot=0 then            
-            iResu=iResu*10+(pFile[iRead]-asc("0"))
-         else
-            iDecimal=iDecimal*10+(pFile[iRead]-asc("0"))
-            iDecMask *= 10
-         end if
-         iHasDigits = 1         
-      case asc(" "),9                'skip spaces/tab
-         if iHasDigits then exit do
-      case asc(!"\r")               'skip the \r in case EOL is \r\n
-         rem nothing to do here
-      case asc(!"\n"),0  'if it's EOL/EOF then we assume it was read 0         
-         iHasDigits = 1 : exit do      
-      case asc(".")         
-         if iHasDot then exit do
-         iHasDot=1 : iHasDigits=1                  
-      case asc("-")         
-         if iSign=1 andalso iHasDigits=0 then iSign=-1 else exit do
-      case asc("E"),asc("e") 'scientific notation
-         iRead += 1
-         dim as long iExpoent = any, iExtra = any
-         iExtra = ReadInt( pFile+iRead , iExpoent )
-         if iExtra < 0 then return -1
-         var fTemp = iResu*iSign+iDecimal/iDecMask
-         if iExpoent < 0 then 'negative expoent
-            while iExpoent <= -5 : fTemp = fTemp/100000 : iExpoent += 5 : wend   
-            for N as long = 1 to -iExpoent : fTemp = fTemp/10 : next N
-         else 'positive expoent
-            while iExpoent >= 5 : fTemp = fTemp*100000 : iExpoent -= 5 : wend   
-            for N as long = 1 to iExpoent : fTemp = fTemp*10 : next N
-         end if
-         fFloat = fTemp
-         return iRead+iExtra
-      case else
-         exit do
-      end select 
+  dim as long iResu=0,iDecimal=0,iDecMask=1,iRead, iHasDigits=0,iHasDot,iSign=1   
+  do
+    select case pFile[iRead]
+    case asc("0") to asc("9")      'add a digit to the number
+      if iHasDot=0 then            
+        iResu=iResu*10+(pFile[iRead]-asc("0"))
+      else
+        if iDecimal < 100000000 then
+          iDecimal=iDecimal*10+(pFile[iRead]-asc("0"))
+          iDecMask *= 10
+        end if
+      end if    
+      iHasDigits = 1         
+    case asc(" "),9                'skip spaces/tab
+      if iHasDigits then exit do
+    case asc(!"\r")               'skip the \r in case EOL is \r\n
+      rem nothing to do here
+    case asc(!"\n"),0  'if it's EOL/EOF then we assume it was read 0         
+      iHasDigits = 1 : exit do      
+    case asc(".")         
+      if iHasDot then exit do
+      iHasDot=1 : iHasDigits=1                  
+    case asc("-")         
+      if iSign=1 andalso iHasDigits=0 then iSign=-1 else exit do
+    case asc("E"),asc("e") 'scientific notation
       iRead += 1
-   loop   
-   'we're done processing digits, but did we read a number at all?
-   if iHasDigits=0 then fFloat=pFile[iRead] : return -1   
-   fFloat = (iResu+iDecimal/iDecMask)*iSign
-   return iRead
+      dim as long iExpoent = any, iExtra = any
+      iExtra = ReadInt( pFile+iRead , iExpoent )
+      if iExtra < 0 then return -1
+      var fTemp = iResu*iSign+iDecimal/iDecMask      
+      if iExpoent < 0 then 'negative expoent
+        while iExpoent <= -5 : fTemp = fTemp/100000 : iExpoent += 5 : wend   
+        for N as long = 1 to -iExpoent : fTemp = fTemp/10 : next N
+      else 'positive expoent
+        while iExpoent >= 5 : fTemp = fTemp*100000 : iExpoent -= 5 : wend   
+        for N as long = 1 to iExpoent : fTemp = fTemp*10 : next N
+      end if      
+      return iRead+iExtra
+    case else
+      exit do
+    end select 
+    iRead += 1
+  loop   
+  'we're done processing digits, but did we read a number at all?
+  if iHasDigits=0 then fFloat=pFile[iRead] : return -1   
+  fFloat = (iResu+iDecimal/iDecMask)*iSign
+  return iRead
 end function
 #define ReadLine ReadFilename
 function ReadFilename( pFile as ubyte ptr , byref sString as string ) as long

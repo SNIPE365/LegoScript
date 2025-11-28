@@ -1091,7 +1091,7 @@ end function
           const cVtxMask = 65536-1 , cAllocGranularity = 32
           
           redim pIndex(cVtxMask) as long ptr , iIdxCtx(cVtxMask) as long
-          redim iAvg(.p##_Group##Vtx-1) as long
+          redim iAvg(.l##_Group##Cnt-1) as long
           
           'allocate indexes for this group of vertex
           .p##_Group##Idx = MyAllocIndex( .l##_Group##Cnt*sizeof(long) )
@@ -1214,9 +1214,10 @@ end function
         
       end sub
     #endmacro
-    GenerateFunction( CubeMap  , 1 )    
+    
+    GenerateFunction( CubeMap  , 0 )
     GenerateFunction( Triangle , 0 , Border )    
-    GenerateFunction( Triangle , 0 )    
+    'GenerateFunction( Triangle , 0 )    
     'GenerateFunction( Border   , 1 )
   #endif
 
