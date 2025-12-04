@@ -15,14 +15,14 @@
 '#define __Tester
 
 '#define DebugShadow
-'#define DebugShadowConnectors
+#define DebugShadowConnectors
 
 '#define ColorizePrimatives
-'#define RenderOptionals
+'#define RenderOptionals //broken
 '#define DebugLoading
 '#define PrimitiveWarnings
 
-#define UseVBO
+'#define UseVBO
 
 '#ifndef __NoRender
 
@@ -263,6 +263,8 @@ scope
  'sFile = "C:\Users\greg\Desktop\LS\TLG_Map\FileA.ldr"
  'sFile = "light.dat"
  'sFile = "3001.dat"
+ 'sFile = "60483.dat"
+ sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\ldraw\parts\s\60483s01.dat"
  'sFile = "F:\10294 - Titanic.mpd"
  'sFile = "4070.dat" '4070 , 87087 , 26604 , 47905 , 4733 , 30414
  'sFile = "G:\Jogos\LegoScript-main\examples\cube\cube.ldr"
@@ -460,7 +462,11 @@ sub RenderOverlay()
   
   glPushAttrib(GL_ENABLE_BIT)
   glDisable( GL_CULL_FACE )
+  'glDisable( GL_DEPTH_TEST )
   
+  'glLoadMatrixf( @tCur.m(0) )
+  
+  dim as PartSnap tSnap
   #ifdef DebugShadow
     dim as PartSnap tSnap
     static as byte bOnce   
@@ -473,9 +479,8 @@ sub RenderOverlay()
   #endif      
   #if 0
     glEnable( GL_POLYGON_STIPPLE )        
-    'SnapModel( g_pModel , tSnap )
-    
-    #if 0 
+    'SnapModel( g_pModel , tSnap )    
+    #if 0
        glPushMatrix()
        glTranslatef( 10 , -2f , 0 ) '/-5)
        glRotatef( 90 , 1,0,0 )
@@ -487,7 +492,7 @@ sub RenderOverlay()
        glutSolidCube(6) 'male square (1,1,N)
        glPopMatrix()
     #endif
-    #if 0
+    #if 1
        glPushMatrix()
        glTranslatef( 10 , -2f , 0 )
        
@@ -504,8 +509,7 @@ sub RenderOverlay()
     
     glDisable( GL_POLYGON_STIPPLE )
   #endif      
-  
-  glLoadMatrixf( @tCur.m(0) )
+      
   
   glDepthMask (GL_FALSE)
   if bBoundingBox then
@@ -578,7 +582,7 @@ sub RenderOverlay()
        glColor4f(1,0,0,1)
        for N as long = 0 to .lClutchCnt-1
           with .pClutch[N]
-             DrawConnectorName(0)
+             DrawConnectorName(-1)
           end with
        next N
     end with
@@ -643,7 +647,7 @@ do
              next N
           else 'if there isnt a model in the clipboard, then load this:
              sModel = _    
-             "1 2 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 39266p03.dat" EOL
+             "1 1 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 60483.dat" EOL '39266p03.dat 
              
              'sModel = _    
              '"1 2 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 NotFound.dat" EOL _
@@ -681,7 +685,8 @@ do
   printf(!"Processing time: %1.2f\n",dLoadTime-g_TotalLoadFileTime)
   'getchar()
     
-  if sEndsExt=".dat" then bEditMode = true   
+  if sEndsExt=".dat" then bEditMode = true : puts("Edit mode?")  
+  bEditMode = false
   if hGfxWnd=0 then
     hGfxWnd = InitOpenGL()
     if bLighting then glEnable( GL_LIGHTING ) else glDisable( GL_LIGHTING )
@@ -929,18 +934,19 @@ do
            SortSnap( tSnap )
            puts("---------- stud ----------")
            for N as long = 0 to .lStudCnt-1
-              with .pStud[N]
-                 printf(!"#%i %g %g %g\n",N+1,.fPX,.fPY,.fPZ)
+              with .pStud[N].tPos
+                 printf(!"#%i %g %g %g\n",N+1,.x,.y,.z)
               end with
            next N
            puts("--------- clutch ---------")
            for N as long = 0 to .lClutchCnt-1
-              with .pClutch[N]
-                 printf(!"#%i %g %g %g\n",N+1,.fPX,.fPY,.fPZ)
+              with .pClutch[N].tPos
+                 printf(!"#%i %g %g %g\n",N+1,.x,.y,.z)
               end with
            next N
         end with
      next I
+     'while len(inkey)=0: flip : wend
   end scope
   #endif
 
@@ -1060,9 +1066,10 @@ do
       glLoadMatrixf( @tCur.m(0) )
       #endif
       
-      'glPushMatrix()
+      glPushMatrix()
       RenderScenery()
-      'glPopMatrix()
+      glPopMatrix()
+      RenderOverlay()      
       
       Dim e as fb.EVENT = any
       dim as boolean bSkipMouse = not g_bFocus
@@ -1164,7 +1171,7 @@ do
       #endif      
       
       RenderScenery()      
-      'RenderOverlay()
+      RenderOverlay()
       
       dim e as fb.EVENT = any
       while (ScreenEvent(@e))

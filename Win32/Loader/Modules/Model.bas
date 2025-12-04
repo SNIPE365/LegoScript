@@ -1492,6 +1492,7 @@ end sub
 #endif
 
 #ifndef Vector3
+#print "alternate vector3"
 type Vector3
     as single x, y, z
 end type
