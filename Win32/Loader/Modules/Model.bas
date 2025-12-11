@@ -1704,7 +1704,7 @@ end sub
 
 #endif
 
-sub SortSnap( tSnap as PartSnap )   
+sub SortSnap( tSnap as PartSnap )
    #macro SortLogic( _ConnName )
       do
          var bDidSort = 0
@@ -2237,11 +2237,10 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                   puts("sit_Include")
                   #endif
                   iIdent += 2
-               case sit_Cylinder
+               case sit_Cylinder 'SNAP_CL
                   static as zstring ptr pzCaps(...)={@"none",@"one",@"two",@"A",@"B"}
                   if iPrevRec>.bRecurse then iIdent -= 2
                   iPrevRec=.bRecurse '4
-
                   dim as Matrix3x3 tMatOri = any
                                     
                   scope
@@ -2458,9 +2457,9 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                         if .bFlagSlide then 'PINHOLE / AXLEHOLE / BARHOLE
                            'if iConCnt > 1 then puts("!!!!! GRID PINHOLE FOUND !!!!!")
                            'bConType = spPinHole
-                           var iMaybePins = 0
+                           var iMaybePins = 0, bSecCnt = .bSecCnt
                            dim as byte bDidAxleHole,bDidClutch,bDidBarHole
-                           for I as long = 0 to .bSecCnt-1                              
+                           for I as long = 0 to bSecCnt-1                              
                               if .tSecs(I).bLength*((pMat->fScaleY)) = 1 then
                                  #ifndef __Tester
                                  puts("Length 1 section ignored")
@@ -2491,7 +2490,41 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                               case sss_Round                                 
                                  select case .tSecs(I).wFixRadius
                                  case 800: bSecs -= 1 '???? (anti-stopper??)
-                                 case 600: iMaybePins += 1 
+                                 case 600
+                                   '{SNAP_CYL} - <[id=connhole] [gender=F] [caps=none] [secs=R 8 2   R 6 16   R 8 2] [center=true] [slide=true]>
+                                   'iMaybePins += 1 
+                                   if bDidClutch=0 then
+                                      bDidClutch=1 : bSecs -= 1
+                                      printf(!"Clutch += %i (round)\n",iConCnt)
+                                      var fLen = .tSecs(I).bLength/bSides
+                                      var fExt1 = iif(I>0,.tSecs(I-1).bLength,0)
+                                      var fExt2 = iif((bSecCnt-1)>I,.tSecs(I+1).bLength,0)
+                                      with *pMat
+                                        dim as Vector3 tV = Vector3_Transform( type<Vector3>(0,fLen+fExt1,0) , tMatOri )
+                                        dim as SnapPV tPV = type(fPX+.fPosX+tV.X , fPY+.fPosY+tV.Y , fPZ+.fPosZ+tV.Z)
+                                        printf("~" & tSnap.lClutchCnt & "~ ")
+                                        'if tSnap.lClutchCnt then
+                                        '  puts(">>> Identity")
+                                        '  tPV.tOriMat = g_tIdentityMatrix3x3
+                                        'else
+                                        '  puts(">>> transformed")
+                                          tPV.tOriMat = tMatori
+                                        'end if
+                                        SnapAddClutch( tSnap , 1 , tPV ) '//this one works!
+                                        #if 1
+                                        if bSides=2 then
+                                          const fPI180 = atn(1)/45                                          
+                                          dim as Vector3 tV = Vector3_Transform( type<Vector3>(0,-(fLen+fExt2),0) , tMatOri )
+                                          dim as SnapPV tPV = type(fPX+.fPosX+tV.X , fPY+.fPosY+tV.Y , fPZ+.fPosZ+tV.Z)
+                                          tPV.tOriMat = tMatori
+                                          MultMatrix3x3( tPV.tOriMat , tMatOri , Mat3_RotZ(fPI180*180) )
+                                          SnapAddClutch( tSnap , 1 , tPV ) 'iConCnt
+                                        end if
+                                        #endif
+                                      end with
+                                   end if
+                                   
+                                   
                                  case 400                                    
                                     DbgConnect(!"BarHole += %i (Round slide)\n",iConCnt*bSides)                                    
                                     if bDidBarHole=0 then bDidBarHole=1 '': tSnap.lBarHoleCnt += iConCnt*bSides 
@@ -2563,9 +2596,9 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                            with *pMat
                               'puts("Female: " & iFemale)
                               dim as SnapPV tPV = type(fPX+.fPosX , fPY+.fPosY , fPZ+.fPosZ) : tPV.tOriMat = tMatori
-                              SnapAddClutch( tSnap , iConCnt , tPV )
+                              'SnapAddClutch( tSnap , iConCnt , tPV )
                            end with
-                           DbgConnect(!"Clutch += %i (Fallback {ignored})\n",iConCnt)
+                           printf(!"Clutch += %i (Fallback {ignored})\n",iConCnt)
                            #ifndef __Tester
                            if iConCnt > 1 then printf(!"WARNING: %i clutches added as fallback {ignored}\n",iConCnt)
                            #endif

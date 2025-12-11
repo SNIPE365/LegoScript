@@ -241,8 +241,8 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
    glEnable(GL_TEXTURE_2D)
    
    glDisable(GL_LINE_SMOOTH)
-   'glEnable(GL_LINE_SMOOTH)
-   'glLineWidth(1.25)
+   glEnable(GL_LINE_SMOOTH)
+   glLineWidth(2.25)
       
    'glEnable(GL_POLYGON_SMOOTH)
    'glEnable(GL_MULTISAMPLE)

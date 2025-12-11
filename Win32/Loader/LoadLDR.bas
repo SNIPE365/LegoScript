@@ -1,5 +1,5 @@
 #ifndef __Main
-  #error " Don't compile this one"
+  #error " Don't compile this one"  
 #endif  
 
 'TODO (20/02/2025) - Create a free index list, so that holes in the array and string can be reused
@@ -14,7 +14,7 @@
 #define RGBA_B( c ) ( CUInt( c )        And 255 )
 #define RGBA_A( c ) ( CUInt( c ) Shr 24         )
 
-'#define __DebugShadowLoad
+#define __DebugShadowLoad
 '#define DebugPrimitive
 '#define DebugLoading
 #define IgnoreMissingDependencies
@@ -540,7 +540,7 @@ function LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as 
                      case asc("t"): pNew->bFlagCenter = true
                      case else
                         iResu = -1
-                        CheckError("Invalid Cender")
+                        CheckError("Invalid Center")
                      end select
                   case cvl("slide")  'T'rue or 'F'alse
                      select case sParms[0] or &h20
@@ -548,7 +548,7 @@ function LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as 
                      case asc("t"): pNew->bFlagSlide = true
                      case else
                         iResu = -1
-                        CheckError("Invalid Cender")
+                        CheckError("Invalid Center")
                      end select
                   case cvl("scale")  '"none" , "YOnly" , "ROnly" , "YandR" 
                      select case *cptr(ulong ptr,strptr(sParms)) or &h20202020 'lcase(sName)

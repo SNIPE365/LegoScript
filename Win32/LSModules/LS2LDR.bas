@@ -629,9 +629,11 @@ function LegoScriptToLDraw( _sScript as string , sErrWarn as string = "" , sMain
                            .tMatrix = g_tIdentityMatrix3x3                           
                            _fPX = .tOffPos.X : _fPY = .tOffPos.Y : _fPZ = .tOffPos.Z
                            ''printf(!"~~- %f %f %f\n",_fPX,_fPY,_fPZ)
+                           
                            if .tOffRot.X then Matrix3x3RotateX( .tMatrix , .tMatrix , .tOffRot.X )
                            if .tOffRot.Y then Matrix3x3RotateY( .tMatrix , .tMatrix , .tOffRot.Y )
                            if .tOffRot.Z then Matrix3x3RotateZ( .tMatrix , .tMatrix , .tOffRot.Z )
+                           
                            var pPos = @.tPositionQ
                            'MultMatrix3x3( .tMatrix , pLeftSnap->tOriMat , .tMatrix )
                            with .tMatrix
@@ -767,7 +769,7 @@ function LegoScriptToLDraw( _sScript as string , sErrWarn as string = "" , sMain
                      sleep : system
                   end if
                   
-                  MultMatrix3x3( .tMatrix , .tMatrix , tInvMat )
+                  'MultMatrix3x3( .tMatrix , .tMatrix , tInvMat )
                   MultMatrix3x3( .tMatrix , .tMatrix , pLeftSnap->tOriMat )
                   
                   tPos = Vector3_Transform( .tOffPos , .tMatrix )

@@ -1,5 +1,5 @@
 #define __Main "ViewModel.bas"
-#cmdline "-gen gcc -fpu sse -O 3 -Wc '-Ofast -march=native' -Wl '--large-address-aware'"
+'#cmdline "-gen gcc -fpu sse -O 3 -Wc '-Ofast -march=native' -Wl '--large-address-aware'"
 
 #include "windows.bi"
 
@@ -919,11 +919,12 @@ do
   #endif
   
   puts("Load Time: " & timer-dLoadTIme)
+  if g_PartCount = 0 then g_PartCount = 1
   
   #ifdef DebugShadowConnectors
-  scope      
+  scope           
      dim as PartSnap tSnap
-     for I as long = 0 to g_PartCount-1               
+     for I as long = 0 to g_PartCount-1
         if g_pModel->tParts(I).bType <> 1 then continue for
         puts("=========== Part " & I & " ===========")
         var pSubPart = g_tModels( g_pModel->tParts(I)._1.lModelIndex ).pModel                  

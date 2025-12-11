@@ -498,3 +498,103 @@ private sub BuildNormalMatrix( byref tmIn as Matrix4x4, byref tmOut as Matrix3x3
     tmOut.M(7) =  (a02*a10 - a00*a12) * det
     tmOut.M(8) =  (a00*a11 - a01*a10) * det
 end sub
+
+Function Mat3_RotX(angle As Single) As Matrix3x3
+    Dim As Matrix3x3 R
+    Dim As Single c = Cos(angle), s = Sin(angle)
+
+    ' row-major:
+    ' [ 1  0  0 ]
+    ' [ 0  c -s ]
+    ' [ 0  s  c ]
+
+    R.m(0) = 1 : R.m(1) = 0 : R.m(2) = 0
+    R.m(3) = 0 : R.m(4) = c : R.m(5) = -s
+    R.m(6) = 0 : R.m(7) = s : R.m(8) =  c
+
+    Return R
+End Function
+Function Mat3_RotY(angle As Single) As Matrix3x3
+    Dim As Matrix3x3 R
+    Dim As Single c = Cos(angle), s = Sin(angle)
+
+    ' row-major:
+    ' [  c  0  s ]
+    ' [  0  1  0 ]
+    ' [ -s  0  c ]
+
+    R.m(0) =  c : R.m(1) = 0 : R.m(2) = s
+    R.m(3) =  0 : R.m(4) = 1 : R.m(5) = 0
+    R.m(6) = -s : R.m(7) = 0 : R.m(8) = c
+
+    Return R
+End Function
+Function Mat3_RotZ(pi As Single) As Matrix3x3
+    Dim As Matrix3x3 R
+    Dim As Single c = Cos(pi), s = Sin(pi)
+
+    R.m(0)=c : R.m(1)=-s : R.m(2)=0
+    R.m(3)=s : R.m(4)= c : R.m(5)=0
+    R.m(6)=0 : R.m(7)= 0 : R.m(8)=1
+
+    Return R
+End Function
+
+#if 0
+' Generates a rotation matrix that aligns the model's Y-axis with the TargetUp vector.
+' WorldForward is an optional vector to define the "twist" around TargetUp.
+Function MatrixFromUpVector(Byref TargetUp As Vector3, Byref WorldForward As Vector3) As Matrix3x3
+    Dim As Matrix3x3 R
+    Dim As Vector3 NewY, NewX, NewZ
+    
+    ' 1. The new Y-axis (Up) is the normalized target vector.
+    NewY = VectorNormalize(TargetUp)
+    
+    ' 2. Calculate the new X-axis (Right)
+    '    It must be perpendicular to both the new Y (TargetUp) and WorldForward.
+    '    We use the cross product: X' = WorldForward x Y'
+    '    This ensures X' and Y' are perpendicular.
+    NewX = VectorCross(WorldForward, NewY)
+    
+    ' Handle the degenerate case where WorldForward is parallel to TargetUp (cross product is zero)
+    Dim As Single xlen = VectorLength(NewX)
+    If xlen < 0.00001 Then
+        ' WorldForward and TargetUp are parallel.
+        ' Pick an arbitrary, non-parallel vector (e.g., world (1, 0, 0)) to define the right axis.
+        ' This prevents the matrix generation from failing.
+        Dim As Vector3 ArbitraryForward = {0, 0, 1} ' World Z-axis
+        NewX = VectorCross(ArbitraryForward, NewY)
+        xlen = VectorLength(NewX)
+        
+        ' If it's STILL zero, TargetUp is (0,0,1) or (0,0,-1). Use World X-axis.
+        If xlen < 0.00001 Then 
+            Dim As Vector3 ArbitraryRight = {1, 0, 0}
+            NewX = VectorCross(ArbitraryRight, NewY)
+        End If
+    End If
+    
+    NewX = VectorNormalize(NewX)
+    
+    ' 3. Calculate the new Z-axis (Forward)
+    '    It must be perpendicular to both NewX and NewY.
+    '    We use the cross product: Z' = Y' x X'
+    NewZ = VectorCross(NewY, NewX)
+    ' NewZ must be normalized due to floating point inaccuracies, 
+    ' even though NewX and NewY are normalized and perpendicular.
+    NewZ = VectorNormalize(NewZ) 
+
+    ' 4. Construct the 3x3 Rotation Matrix (Column-Major Convention)
+    ' The column vectors of the rotation matrix are the new basis vectors (X', Y', Z').
+    
+    ' Column 0 (New X-axis / Right)
+    R.m(0, 0) = NewX.x : R.m(1, 0) = NewX.y : R.m(2, 0) = NewX.z
+    
+    ' Column 1 (New Y-axis / Up)
+    R.m(0, 1) = NewY.x : R.m(1, 1) = NewY.y : R.m(2, 1) = NewY.z
+    
+    ' Column 2 (New Z-axis / Forward)
+    R.m(0, 2) = NewZ.x : R.m(1, 2) = NewZ.y : R.m(2, 2) = NewZ.z
+    
+    Return R
+End Function
+#endif
