@@ -181,20 +181,40 @@ function LoadPartModel( byref tPart as PartStructLS ) as long
          SortSnap( *pSnap )
          #if 1 'snap debug            
             with *pSnap
-               printf(!"Studs=%i Clutchs=%i Aliases=%i Axles=%i Axlehs=%i Bars=%i Barhs=%i Pins=%i Pinhs=%i\n", _            
-               .lStudCnt , .lClutchCnt , .lAliasCnt , .lAxleCnt , .lAxleHoleCnt ,.lBarCnt , .lBarHoleCnt , .lPinCnt , .lPinHoleCnt )
-               puts("---------- stud ----------")
-               for N as long = 0 to .lStudCnt-1
+              printf(!"Studs=%i Clutchs=%i Axles=%i Axlehs=%i Bars=%i Barhs=%i Pins=%i Pinhs=%i\n", _            
+              .lStudCnt , .lClutchCnt , .lAxleCnt , .lAxleHoleCnt ,.lBarCnt , .lBarHoleCnt , .lPinCnt , .lPinHoleCnt )
+              if .lStudCnt andalso .pStud then
+                puts("---------- stud ----------")
+                for N as long = 0 to .lStudCnt-1
                   with .pStud[N]
-                     printf(!"#%i %g %g %g\n",N+1,.tPos.X,.tPos.Y,.tPos.Z)
+                    printf(!"#%i %g %g %g\n",N+1,.tPos.X,.tPos.Y,.tPos.Z)
                   end with
-               next N
-               puts("--------- clutch ---------")
-               for N as long = 0 to .lClutchCnt-1
+                next N
+              end if
+              if .lClutchCnt andalso .pClutch then
+                puts("--------- clutch ---------")
+                for N as long = 0 to .lClutchCnt-1
                   with .pClutch[N]
-                     printf(!"#%i %g %g %g\n",N+1,.tPos.X,.tPos.Y,.tPos.Z)
+                    printf(!"#%i %g %g %g\n",N+1,.tPos.X,.tPos.Y,.tPos.Z)
                   end with
-               next N
+                next N
+              end if
+              if .lAxleCnt andalso .pAxle then
+                puts("--------- axle ---------")
+                for N as long = 0 to .lAxleCnt-1
+                  with .pAxle[N]
+                    printf(!"#%i %g %g %g\n",N+1,.tPos.X,.tPos.Y,.tPos.Z)
+                  end with
+                next N
+              end if
+              if .lAxleHoleCnt andalso .pAxleHole then
+                puts("------- axlehole -------")
+                for N as long = 0 to .lAxleHoleCnt-1
+                  with .pAxleHole[N]
+                    printf(!"#%i %g %g %g\n",N+1,.tPos.X,.tPos.Y,.tPos.Z)
+                  end with
+                next N
+              end if
             end with
          #endif
       end if

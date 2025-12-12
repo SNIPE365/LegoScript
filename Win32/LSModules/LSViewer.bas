@@ -493,8 +493,8 @@ namespace Viewer
          'glPopMatrix()
          flip
          
-         var dTime = (timer-dRendertime)*1000
-         printf(!"Render time=%1.2fms (%i fps)   \r",dTime,cint(int(1000/dTime)))
+         'var dTime = (timer-dRendertime)*1000
+         'printf(!"Render time=%1.2fms (%i fps)   \r",dTime,cint(int(1000/dTime)))
          
       loop
       

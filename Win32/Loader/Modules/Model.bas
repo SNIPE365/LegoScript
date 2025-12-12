@@ -1505,7 +1505,6 @@ end type
 type PartSnap
    lStudCnt     as long
    lClutchCnt   as long
-   lAliasCnt    as long 
    lAxleCnt     as long
    lAxleHoleCnt as long
    lBarCnt      as long
@@ -1513,26 +1512,47 @@ type PartSnap
    lPinCnt      as long
    lPinHoleCnt  as long   
    as SnapPV ptr pStud,pClutch
+   as SnapPV ptr pAxle,pAxleHole
+   as snapPV ptr pBar ,pBarHole
+   as SnapPV ptr pPin ,pPinHole
 end type
 
 sub SnapAddStud( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) )   
-   with tSnap      
-      for N as long = 0 to iCnt-1
-        .lStudCnt += 1
-        .pStud = MyReallocData(.pStud,sizeof(tPV)*.lStudCnt)
-        .pStud[.lStudCnt-1] = tPV        
-      next N
-   end with
+  with tSnap      
+    for N as long = 0 to iCnt-1
+      .lStudCnt += 1
+      .pStud = MyReallocData(.pStud,sizeof(tPV)*.lStudCnt)
+      .pStud[.lStudCnt-1] = tPV        
+    next N
+  end with
 end sub
 sub SnapAddClutch( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) )
-   with tSnap
-      for N as long = 0 to iCnt-1
-        .lClutchCnt += 1
-        .pClutch = MyReallocData(.pClutch,sizeof(tPV)*.lClutchCnt)
-        .pClutch[.lClutchCnt-1] = tPV        
-      next N
-   end with
-end sub 
+  with tSnap
+    for N as long = 0 to iCnt-1
+      .lClutchCnt += 1
+      .pClutch = MyReallocData(.pClutch,sizeof(tPV)*.lClutchCnt)
+      .pClutch[.lClutchCnt-1] = tPV        
+    next N
+  end with
+end sub
+sub SnapAddAxle( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) )
+  with tSnap
+    for N as long = 0 to iCnt-1
+      .lAxleCnt += 1
+      .pAxle = MyReallocData(.pAxle,sizeof(tPV)*.lAxleCnt)
+      .pAxle[.lAxleCnt-1] = tPV        
+    next N
+  end with
+end sub
+sub SnapAddAxleHole( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) )
+  with tSnap
+    for N as long = 0 to iCnt-1
+      .lAxleHoleCnt += 1
+      .pAxleHole = MyReallocData(.pAxleHole,sizeof(tPV)*.lAxleHoleCnt)
+      .pAxleHole[.lAxleHoleCnt-1] = tPV        
+    next N
+  end with
+end sub
 
 #ifndef __NoRender
    static shared as ulong MaleStipple(32-1), FemaleStipple(32-1)
@@ -2295,7 +2315,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                               dim as byte bRound = false
                               select case p->bShape
                               case sss_Round  : bRound  = true
-                              case sss_Square : bRound  = false
+                              case sss_Square : bRound  = false                              
                               case else      : continue for 'skip
                               end select  
                               dim as single fCenX,fCenY,fCenZ
@@ -2402,12 +2422,23 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                            end select
                         next I                           
                         for I as long = 0 to .bSecCnt-1
-                           if .tSecs(I).bLength = 1 then bSecs -= 1 : continue for 'ignore length=1 sections
-                           select case .tSecs(I).bShape
-                           case sss_Axle                              
-                              DbgConnect(!"Axle += %i\n",iConCnt)                              
-                              tSnap.lAxleCnt += iConCnt : bSecs -= 1 'AXLEHOLE //bConType = spAxleHole: exit for 
-                              'puts("Axle " & bSecs)
+                          if .tSecs(I).bLength = 1 then bSecs -= 1 : continue for 'ignore length=1 sections
+                          select case .tSecs(I).bShape
+                          case sss_Axle                              
+                            DbgConnect(!"Axle += %i\n",iConCnt)                              
+                            'tSnap.lAxleCnt += iConCnt
+                            bSecs -= 1 'AXLE //bConType = spAxleHole: exit for 
+                            if .bFlagCenter then
+                              dim as single fCenter(2) = {0,-.tSecs(I).bLength,.tSecs(I).bLength/-2}
+                              for iN as long = 0 to 2                                
+                                dim as Vector3 tV = Vector3_Transform( type<Vector3>(0,fCenter(iN),0) , tMatOri )                                  
+                                dim as SnapPV tPV = type(fPX+.fPosX+tV.X , fPY+.fPosY+tV.Y , fPZ+.fPosZ+tV.Z) : tPV.tOriMat = tMatori
+                                SnapAddAxle( tSnap , 1 , tPV )
+                              next iN
+                            else
+                              dim as SnapPV tPV = type(fPX+.fPosX , fPY+.fPosY , fPZ+.fPosZ) : tPV.tOriMat = tMatori
+                              SnapAddAxle( tSnap , 1 , tPV )
+                            end if                              
                            case sss_FlexNext
                               bSecs -= 1 'other side of pin?
                               'puts("Pin Mirror " & bSecs)
@@ -2452,7 +2483,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                               puts("Unknown male?")
                            end select
                         next I
-                     else 'females can be BARHOLE / PINHOLE / CLUTCHES / ALIAS
+                     else 'females can be AXLEHOLE / BARHOLE / PINHOLE / CLUTCHES / ALIAS
                         bConType = spClutch
                         if .bFlagSlide then 'PINHOLE / AXLEHOLE / BARHOLE
                            'if iConCnt > 1 then puts("!!!!! GRID PINHOLE FOUND !!!!!")
@@ -2461,18 +2492,29 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                            dim as byte bDidAxleHole,bDidClutch,bDidBarHole
                            for I as long = 0 to bSecCnt-1                              
                               if .tSecs(I).bLength*((pMat->fScaleY)) = 1 then
-                                 #ifndef __Tester
+                                 '#ifndef __Tester
                                  puts("Length 1 section ignored")
-                                 #endif
+                                 '#endif
                                  bSecs -= 1 : continue for 'ignore length=1 sections
                               end if
                               select case .tSecs(I).bShape 
                               case sss_Axle
-                                 DbgConnect(!"AxleHole += %i (Axle slide)\n",iConCnt*bSides)
-                                 if bDidAxleHole=0 then bDidAxleHole=1 '': tSnap.lAxleHoleCnt += iConCnt*bSides 
-                                 'AXLEHOLE //bConType = spAxleHole: exit for 
-                                 'if there's an axlehole then it can't be a pinhole, and it can't have dual clutches
-                                 bSecs -= 1 : iMaybePins=-999 : bSides = 1
+                                DbgConnect(!"AxleHole += %i (Axle slide)\n",iConCnt*bSides)
+                                if bDidAxleHole=0 then bDidAxleHole=1 '': tSnap.lAxleHoleCnt += iConCnt*bSides 
+                                'AXLEHOLE //bConType = spAxleHole: exit for 
+                                'if there's an axlehole then it can't be a pinhole, and it can't have dual clutches
+                                var iLen = -.tSecs(I).bLength
+                                with *pMat
+                                  ''puts("Female: " & iFemale)
+                                  dim as single fCenter(2) = {0,iLen,iLen/2}
+                                  for iN as long = 0 to 2
+                                    dim as Vector3 tV = Vector3_Transform( type<Vector3>(0,fCenter(iN),0) , tMatOri )
+                                    'TODO: what to do with the .fPY? because it's 1 and that's wrong.
+                                    dim as SnapPV tPV = type(fPX+.fPosX+tV.X , .fPosY+tV.Y , fPZ+.fPosZ+tV.Z) : tPV.tOriMat = tMatori
+                                    SnapAddAxleHole( tSnap , 1 , tPV )
+                                  next iN
+                                end with
+                                bSecs -= 1 : iMaybePins=-999 : bSides = 1
                               case sss_Square                                    
                                  if bDidClutch=0 then
                                     bDidClutch=1
@@ -2501,8 +2543,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                                       var fExt2 = iif((bSecCnt-1)>I,.tSecs(I+1).bLength,0)
                                       with *pMat
                                         dim as Vector3 tV = Vector3_Transform( type<Vector3>(0,fLen+fExt1,0) , tMatOri )
-                                        dim as SnapPV tPV = type(fPX+.fPosX+tV.X , fPY+.fPosY+tV.Y , fPZ+.fPosZ+tV.Z)
-                                        printf("~" & tSnap.lClutchCnt & "~ ")
+                                        dim as SnapPV tPV = type(fPX+.fPosX+tV.X , fPY+.fPosY+tV.Y , fPZ+.fPosZ+tV.Z)                                        
                                         'if tSnap.lClutchCnt then
                                         '  puts(">>> Identity")
                                         '  tPV.tOriMat = g_tIdentityMatrix3x3
@@ -2510,8 +2551,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                                         '  puts(">>> transformed")
                                           tPV.tOriMat = tMatori
                                         'end if
-                                        SnapAddClutch( tSnap , 1 , tPV ) '//this one works!
-                                        #if 1
+                                        SnapAddClutch( tSnap , 1 , tPV ) '//this one works!                                        
                                         if bSides=2 then
                                           const fPI180 = atn(1)/45                                          
                                           dim as Vector3 tV = Vector3_Transform( type<Vector3>(0,-(fLen+fExt2),0) , tMatOri )
@@ -2519,8 +2559,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                                           tPV.tOriMat = tMatori
                                           MultMatrix3x3( tPV.tOriMat , tMatOri , Mat3_RotZ(fPI180*180) )
                                           SnapAddClutch( tSnap , 1 , tPV ) 'iConCnt
-                                        end if
-                                        #endif
+                                        end if                                        
                                       end with
                                    end if
                                    
