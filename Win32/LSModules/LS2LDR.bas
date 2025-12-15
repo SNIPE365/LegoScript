@@ -397,127 +397,144 @@ function LegoScriptToLDraw( _sScript as string , sErrWarn as string = "" , sMain
          with g_tPart(iName)
             dim as byte bAttIgnored = 0
             do 
-               if iCurToken = iTokCnt then                
-                  if tLeft(Part) < 0 then ParserError("premature end of statement")                  
-                  exit do,do
-               end if
-               iCurToken += 1
-               var sThisToken = sRelToken(-1)               
-               'parse characteristic
-               if iName = _NULLPARTNAME andalso sThisToken[0] <> asc("=") then                  
-                  if bAttIgnored=0 then bAttIgnored=1 : ParserWarning("NULL part attribute ignored")
-                  continue do
-               end if      
-               if sThisToken[0] = asc("#") then 'it's an attribute modifier
-                  'lowercase first two chars of the name as they can be attribute|modifier
-                  if sThisToken[1] >= asc("A") andalso sThisToken[1] <= asc("Z") then
-                     sThisToken[1] += 32 'lowercase
+              if iCurToken = iTokCnt then                
+                if tLeft(Part) < 0 then ParserError("premature end of statement")                  
+                exit do,do
+              end if
+              iCurToken += 1
+              var sThisToken = sRelToken(-1)               
+              'parse characteristic
+              if iName = _NULLPARTNAME andalso sThisToken[0] <> asc("=") then                  
+                if bAttIgnored=0 then bAttIgnored=1 : ParserWarning("NULL part attribute ignored")
+                continue do
+              end if      
+              if sThisToken[0] = asc("#") then 'it's an attribute modifier
+                'lowercase first two chars of the name as they can be attribute|modifier
+                if sThisToken[1] >= asc("A") andalso sThisToken[1] <= asc("Z") then
+                  sThisToken[1] += 32 'lowercase
+                end if
+                if sThisToken[2] >= asc("A") andalso sThisToken[2] <= asc("Z") then
+                  sThisToken[2] += 32 'lowercase
+                end if
+                'if it's an hex digit then it's a color (this makes A-F unusable for attribute names)
+                if (sThisToken[1] >= asc("0") andalso sThisToken[1] <= asc("9")) orelse (sThisToken[1] >= asc("a") andalso sThisToken[1] <= asc("f")) then
+                  'color token #nn #RGB #RRGGBB
+                  if .bConnected then 
+                    ParserError("Can't define attributes for existing parts")
                   end if
-                  if sThisToken[2] >= asc("A") andalso sThisToken[2] <= asc("Z") then
-                     sThisToken[2] += 32 'lowercase
+                  if .iColor >= 0 then ParserError("color attribute was already set for part '"+.sName+"'")
+                  var iColor = ParseColor( sThisToken )
+                  if iColor < 0 then
+                    ParserError("Invalid color format '"+sThisToken+"'")
                   end if
-                  
-                  'if it's an hex digit then it's a color (this makes A-F unusable for attribute names)
-                  if (sThisToken[1] >= asc("0") andalso sThisToken[1] <= asc("9")) orelse (sThisToken[1] >= asc("a") andalso sThisToken[1] <= asc("f")) then
-                     'color token #nn #RGB #RRGGBB
-                     if .bConnected then 
-                        ParserError("Can't define attributes for existing parts")
-                     end if
-                     if .iColor >= 0 then ParserError("color attribute was already set for part '"+.sName+"'")
-                     var iColor = ParseColor( sThisToken )
-                     if iColor < 0 then
-                        ParserError("Invalid color format '"+sThisToken+"'")
-                     end if
-                     .iColor = iColor
-                  else 'x y z xo yo zo = attribute tokens
-                     select case sThisToken[1] 'which attribute it is?
-                     case asc("x"): 'X angle or position for this piece
-                        if .bConnected then ParserError("Can't define attributes for existing parts (redefined X offset or rotation)")
-                        select case sThisToken[2]
-                        case asc("o") 
-                           if bDefinedXOff then ParserError("Defined X offset twice")                                                      
-                           .tOffPos.X += ReadTokenNumber( sThisToken , 3 , true , lError ) : bDefinedXOff = 1
-                           if lError then ParserError("Invalid number at attribute '"+sThisToken+"'")
-                        case asc("-"),asc("0") to asc("9") 'must be a number to be a rotation
-                           if bDefinedXRot then ParserError("Defined X rotation twice")
-                           .tOffRot.X  = ReadTokenNumber( sThisToken , 2-(sThisToken[2]=asc("r")) , true , lError )*(PI/180) : bDefinedXrot = 1
-                           if lError then ParserError("Invalid number at attribute '"+sThisToken+"'")
-                        case else
-                           ParserError("Invalid attribute '"+sThisToken+"'")
-                        end select
-                     case asc("y"): 'Y angle or position for this piece
-                        if .bConnected then ParserError("Can't define attributes for existing parts (redefined Y offset or rotation)")
-                        select case sThisToken[2]
-                        case asc("o") 'it's an offset instead of rotation
-                           if bDefinedYOff then ParserError("Defined Y offset twice")
-                           .tOffPos.Y += ReadTokenNumber( sThisToken , 3 , true , lError ) : bDefinedYOff = 1
-                           if lError then ParserError("Invalid number at attribute '"+sThisToken+"'")
-                        case asc("-"),asc("0") to asc("9") 'must be a number to be a rotation
-                           if bDefinedYRot then ParserError("Defined Y rotation twice")
-                           .tOffRot.Y  = ReadTokenNumber( sThisToken , 2-(sThisToken[2]=asc("r")) , true , lError )*(PI/180) : bDefinedYrot = 1                        
-                           if lError then ParserError("Invalid number at attribute '"+sThisToken+"'")
-                        case else
-                           ParserError("Invalid attribute '"+sThisToken+"'")
-                        end select
-                     case asc("z"): 'Z angle or position for this piece
-                        if .bConnected then ParserError("Can't define attributes for existing parts (redefined Z offset or rotation)")
-                        select case sThisToken[2]
-                        case asc("o") 'it's an offset instead of rotation
-                           if bDefinedZOff then ParserError("Defined Z offset twice")
-                           .tOffPos.Z += ReadTokenNumber( sThisToken , 3 , true , lError ) : bDefinedZOff = 1
-                           if lError then ParserError("Invalid number at attribute '"+sThisToken+"'")
-                        case asc("-"),asc("0") to asc("9") 'must be a number to be a rotation
-                           if bDefinedZRot then ParserError("Defined Z rotation twice")
-                           .tOffRot.Z  = ReadTokenNumber( sThisToken , 2-(sThisToken[2]=asc("r")) , true , lError )*(PI/180) : bDefinedZrot = 1
-                           if lError then ParserError("Invalid number at attribute '"+sThisToken+"'")
-                        case else
-                           ParserError("Invalid attribute '"+sThisToken+"'")
-                        end select
-                     case else                        
-                        ParserError("Invalid attribute '"+sThisToken+"'")
-                     end select
-                  end if
+                  .iColor = iColor
+                else 'x y z xo yo zo = attribute tokens
+                  select case sThisToken[1] 'which attribute it is?
+                  case asc("x"): 'X angle or position for this piece
+                    if .bConnected then ParserError("Can't define attributes for existing parts (redefined X offset or rotation)")
+                    select case sThisToken[2]
+                    case asc("o") 
+                      if bDefinedXOff then ParserError("Defined X offset twice")                                                      
+                      .tOffPos.X += ReadTokenNumber( sThisToken , 3 , true , lError ) : bDefinedXOff = 1
+                      if lError then ParserError("Invalid number at attribute '"+sThisToken+"'")
+                    case asc("-"),asc("0") to asc("9") 'must be a number to be a rotation
+                      if bDefinedXRot then ParserError("Defined X rotation twice")
+                      .tOffRot.X  = ReadTokenNumber( sThisToken , 2-(sThisToken[2]=asc("r")) , true , lError )*(PI/180) : bDefinedXrot = 1
+                      if lError then ParserError("Invalid number at attribute '"+sThisToken+"'")
+                    case else
+                      ParserError("Invalid attribute '"+sThisToken+"'")
+                    end select
+                  case asc("y"): 'Y angle or position for this piece
+                    if .bConnected then ParserError("Can't define attributes for existing parts (redefined Y offset or rotation)")
+                    select case sThisToken[2]
+                    case asc("o") 'it's an offset instead of rotation
+                      if bDefinedYOff then ParserError("Defined Y offset twice")
+                      .tOffPos.Y += ReadTokenNumber( sThisToken , 3 , true , lError ) : bDefinedYOff = 1
+                      if lError then ParserError("Invalid number at attribute '"+sThisToken+"'")
+                    case asc("-"),asc("0") to asc("9") 'must be a number to be a rotation
+                      if bDefinedYRot then ParserError("Defined Y rotation twice")
+                      .tOffRot.Y  = ReadTokenNumber( sThisToken , 2-(sThisToken[2]=asc("r")) , true , lError )*(PI/180) : bDefinedYrot = 1                        
+                      if lError then ParserError("Invalid number at attribute '"+sThisToken+"'")
+                    case else
+                      ParserError("Invalid attribute '"+sThisToken+"'")
+                    end select
+                  case asc("z"): 'Z angle or position for this piece
+                    if .bConnected then ParserError("Can't define attributes for existing parts (redefined Z offset or rotation)")
+                    select case sThisToken[2]
+                    case asc("o") 'it's an offset instead of rotation
+                      if bDefinedZOff then ParserError("Defined Z offset twice")
+                      .tOffPos.Z += ReadTokenNumber( sThisToken , 3 , true , lError ) : bDefinedZOff = 1
+                      if lError then ParserError("Invalid number at attribute '"+sThisToken+"'")
+                    case asc("-"),asc("0") to asc("9") 'must be a number to be a rotation
+                      if bDefinedZRot then ParserError("Defined Z rotation twice")
+                      .tOffRot.Z  = ReadTokenNumber( sThisToken , 2-(sThisToken[2]=asc("r")) , true , lError )*(PI/180) : bDefinedZrot = 1
+                      if lError then ParserError("Invalid number at attribute '"+sThisToken+"'")
+                    case else
+                      ParserError("Invalid attribute '"+sThisToken+"'")
+                    end select
+                  case else                        
+                    ParserError("Invalid attribute '"+sThisToken+"'")
+                  end select
+                end if
                else 'is a connector or what?
                   if sThisToken[0] >= asc("A") andalso sThisToken[0] <= asc("Z") then
-                     sThisToken[0] += 32 'lowercase
+                    sThisToken[0] += 32 'lowercase
                   end if
                   select case sThisToken[0]
-                  case asc("s"),asc("c"): 'stud/clutch (connector)   (last token from the side)
-                     #define curPart g_tPart(iName)
-                     #define sFullName "'"+curPart.sName+"("+curPart.sPrimative+")'"
-                     if tRight(Part) < 0 then
-                        if tRight(Type) then ParserError("Expected '=', got '"+sThisToken+"'")
-                     else
-                        if tRight(Type) then ParserError("Expected end of statement, got '"+sThisToken+"'")
-                     end if
-                     var iConn = ReadTokenNumber(sThisToken,1)                  
-                     if iConn <= 0 then ParserError("invalid connector number")                  
-                     if LoadPartModel( g_tPart(iName) ) < 0 then 
-                        '*CHECK* it hangs here if it fails to load?
-                        ParserError("failed to load model")
-                     end if                  
-                     var pModel = g_tModels(curPart.iModelIndex).pModel 
-                     var pSnap = cptr(PartSnap ptr,pModel->pData)                  
-                     with *pSnap
-                        select case sThisToken[0]
-                        case asc("s")                        
-                           if iConn > .lStudCnt then iConn=0: ParserWarning("part "+sFullName+" only have " & .lStudCnt   & " studs.")
-                           if tRight(Part) < 0 then tLeft(Type)=spStud : tLeft(Num)=iConn else tRight(Type)=spStud : tRight(Num)=iConn
-                        case asc("c")
-                           if iConn > .lClutchCnt then iConn=0: ParserWarning("part "+sFullName+" only have " & .lClutchCnt & " clutches.")
-                           if tRight(Part) < 0 then tLeft(Type)=spClutch : tLeft(Num)=iConn else tRight(Type)=spClutch : tRight(Num)=iConn
+                  case asc("s"),asc("c"),asc("a") '(connector) (last token from the side)
+                    'Stud/Clutch/AXle/AxleHole
+                    #define curPart g_tPart(iName)
+                    #define sFullName "'"+curPart.sName+"("+curPart.sPrimative+")'"
+                    var iTokLen = 1
+                    if sThisToken[0]=asc("a") then
+                      select case sThisToken[1]
+                      case asc("x"),asc("h") : iTokLen = 2
+                      case else : ParserError("invalid connector")
+                      end select
+                    end if
+                     
+                    if tRight(Part) < 0 then
+                      if tRight(Type) then ParserError("Expected '=', got '"+sThisToken+"'")
+                    else
+                      if tRight(Type) then ParserError("Expected end of statement, got '"+sThisToken+"'")
+                    end if
+                    var iConn = ReadTokenNumber(sThisToken,iTokLen)                  
+                    if iConn <= 0 then ParserError("invalid connector number")                  
+                    if LoadPartModel( g_tPart(iName) ) < 0 then 
+                      '*CHECK* it hangs here if it fails to load?
+                      ParserError("failed to load model")
+                    end if                  
+                    var pModel = g_tModels(curPart.iModelIndex).pModel 
+                    var pSnap = cptr(PartSnap ptr,pModel->pData)                  
+                    with *pSnap
+                      select case sThisToken[0]
+                      case asc("s") 'stud
+                        if iConn > .lStudCnt then iConn=0: ParserWarning("part "+sFullName+" only have " & .lStudCnt   & " studs.")
+                        if tRight(Part) < 0 then tLeft(Type)=spStud : tLeft(Num)=iConn else tRight(Type)=spStud : tRight(Num)=iConn
+                      case asc("c") 'clutch
+                        if iConn > .lClutchCnt then iConn=0: ParserWarning("part "+sFullName+" only have " & .lClutchCnt & " clutches.")
+                        if tRight(Part) < 0 then tLeft(Type)=spClutch : tLeft(Num)=iConn else tRight(Type)=spClutch : tRight(Num)=iConn
+                      case asc("a") 'a??? , axle , axlehole
+                        select case sThisToken[1]
+                        case asc("x") 'axle
+                          if iConn > .lAxleCnt then iConn=0: ParserWarning("part "+sFullName+" only have " & .lAxleCnt & " axles.")
+                          if tRight(Part) < 0 then tLeft(Type)=spAxle : tLeft(Num)=iConn else tRight(Type)=spAxle : tRight(Num)=iConn
+                        case asc("h") 'axlehole
+                          if iConn > .lAxleHoleCnt then iConn=0: ParserWarning("part "+sFullName+" only have " & .lAxleHoleCnt & " axleholes.")
+                          if tRight(Part) < 0 then tLeft(Type)=spAxleHole : tLeft(Num)=iConn else tRight(Type)=spAxleHole : tRight(Num)=iConn
                         end select
-                        'dbg_printf(!"Studs=%i Clutchs=%i Aliases=%i Axles=%i Axlehs=%i Bars=%i Barhs=%i Pins=%i Pinhs=%i\n", _
-                        '.lStudCnt , .lClutchCnt , .lAliasCnt , .lAxleCnt , .lAxleHoleCnt ,.lBarCnt , .lBarHoleCnt , .lPinCnt , .lPinHoleCnt )
-                     end with
-                     if tLeft(Type) = tRight(Type) then ParserError("same type of connector")                  
+                      end select
+                      'dbg_printf(!"Studs=%i Clutchs=%i Aliases=%i Axles=%i Axlehs=%i Bars=%i Barhs=%i Pins=%i Pinhs=%i\n", _
+                      '.lStudCnt , .lClutchCnt , .lAliasCnt , .lAxleCnt , .lAxleHoleCnt ,.lBarCnt , .lBarHoleCnt , .lPinCnt , .lPinHoleCnt )
+                    end with
+                    if tLeft(Type) = tRight(Type) then ParserError("same type of connector")                  
                   case asc("="): 'assignment token
-                     if tRight(Part) >= 0 then               
-                        ParserError("expected end of statement, got '"+sThisToken+"'")
-                     end if
-                     continue do,do
+                    if tRight(Part) >= 0 then               
+                      ParserError("expected end of statement, got '"+sThisToken+"'")
+                    end if
+                    continue do,do
                   case else
-                     ParserError("Unknown token '"+sThisToken+"'")
+                    ParserError("Unknown token '"+sThisToken+"'")
                   end select
                end if
             loop
@@ -680,9 +697,11 @@ function LegoScriptToLDraw( _sScript as string , sErrWarn as string = "" , sMain
                      pLeftSnap = @g_NullSnap
                   else                     
                      select case .iLeftType
-                     case spStud   : pLeftSnap = pSnap->pStud  +.iLeftNum-1
-                     case spClutch : pLeftSnap = pSnap->pClutch+.iLeftNum-1
-                     case else     : puts("Error")
+                     case spStud    : pLeftSnap = pSnap->pStud    +.iLeftNum-1
+                     case spClutch  : pLeftSnap = pSnap->pClutch  +.iLeftNum-1
+                     case spAxle    : pLeftSnap = pSnap->pAxle    +.iLeftNum-1
+                     case spAxleHole: pLeftSnap = pSnap->pAxleHole+.iLeftNum-1
+                     case else      : puts("Error")
                      end select
                   end if
                end if
@@ -695,9 +714,11 @@ function LegoScriptToLDraw( _sScript as string , sErrWarn as string = "" , sMain
                      pRightSnap = @g_NullSnap
                   else
                      select case .iRightType
-                     case spStud   : pRightSnap = pSnap->pStud  +.iRightNum-1
-                     case spClutch : pRightSnap = pSnap->pClutch+.iRightNum-1
-                     case else     : puts("Error")
+                     case spStud    : pRightSnap = pSnap->pStud    +.iRightNum-1
+                     case spClutch  : pRightSnap = pSnap->pClutch  +.iRightNum-1
+                     case spAxle    : pRightSnap = pSnap->pAxle    +.iRightNum-1
+                     case spAxleHole: pRightSnap = pSnap->pAxleHole+.iRightNum-1
+                     case else      : puts("Error")
                      end select
                   end if
                end if  
