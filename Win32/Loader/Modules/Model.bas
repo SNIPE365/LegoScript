@@ -2510,7 +2510,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                                   for iN as long = 0 to 2
                                     dim as Vector3 tV = Vector3_Transform( type<Vector3>(0,fCenter(iN),0) , tMatOri )
                                     'TODO: what to do with the .fPY? because it's 1 and that's wrong.
-                                    dim as SnapPV tPV = type(fPX+.fPosX+tV.X , .fPosY+tV.Y , fPZ+.fPosZ+tV.Z) : tPV.tOriMat = tMatori
+                                    dim as SnapPV tPV = type(fPX+.fPosX+tV.X , fPY+.fPosY+tV.Y , fPZ+.fPosZ+tV.Z) : tPV.tOriMat = tMatori
                                     SnapAddAxleHole( tSnap , 1 , tPV )
                                   next iN
                                 end with
