@@ -1,8 +1,7 @@
 '******************************************************************
 namespace Viewer
-
    '#define UseVBO
-
+  
    dim shared as byte g_LoadFile = 0
    dim shared as string g_sGfxFile , g_sFileName
    dim shared as any ptr g_Mutex
@@ -34,13 +33,79 @@ namespace Viewer
       Mutexunlock( g_Mutex )
       return bLoadResult
    end function
-
-   sub MainThread( hReadyEvent as any ptr )
+   
+  const NOTVIS = (not WS_VISIBLE)
+  const CANRES = WS_THICKFRAME  
+  const _TOOL = WS_EX_LAYERED
+  
+  dim shared PreDetour as any ptr,llDetour as ulongint
+  dim shared as DWORD dwThisThread
+  declare sub PreventWindowBlink(iUndo as integer=0)  
+  private sub AutoUnDetour() destructor        
+    'TimeEndPeriod(1)
+    if PreDetour then PreventWindowBlink(1): PreDetour=0
+  end sub
+  
+  sub CreateWindowExADetour naked alias "CreateWindowExADetour" ()
+    asm      
+      mov eax,[PreDetour]
+      pusha
+      call GetCurrentThreadID             '\ if we are not on the right THREAD
+      cmp eax,[dwThisThread]              '| then skip undoing the detour
+      jnz 1f                              '/
+      'push 1                                   
+      'call PreventWindowBlink             ' undo detour
+      'xor eax, eax                        ' tell that we did undo the detour
+      1:
+      popa     
+      jnz 1f                              ' straight to the trampoline if not right THREAD    
+      'and dword ptr [esp+3*4+8], NOTVIS
+      'or dword ptr [esp+3*4+8], CANRES
+      'or dword ptr [esp+0*4+8], TOOL
+      mov dword ptr [esp+0*4+4], _TOOL
+      'mov dword ptr [esp+3*4+4], _SET
+      'hlt
+      1:
+      push ebp
+      mov ebp,esp      
+      jmp eax
+      2:
+      hlt
+    end asm
+  end sub
+  sub PreventWindowBlink(iUndo as integer=0)    
+    'TimeBeginPeriod(1)
+    var pPtr = cast(any ptr,GetProcAddress(GetModuleHandle("user32.dll"),"CreateWindowExA"))
+    dim as integer OldProt = any    
+    VirtualProtect(pPtr,8,PAGE_READWRITE,@OldProt)      
+    if iUndo then
+      if PreDetour then
+        puts("undo")      
+        *cptr(ulongint ptr,pPtr) = llDetour : PreDetour = 0
+      end if
+    else              
+      if PreDetour=0 then                  
+        puts("detour")
+        dwThisThread = GetCurrentThreadID()
+        PreDetour = pPtr+5 'mov esi | push ebp | mov ebp,esp
+        llDetour = *cptr(ulongint ptr,pPtr)
+        *cptr(ubyte ptr,pPtr+0) = &hE9
+        *cptr(ulong ptr,pPtr+1) = clng(@CreateWindowExADetour)-clng(pPtr+5)
+      end if
+    end if
+    VirtualProtect(pPtr,8,OldProt,@OldProt)
+    FlushInstructionCache(GetCurrentProcess(),pPtr,8)
+  end sub
+  
+  sub MainThread( hReadyEvent as any ptr )
       
       g_Mutex = MutexCreate()
-      dim as long ScrWid,ScrHei : screeninfo ScrWid,ScrHei      
-      g_GfxHwnd = InitOpenGL(ScrWid,ScrHei)   
-      
+      dim as long ScrWid,ScrHei : screeninfo ScrWid,ScrHei            
+      PreventWindowBlink()
+      g_GfxHwnd = InitOpenGL(ScrWid,ScrHei)      
+      PreventWindowBlink(1)      
+      ShowWIndow( g_GfxHwnd , SW_HIDE )
+      SetWindowLong( g_GfxHwnd , GWL_EXSTYLE ,  GetWindowLong( g_GfxHwnd , GWL_EXSTYLE ) and (not WS_EX_LAYERED) )
       scope
          dim as RECT tRcWnd = any , tRcCli = any
          GetWindowRect( g_GfxHwnd , @tRcWnd ): GetClientRect( g_GfxHwnd , @tRcCli ) 
@@ -53,6 +118,7 @@ namespace Viewer
       ShowWIndow( g_GfxHwnd , SW_HIDE )
       if hReadyEvent then SetEvent( hReadyEvent )
       SetEvent( g_hResizeEvent )
+      
                   
       #ifdef UseVBO
          redim as VertexStruct atModelTrigs() , atModelVtxLines()
@@ -188,7 +254,7 @@ namespace Viewer
                case fb.SC_RSHIFT : bShiftPressed and= (not 2)
                end select
             case fb.EVENT_WINDOW_CLOSE
-               menu.Trigger( 30001 ) 'hide GFX window
+               menu.Trigger( meView_ToggleGW ) 'hide GFX window
             end select
          wend
                      
@@ -502,5 +568,5 @@ namespace Viewer
       Screen 0, , , fb.GFX_SCREEN_EXIT
       mutexdestroy( g_Mutex )
       
-   end sub
+  end sub
 end namespace

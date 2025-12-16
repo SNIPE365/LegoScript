@@ -181,7 +181,7 @@ sub glInitFont()
   
 end sub
 
-sub ResizeOpengGL( ScrWid as long , ScrHei as long )
+sub ResizeOpengGL( ScrWid as long , ScrHei as long )   
    glViewport 0, 0, ScrWid, ScrHei                  '' Reset The Current Viewport
    glMatrixMode GL_PROJECTION                       '' Select The Projection Matrix
    glLoadIdentity                                   '' Reset The Projection Matrix
@@ -190,108 +190,109 @@ sub ResizeOpengGL( ScrWid as long , ScrHei as long )
 end sub
 
 function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
-   
-   'screencontrol( fb.SET_GL_NUM_SAMPLES , 4 )
-   'screencontrol( fb.SET_GL_DEPTH_BITS , 24 )
-   'screencontrol( fb.SET_GL_COLOR_BITS , 32 )
-   
-   screenres 1,4096,32,,fb.GFX_OPENGL' or fb.GFX_MULTISAMPLE      
-   Gfx.Resize(ScrWid,ScrHei)
-   flip
-   dim as HWND hwndGFX
-   screencontrol fb.GET_WINDOW_HANDLE , *cptr(uinteger ptr,@hwndGFX)   
-   InitRawInput( hwndGFX )
-   
-   #macro _InitExtension(_NAME) 
-      _NAME = cast(any ptr, wglGetProcAddress(#_NAME))
-      'printf(!"%s = %p\n",#_NAME,_NAME)
-      if _NAME = 0 then
-         printf("%s%s%s","ERROR: required extension '",#_NAME,!"' was not found\n")
-         getchar : system()
-      end if
-   #endmacro
-   ForEachExtensionGL( _InitExtension )
-   #undef _InitExtension
-
-         
-   'var lCurStyle = GetWindowLong(hwndGFX,GWL_STYLE) and (not (WS_MINIMIZEBOX or WS_MAXIMIZEBOX))   
-   var lCurStyle = GetWindowLong(hwndGFX,GWL_STYLE) or WS_MAXIMIZEBOX
-   var lCurStyleEx = GetWindowLong(hwndGFX,GWL_EXSTYLE)
-   SetWindowLong( hwndGFX , GWL_STYLE , lCurStyle or WS_SIZEBOX )
-   'SetWindowLong( hwndGFX , GWL_EXSTYLE , lCurStyleEx or WS_EX_TOOLWINDOW )
-   SetWindowPos( hwndGFX , NULL , 0,0 , 0,0 , SWP_NOMOVE or SWP_NOSIZE or SWP_NOZORDER or SWP_FRAMECHANGED )
-   
-   '' ReSizeGLScene
-   ResizeOpengGL( ScrWid , ScrHei )   
-   glLoadIdentity()                                 '' Reset The Modelview Matrix
-   
-   '' All Setup For OpenGL Goes Here
-   glShadeModel GL_SMOOTH                           '' Enable Smooth Shading
-   glClearColor 115/255, 140/255, 191/255, 1        '' Background color
-   glClearDepth 1.0                                 '' Depth Buffer Setup
-   glEnable GL_DEPTH_TEST                           '' Enables Depth Testing
-   'glDisable GL_DEPTH_TEST                         '' Enables Depth Testing
-   glDepthFunc GL_LESS                              '' The Type Of Depth Testing To Do
-   glHint GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST '' Really Nice Perspective Calculations
-   glEnable GL_BLEND
-   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-   glAlphaFunc( GL_GREATER , 0.5 )
-   'glEnable(GL_NORMALIZE)
+  
+  'screencontrol( fb.SET_GL_NUM_SAMPLES , 4 )
+  'screencontrol( fb.SET_GL_DEPTH_BITS , 24 )
+  'screencontrol( fb.SET_GL_COLOR_BITS , 32 )
+  
+  screenres 1,4096,32,,fb.GFX_OPENGL' or fb.GFX_MULTISAMPLE      
+  Gfx.Resize(ScrWid,ScrHei)   
+  dim as HWND hwndGFX
+  screencontrol fb.GET_WINDOW_HANDLE , *cptr(uinteger ptr,@hwndGFX)   
+  InitRawInput( hwndGFX )
+  
+  #macro _InitExtension(_NAME) 
+    _NAME = cast(any ptr, wglGetProcAddress(#_NAME))
+    'printf(!"%s = %p\n",#_NAME,_NAME)
+    if _NAME = 0 then
+       printf("%s%s%s","ERROR: required extension '",#_NAME,!"' was not found\n")
+       getchar : system()
+    end if
+  #endmacro
+  ForEachExtensionGL( _InitExtension )
+  #undef _InitExtension
+  
+       
+  'var lCurStyle = GetWindowLong(hwndGFX,GWL_STYLE) and (not (WS_MINIMIZEBOX or WS_MAXIMIZEBOX))   
+  var lCurStyle = GetWindowLong(hwndGFX,GWL_STYLE) or WS_MAXIMIZEBOX
+  var lCurStyleEx = GetWindowLong(hwndGFX,GWL_EXSTYLE)
+  if (lCurStyle and WS_SIZEBOX)=0 then
+  SetWindowLong( hwndGFX , GWL_STYLE , lCurStyle or WS_SIZEBOX )
+  'SetWindowLong( hwndGFX , GWL_EXSTYLE , lCurStyleEx or WS_EX_TOOLWINDOW )
+  SetWindowPos( hwndGFX , NULL , 0,0 , 0,0 , SWP_NOMOVE or SWP_NOSIZE or SWP_NOZORDER or SWP_FRAMECHANGED )
+  end if
+  
+  '' ReSizeGLScene
+  ResizeOpengGL( ScrWid , ScrHei )   
+  glLoadIdentity()                                 '' Reset The Modelview Matrix
+  
+  '' All Setup For OpenGL Goes Here
+  glShadeModel GL_SMOOTH                           '' Enable Smooth Shading
+  glClearColor 115/255, 140/255, 191/255, 1        '' Background color
+  glClearDepth 1.0                                 '' Depth Buffer Setup
+  glEnable GL_DEPTH_TEST                           '' Enables Depth Testing
+  'glDisable GL_DEPTH_TEST                         '' Enables Depth Testing
+  glDepthFunc GL_LESS                              '' The Type Of Depth Testing To Do
+  glHint GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST '' Really Nice Perspective Calculations
+  glEnable GL_BLEND
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+  glAlphaFunc( GL_GREATER , 0.5 )
+  'glEnable(GL_NORMALIZE)
+    
+  glEnable(GL_TEXTURE_2D)
+  
+  glDisable(GL_LINE_SMOOTH)
+  glEnable(GL_LINE_SMOOTH)
+  glLineWidth(2.25)
+    
+  'glEnable(GL_POLYGON_SMOOTH)
+  'glEnable(GL_MULTISAMPLE)
+  'glEnable(GL_SAMPLE_COVERAGE)
+  'fnglSampleCoverage(0.5, GL_FALSE)
+  
+  
+  'glPolygonMode( GL_FRONT_AND_BACK , GL_LINE )
+  'glPolygonMode( GL_BACK , GL_LINE )
+  
+  'GL_POINT, GL_LINE, and GL_FILL.
+  'glEnable( GL_CULL_FACE )
+  glDisable( GL_CULL_FACE )
+  'glFrontFace( GL_CCW ): glCullFace(	GL_BACK )
+  'glFrontFace( GL_CW ): glCullFace( GL_FRONT )
+  glFrontFace( GL_CW ): glCullFace( GL_BACK )
+    
+  'glEnable(GL_POLYGON_OFFSET_FILL)
+  glPolygonOffset(1.0, 1/-20)
+  
+  '============== light initialization ==============
+  glEnable(GL_LIGHTING)
+  '// Enable light source 0
+  glEnable(GL_LIGHT0)
+  
+  '// Set light properties (optional)
+  
+  '// Ambient light (soft background lighting)
+  dim as GLfloat ambientLight(...) = {0.01f, 0.01f, 0.01f, 1.0f}';  // Low-intensity white ambient light
+  glLightfv(GL_LIGHT0, GL_AMBIENT, @ambientLight(0))
+  
+  '#ifdef UseVBO
+    dim as GLfloat diffuseLight(...) = {1.0f/20, 1.0f/20, 1.0f/20, 1f}';  // Bright white diffuse light
+    dim as GLfloat specularLight(...) = {1.0f/20, 1.0f/20, 1.0f/20, 1f}'; // White specular light
+  '#else
+  '  dim as GLfloat diffuseLight(...) = {1.0f, 1.0f, 1.0f, 1f}';  // Bright white diffuse light
+  '  dim as GLfloat specularLight(...) = {1.0f, 1.0f, 1.0, 1f}'; // White specular light
+  '#endif
+  
+  '// Diffuse light (main light that affects the surface)
+  glLightfv(GL_LIGHT0, GL_DIFFUSE, @diffuseLight(0))
+  '// Specular light (shiny reflections)    
+  glLightfv(GL_LIGHT0, GL_SPECULAR, @specularLight(0))
+  
+  glEnable(GL_COLOR_MATERIAL)
+  glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE)
+  
+  glInitFont()
       
-   glEnable(GL_TEXTURE_2D)
-   
-   glDisable(GL_LINE_SMOOTH)
-   glEnable(GL_LINE_SMOOTH)
-   glLineWidth(2.25)
-      
-   'glEnable(GL_POLYGON_SMOOTH)
-   'glEnable(GL_MULTISAMPLE)
-   'glEnable(GL_SAMPLE_COVERAGE)
-   'fnglSampleCoverage(0.5, GL_FALSE)
-   
-   
-   'glPolygonMode( GL_FRONT_AND_BACK , GL_LINE )
-   'glPolygonMode( GL_BACK , GL_LINE )
-   
-   'GL_POINT, GL_LINE, and GL_FILL.
-   'glEnable( GL_CULL_FACE )
-   glDisable( GL_CULL_FACE )
-   'glFrontFace( GL_CCW ): glCullFace(	GL_BACK )
-   'glFrontFace( GL_CW ): glCullFace( GL_FRONT )
-   glFrontFace( GL_CW ): glCullFace( GL_BACK )
-      
-   'glEnable(GL_POLYGON_OFFSET_FILL)
-   glPolygonOffset(1.0, 1/-20)
-   
-   '============== light initialization ==============
-    glEnable(GL_LIGHTING)
-    '// Enable light source 0
-    glEnable(GL_LIGHT0)
-    
-    '// Set light properties (optional)
-    
-    '// Ambient light (soft background lighting)
-    dim as GLfloat ambientLight(...) = {0.01f, 0.01f, 0.01f, 1.0f}';  // Low-intensity white ambient light
-    glLightfv(GL_LIGHT0, GL_AMBIENT, @ambientLight(0))
-    
-    '#ifdef UseVBO
-      dim as GLfloat diffuseLight(...) = {1.0f/20, 1.0f/20, 1.0f/20, 1f}';  // Bright white diffuse light
-      dim as GLfloat specularLight(...) = {1.0f/20, 1.0f/20, 1.0f/20, 1f}'; // White specular light
-    '#else
-    '  dim as GLfloat diffuseLight(...) = {1.0f, 1.0f, 1.0f, 1f}';  // Bright white diffuse light
-    '  dim as GLfloat specularLight(...) = {1.0f, 1.0f, 1.0, 1f}'; // White specular light
-    '#endif
-    
-    '// Diffuse light (main light that affects the surface)
-    glLightfv(GL_LIGHT0, GL_DIFFUSE, @diffuseLight(0))
-    '// Specular light (shiny reflections)    
-    glLightfv(GL_LIGHT0, GL_SPECULAR, @specularLight(0))
-    
-    glEnable(GL_COLOR_MATERIAL)
-    glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE)
-    
-    glInitFont()
-        
-    return hwndGFX
+  return hwndGFX
 
 end function

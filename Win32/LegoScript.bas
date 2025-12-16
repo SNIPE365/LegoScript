@@ -423,7 +423,7 @@ sub DockGfxWindow( bForce as boolean = false )
    GetClientRect( CTL(wcMain) ,@RcCli )
    dim as POINT tPtRight = type(RcCli.Right-3,0)
    ClientToScreen( CTL(wcMain) , @tPtRight )   
-   var hPlace = HWND_TOP
+   var hPlace = HWND_NOTOPMOST
    'if tPtRight.x >= (RcDesk.right-8) then 
    '   hPlace = HWND_TOPMOST : tPtRight.x -= (RcGfx.right - RcGfx.left)
    'end if
@@ -485,7 +485,7 @@ sub ResizeMainWindow( bInit as boolean = false )
    SendMessage( CTL(wcStatus) , SB_SETPARTS , 2 , cast(LPARAM,@aWidths(0)) )
    DockGfxWindow()   
    bResize=false   
-   puts("...")
+   'puts("...")
    
 end sub
 
@@ -745,26 +745,27 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
       SetControl( wcLines , cMarginL , _BtP(wcButton,0.5) , _pct(fMul*(g_RowDigits+1)) , _pct(100) , CTL(wcLines) )      
       ResizeMainWindow()      
    case WM_ACTIVATE  'Activated/Deactivated
-      static as boolean b_IgnoreActivation
+      static as boolean b_IgnoreActivation      
       if b_IgnoreActivation=0 andalso g_GfxHwnd andalso g_Show3D then
          var fActive = LOWORD(wParam) , fMinimized = HIWORD(wParam) , hwndPrevious = cast(HWND,lParam)
          if fActive then            
             'puts("Main Activate")
-            DockGfxWindow()            
             SetWindowPos( g_GfxHwnd , HWND_TOPMOST , 0,0,0,0 , SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE)
-            SetWindowPos( g_GfxHwnd , HWND_NOTOPMOST , 0,0,0,0 , SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE or SWP_SHOWWINDOW)
+            DockGfxWindow()
+            SetWindowPos( g_GfxHwnd , HWND_NOTOPMOST , 0,0,0,0 , SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE or SWP_SHOWWINDOW)            
             'SetFocus( CTL(wcMain) )
          else
             'puts("main deactivate")
             if isIconic(g_GfxHwnd) = 0 then            
-               if fMinimized then                              
+               if fMinimized andalso (GetKeyState(VK_SHIFT) shr 7) then                              
                   ShowWindow( g_GfxHwnd , SW_HIDE )
                else
-                  SetWindowPos( g_GfxHwnd , HWND_NOTOPMOST , 0,0 , 0,0 , SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE )
+                  SetWindowPos( g_GfxHwnd , HWND_NOTOPMOST , 0,0 , 0,0 , SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE )                  
+                  
                end if
             end if
          end if
-      end if
+      end if   
    #if 0
    case WM_ACTIVATEAPP
       var fActive = wParam
