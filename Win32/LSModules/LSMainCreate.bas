@@ -48,9 +48,22 @@ end with
 SetControlsFont( wfStatus, wcTabs )
 
 InitSearchWindow()
-Menu.Trigger( meCompletion_Enable )
+
+'Menu.Trigger( meCompletion_Enable )
 'Menu.Trigger( meView_ToggleGWDock )
 'Menu.Trigger( meCompletion_Variations )
+
+#define CallSetupFunction( _Varname , _Function , _Parms... ) _Function( _Parms )
+#macro CheckSetupFunction( _Varname , _VarType , _Default , _SetupFunction... )
+  #if len(#_SetupFunction)
+    #define _cfgVarName ._VarName
+    CallSetupFunction( _Varname , _SetupFunction )
+    #undef _cfgVarName
+  #endif
+#endmacro
+with g_tCfg
+  ForEachSetting( CheckSetupFunction )
+end with
 
 ColoredControl.Colorize( CTL(wcRadOutput) , &HFF8844 )
 ColoredControl.Colorize( CTL(wcRadQuery)  , &HFF8844 )

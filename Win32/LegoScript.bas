@@ -727,7 +727,7 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
          var lWid = clng(LOWORD(lParam)) , lHei = clng(HIWORD(lParam))
          if g_tCfg.lGuiWid <> lWid orelse g_tCfg.lGuiHei <> lHei then
             'puts("SIZE CHANGED!")
-            g_tCfg.lGuiWid = lWid : g_tCfg.lGuiHei = lHei : g_bSettingsChanged = true
+            g_tCfg.lGuiWid = lWid : g_tCfg.lGuiHei = lHei
             ResizeMainWindow() : UpdateTabCloseButton() 
          end if         
          return 0
@@ -909,21 +909,21 @@ sub WinMain ()
       dim as RECT tRcWnd , tRcCli
       GetWindowRect( hWnd , @tRcWnd ) : GetClientRect( hWnd , @tRcCli )
       if bMaximized <> g_tCfg.bGuiMaximized then 
-         g_tCfg.bGuiMaximized = bMaximized : g_bSettingsChanged = true
+         g_tCfg.bGuiMaximized = bMaximized 
       end if
       if tRcWnd.left <> g_tCfg.lGuiX orelse tRcWnd.top <> g_tCfg.lGuiY then
-         g_tCfg.lGuiX = tRcWnd.left : g_tCfg.lGuiY = tRcWnd.top : g_bSettingsChanged = true
+         g_tCfg.lGuiX = tRcWnd.left : g_tCfg.lGuiY = tRcWnd.top 
       end if
       if tRcCli.right <> g_tCfg.lGuiWid orelse tRcCli.bottom <> g_tCfg.lGuiHei then
-         g_tCfg.lGuiWid = tRcCli.right : g_tCfg.lGuiHei = tRcCli.bottom  : g_bSettingsChanged = true
+         g_tCfg.lGuiWid = tRcCli.right : g_tCfg.lGuiHei = tRcCli.bottom  
       end if
       if IsZoomed(g_GfxHwnd) orelse IsIconic(g_GfxHwnd) then ShowWindow( g_GfxHwnd , SW_SHOWNORMAL )
       GetWindowRect( g_GfxHwnd , @tRcWnd ) : GetClientRect( g_GfxHwnd , @tRcCli )
       if tRcWnd.left <> g_tCfg.lGfxX orelse tRcWnd.top <> g_tCfg.lGfxY then
-         g_tCfg.lGfxX = tRcWnd.left : g_tCfg.lGfxY = tRcWnd.top : g_bSettingsChanged = true
+         g_tCfg.lGfxX = tRcWnd.left : g_tCfg.lGfxY = tRcWnd.top 
       end if
       if tRcCli.right <> g_tCfg.lGfxWid orelse tRcCli.bottom <> g_tCfg.lGfxHei then
-         g_tCfg.lGfxWid = tRcCli.right : g_tCfg.lGfxHei = tRcCli.bottom  : g_bSettingsChanged = true
+         g_tCfg.lGfxWid = tRcCli.right : g_tCfg.lGfxHei = tRcCli.bottom
       end if
    end if   
    SaveSettings()   

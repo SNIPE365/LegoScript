@@ -80,12 +80,12 @@ namespace Viewer
     VirtualProtect(pPtr,8,PAGE_READWRITE,@OldProt)      
     if iUndo then
       if PreDetour then
-        puts("undo")      
+        'puts("undo")      
         *cptr(ulongint ptr,pPtr) = llDetour : PreDetour = 0
       end if
     else              
       if PreDetour=0 then                  
-        puts("detour")
+        'puts("detour")
         dwThisThread = GetCurrentThreadID()
         PreDetour = pPtr+5 'mov esi | push ebp | mov ebp,esp
         llDetour = *cptr(ulongint ptr,pPtr)

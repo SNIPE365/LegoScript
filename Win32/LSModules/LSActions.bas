@@ -693,10 +693,11 @@ sub Code_ClearOutput()
    SetWindowText( CTL(wcOutput) , "" )
 end sub
 
-sub Completion_Enable()
-   puts(__FUNCTION__)
+sub Completion_Enable()   
    var iToggledState = g_CurItemState xor MFS_CHECKED
    g_CompletionEnable = (iToggledState and MFS_CHECKED)<>0
+   puts(__FUNCTION__ & ":" & iif(g_CompletionEnable,"Enabled","Disabled"))
+   _Cfg(bCompletionEnable) = g_CompletionEnable
    g_SQCtx.iCur = -1
    Menu.MenuState( g_hCurMenu,g_CurItemID,iToggledState )   
    EnableMenuItem( g_hCurMenu , sbeCompletion_Filters , iif( iToggledState and MFS_CHECKED , MF_ENABLED , MF_GRAYED ) )
@@ -734,6 +735,15 @@ sub Completion_Toggle()
    case meFilter_Helper      : ChgFilter( wIsHelper )
    case meFilter_Stickers    : ChgFilter( wIsSticker )
    end select
+end sub
+
+sub AutoFormat_Toggle()
+  var iToggledState = g_CurItemState xor MFS_CHECKED
+  Menu.MenuState( g_hCurMenu,g_CurItemID,iToggledState )   
+  #define ChgFilter( _Name ) g_FilterFlags = iif( iToggledState and MFS_CHECKED , g_FilterFlags or _Name , g_FilterFlags and (not (_Name)) )
+  select case g_CurItemID
+    case meAutoFormat_Case : _Cfg( bAutoFmtCase ) = ((iToggledState and MFS_CHECKED)<>0)
+  end select
 end sub
 
 sub View_ToggleGW()
