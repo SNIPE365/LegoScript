@@ -6,6 +6,12 @@
   #define GiveUp(_N) sleep : end (_N)
 #endif
 
+enum ModelQuality
+  ModelQuality_Low    = 1
+  ModelQuality_Normal
+  ModelQuality_High
+end enum
+
 'type Matrix4x4
 '   m(15) as single
 'end type   

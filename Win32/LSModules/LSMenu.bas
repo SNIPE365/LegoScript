@@ -58,7 +58,7 @@
       __Entry( meView_ResetCamera  , "&Reset Camera"       , _Ctrl+_Shift , VK_R   , @View_Key )
       __SubMenu( "Graphics &Quality" )
          __Entry( meView_QualityLow    , "&Low"    , _Ctrl+_Shift , VK_1   , @View_GfxQuality  , MFT_RADIOCHECK )
-         __Entry( meView_QualityNormal , "&Normal" , _Ctrl+_Shift , VK_2   , @View_GfxQuality  , MFT_RADIOCHECK or MFS_CHECKED )
+         __Entry( meView_QualityNormal , "&Normal" , _Ctrl+_Shift , VK_2   , @View_GfxQuality  , MFT_RADIOCHECK )
          __Entry( meView_QualityHigh   , "&High"   , _Ctrl+_Shift , VK_3   , @View_GfxQuality  , MFT_RADIOCHECK )
       __EndSubMenu()
       __Separator()

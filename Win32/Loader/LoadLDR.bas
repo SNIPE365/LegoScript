@@ -24,7 +24,7 @@
 
 'dim shared as string g_sLog
 dim shared as string g_sFilenames,g_sFilesToLoad
-dim shared as long g_ModelCount , g_LoadQuality = 2 'normal
+dim shared as long g_ModelCount , g_LoadQuality = ModelQuality_Normal
 redim shared as ModelList g_tModels(0)
 
 g_sFilenames = chr(0)

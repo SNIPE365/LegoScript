@@ -75,6 +75,7 @@ enum Accelerators
 end enum
 
 #define CTL(_I) g_tMainCtx.hCtl(_I).hwnd
+#define AsBool(_var) cast(boolean,((_var)<>0))
 
 dim shared as boolean g_bChangingFont = false
 
@@ -106,9 +107,13 @@ dim shared g_hCurMenu as any ptr , g_CurItemID as long , g_CurItemState as long
 
 dim shared as HANDLE g_hResizeEvent
 dim shared as hwnd g_GfxHwnd
-dim shared as byte g_DoQuit , g_Show3D , g_Dock3D , g_CompletionEnable
+dim shared as byte g_DoQuit
 dim shared as any ptr g_ViewerThread
 dim shared as string g_CurrentFilePath
+
+#define g_Show3D           g_tCfg.bGfxEnable
+#define g_Dock3D           g_tCfg.bGuiAttached
+#define g_CompletionEnable g_tCfg.bCompletionEnable
 
 declare sub DockGfxWindow( bForce as boolean = false )
 declare sub File_SaveAs()
@@ -118,8 +123,8 @@ declare sub RichEdit_Replace( hCtl as HWND , iStart as long , iEnd as long , sTe
 
 declare sub ChangeToTabByFile( sFullPath as string , iLine as long = -1 )
 
-#include once "LSModules\Settings.bas"
 #include "Loader\Modules\Matrix.bas"
+#include once "LSModules\Settings.bas"
 #include "Loader\LoadLDR.bas"
 #include "Loader\Include\Colours.bas"
 #include "Loader\Modules\Clipboard.bas"
@@ -297,7 +302,7 @@ sub RichEdit_SelChange( hCtl as HWND , iRow as long , iCol as long )
       var iSz = SendMessage( hCtl , EM_GETLINE , g_SQCtx.iRow , cast(LRESULT,@t) )
       if iSz then 'if line is not empty
          zRow[iSz-1]=0 : var sText = zRow
-         if HandleCasing( sText , g_SQCtx ) then 'if case was changed update line
+         if _cfg(bAutoFmtCase) andalso asBool(HandleCasing( sText , g_SQCtx )) then 'if case was changed update line
             var iStart = SendMessage( hCTL , EM_LINEINDEX , g_SQCtx.iRow , 0 )
             RichEdit_Replace( hCtl , iStart , iStart+iSz-1 , sText )
          end if
@@ -344,7 +349,7 @@ function RichEdit_KeyPress( hCtl as HWND , iKey as long , iMod as long ) as long
       end if      
    end select
    
-   if g_SearchChanged andalso g_CompletionEnable then      
+   if g_SearchChanged<>0 andalso g_CompletionEnable then      
       Try()
          HandleTokens( sLastSearch , g_SQCtx )
          Catch()
@@ -746,7 +751,7 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
       ResizeMainWindow()      
    case WM_ACTIVATE  'Activated/Deactivated
       static as boolean b_IgnoreActivation      
-      if b_IgnoreActivation=0 andalso g_GfxHwnd andalso g_Show3D then
+      if b_IgnoreActivation=false andalso AsBool(g_GfxHwnd) andalso g_Show3D then
          var fActive = LOWORD(wParam) , fMinimized = HIWORD(wParam) , hwndPrevious = cast(HWND,lParam)
          if fActive then            
             'puts("Main Activate")

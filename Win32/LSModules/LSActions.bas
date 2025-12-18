@@ -765,7 +765,7 @@ end sub
 sub View_ToggleGWDock()
    var iToggledState = g_CurItemState xor MFS_CHECKED
    g_Dock3D = (iToggledState and MFS_CHECKED)<>0
-   if g_Dock3D andalso g_GfxHwnd then DockGfxWindow()
+   if g_Dock3D andalso g_GfxHwnd<>0 then DockGfxWindow()
    Menu.MenuState( g_hCurMenu,g_CurItemID, iToggledState )   
 end sub
 sub View_ToggleKey()
@@ -818,9 +818,9 @@ sub View_GfxQuality()
    Menu.MenuState( g_hCurMenu,meView_QualityNormal,g_CurItemState or ((g_CurItemID=meView_QualityNormal) and MFS_CHECKED) )
    Menu.MenuState( g_hCurMenu,meView_QualityHigh  ,g_CurItemState or ((g_CurItemID=meView_QualityHigh)   and MFS_CHECKED) )
    select case g_CurItemID
-   case meView_QualityLow   : g_LoadQuality = 1
-   case meView_QualityNormal: g_LoadQuality = 2
-   case meView_QualityHigh  : g_LoadQuality = 3
+   case meView_QualityLow   : g_LoadQuality = 1 : _cfg(lGfxModelQuality) = 1
+   case meView_QualityNormal: g_LoadQuality = 2 : _cfg(lGfxModelQuality) = 2
+   case meView_QualityHigh  : g_LoadQuality = 3 : _cfg(lGfxModelQuality) = 3
    end select     
    
    if viewer.g_pLoadedModel then
