@@ -23,6 +23,10 @@
 ' !!! some pieces have unmatched studs vs clutch (and i suspect that's their design problem) !!!
 ' !!! because when using ldraw it does not matter the order, so they never enforced that     !!!
 
+'TODO (21/12/25): make the errors bar height changable on mouseover
+'TODO (21/12/25): make the buttons smaller / change colors
+'TODO (21/12/25): the gray parts should now be very dark gray / buttons should be yellow
+'TODO (21/12/25): fix 3005 B1 s1 = 3024 P1 c1
 'TODO (02/09/25): fix piece declaration + forward reference (RotatePivot.ls)
 'TODO (30/06/25): continue fixing/improving the row counter
 'TODO (13/06/25): fix LS2LDR showing wrong error line numbers with #defines
@@ -31,7 +35,6 @@
 'TODO (16/05/25): clutches [slide=true] are real clutches??
 'TODO (13/05/25): Add Menu entries for the Query window/buttons 
 'TODO (16/05/25): TAB structure must keep the selection position
-'TODO (13/05/25): load/save settings for Legoscript main window
 'TODO (06/03/25): check bug regarding wheel positioning and the line numbers
 'TODO (21/04/25): prevent buffer overflow when doing a FIND/REPLACE when the selected text is bigger than 32k
 
@@ -45,6 +48,8 @@ enum WindowControls
   wcBtnClose
   wcTabs
   wcButton  
+  wcSidePanel
+  wcBtnSide
   wcLines
   wcEdit
   wcRadOutput
@@ -443,55 +448,58 @@ sub DockGfxWindow( bForce as boolean = false )
    iOnce = true
 end sub   
 sub ResizeMainWindow( bInit as boolean = false )            
-   static as boolean bResize   
-   if bResize then exit sub    
-   'Calculate Client Area Size
-   dim as RECT RcWnd=any,RcCli=any,RcDesk=any
-   var hWnd = CTL(wcMain)
-   if hWnd=0 orelse IsIconic(hWnd) orelse (bInit=0 andalso IsWindowVisible(hWnd)=0) then exit sub   
-   bResize = true : GetClientRect(hWnd,@RcCli)
-   GetWindowRect(hWnd,@RcWnd)
-   'Window Rect is in SCREEN coordinate.... make right/bottom become WID/HEI
-   if 1 then 'bInit then 'orelse (RcCli.right<>g_tCfg.lGuiWid) orelse (RcCli.bottom<>g_tCfg.lGuiHei) then
-      with RcWnd      
-         .right -= .left : .bottom -= .top                   'get window size
-         .right -= RcCli.right : .bottom -= RcCli.bottom      'make it be difference from wnd/client
-         .right += g_tCfg.lGuiWid : .bottom += g_tCfg.lGuiHei 'add back desired client area size
-         GetClientRect(GetDesktopWindow(),@RcDesk)         
-         dim as RECT RcGfx=any : GetWindowRect( g_GfxHwnd , @RcGfx )         
-         var iAllWid = .right , iGfxHei = RcGfx.bottom-RcGfx.top
-         'if using default settings then center the window
-         if bInit andalso g_tCfg.lGuiX = clng(CW_USEDEFAULT) then
-            if iGfxHei > .bottom then .bottom = iGfxHei
-            iAllWid = .right + RcGfx.right-RcGfx.left         
-            var iCenterX = (RcDesk.right-iAllWid)\2 , iCenterY = (RcDesk.bottom-.bottom)\2                 
-            SetWindowPos(hwnd,null,iCenterX,iCenterY,.right,.bottom,SWP_NOZORDER or SWP_NOSENDCHANGING)
-         else            
-            SetWindowPos(hwnd,null,.left,.top,.right,.bottom,SWP_NOZORDER or SWP_NOSENDCHANGING)                     
-         end if
-         'puts("Wid: " & g_tCfg.lGuiWid & " Hei: " & g_tCfg.lGuiHei )
-         'GetClientRect( hWnd , @RcCli )
-         'puts("Wid?: " & RcCli.right & " Hei?: " & RcCli.bottom )
-      end with   
-   end if
-   RcCli.right = g_tCfg.lGuiWid : RcCli.bottom = g_tCfg.lGuiHei
-   
-      
-   'recalculate control sizes based on window size
-   ShowWindow( g_hContainer , SW_HIDE )      
-   var iModify = SendMessage( CTL(wcEdit) , EM_GETMODIFY , 0 , 0 )   
-   ResizeLayout( hWnd , g_tMainCtx.tForm , RcCli.right , RcCli.bottom )   
-   UpdateTabCloseButton() 
-   SendMessage( CTL(wcEdit) , EM_SETMODIFY , iModify , 0 )
-      
-   if g_hSearch then UpdateSearchWindowFont( g_tMainCtx.hFnt(wfStatus).HFONT )      
-   MoveWindow( CTL(wcStatus) ,0,0 , 0,0 , TRUE )
-   dim as long aWidths(2-1) = {RcCli.right*.85,-1}
-   SendMessage( CTL(wcStatus) , SB_SETPARTS , 2 , cast(LPARAM,@aWidths(0)) )
-   DockGfxWindow()   
-   bResize=false   
-   'puts("...")
-   
+  static as boolean bResize   
+  if bResize then exit sub    
+  'Calculate Client Area Size
+  dim as RECT RcWnd=any,RcCli=any,RcDesk=any
+  var hWnd = CTL(wcMain)
+  if hWnd=0 orelse IsIconic(hWnd) orelse (bInit=0 andalso IsWindowVisible(hWnd)=0) then exit sub   
+  bResize = true : GetClientRect(hWnd,@RcCli)
+  GetWindowRect(hWnd,@RcWnd)
+  'Window Rect is in SCREEN coordinate.... make right/bottom become WID/HEI
+  if 1 then 'bInit then 'orelse (RcCli.right<>g_tCfg.lGuiWid) orelse (RcCli.bottom<>g_tCfg.lGuiHei) then
+    with RcWnd      
+      .right -= .left : .bottom -= .top                   'get window size
+      .right -= RcCli.right : .bottom -= RcCli.bottom      'make it be difference from wnd/client
+      .right += g_tCfg.lGuiWid : .bottom += g_tCfg.lGuiHei 'add back desired client area size
+      GetClientRect(GetDesktopWindow(),@RcDesk)         
+      dim as RECT RcGfx=any : GetWindowRect( g_GfxHwnd , @RcGfx )         
+      var iAllWid = .right , iGfxHei = RcGfx.bottom-RcGfx.top
+      'if using default settings then center the window
+      if bInit andalso g_tCfg.lGuiX = clng(CW_USEDEFAULT) then
+        if iGfxHei > .bottom then .bottom = iGfxHei
+        iAllWid = .right + RcGfx.right-RcGfx.left         
+        var iCenterX = (RcDesk.right-iAllWid)\2 , iCenterY = (RcDesk.bottom-.bottom)\2                 
+        SetWindowPos(hwnd,null,iCenterX,iCenterY,.right,.bottom,SWP_NOZORDER or SWP_NOSENDCHANGING)
+      else            
+        SetWindowPos(hwnd,null,.left,.top,.right,.bottom,SWP_NOZORDER or SWP_NOSENDCHANGING)                     
+      end if
+      'puts("Wid: " & g_tCfg.lGuiWid & " Hei: " & g_tCfg.lGuiHei )
+      'GetClientRect( hWnd , @RcCli )
+      'puts("Wid?: " & RcCli.right & " Hei?: " & RcCli.bottom )
+    end with   
+  end if
+  RcCli.right = g_tCfg.lGuiWid : RcCli.bottom = g_tCfg.lGuiHei
+  
+  'trigger a window maximizing if settings says so.
+  if bInit andalso g_tCfg.bGuiMaximized then
+    PostMessage( hWnd , WM_SYSCOMMAND , SC_MAXIMIZE,0 )
+  end if
+  
+  'recalculate control sizes based on window size
+  ShowWindow( g_hContainer , SW_HIDE )      
+  var iModify = SendMessage( CTL(wcEdit) , EM_GETMODIFY , 0 , 0 )   
+  ResizeLayout( hWnd , g_tMainCtx.tForm , RcCli.right , RcCli.bottom )   
+  UpdateTabCloseButton() 
+  SendMessage( CTL(wcEdit) , EM_SETMODIFY , iModify , 0 )
+    
+  if g_hSearch then UpdateSearchWindowFont( g_tMainCtx.hFnt(wfStatus).HFONT )      
+  MoveWindow( CTL(wcStatus) ,0,0 , 0,0 , TRUE )
+  dim as long aWidths(2-1) = {RcCli.right*.85,-1}
+  SendMessage( CTL(wcStatus) , SB_SETPARTS , 2 , cast(LPARAM,@aWidths(0)) )
+  DockGfxWindow()   
+  bResize=false   
+  'puts("...")
 end sub
 
 static shared as any ptr OrgEditProc
@@ -698,6 +706,7 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
          case wcBtnLoad   : Output_Load()
          case wcBtnSave   : Output_Save()
          case wcBtnMinOut : Output_ShowHide()
+         case wcBtnSide   : Solution_ShowHide()
          end select
       end select      
       select case wID

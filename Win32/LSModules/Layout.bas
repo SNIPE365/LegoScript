@@ -123,6 +123,8 @@ sub ControlUpdateLayout( byref tForm as FormStruct , iCtl as long , bResize as W
   const cFromCenter = -32768
   with tForm.pCtl[iCtl]
     
+    'if iCtl = wcSidePanel then puts("--------------------")
+    
     var wOffset = .tX.wOffset : .iX = 0    
     if .tX.wRelID=cFromEdges then 
       .iX = iif(.tX.bIsEnd , tForm.iCliWid , 0 )
@@ -162,7 +164,17 @@ sub ControlUpdateLayout( byref tForm as FormStruct , iCtl as long , bResize as W
       var pRel = tForm.pCtl+.tH.wRelID
       .iH = (pRel->iY + iif(.tH.bIsEnd , pRel->iH , 0 ))-.iY
     end if
-    .iH += iif( .tH.bIsPct , (.tH.wOffset*tForm.iCliHei)\(128*100) , .tH.wOffset )
+    
+    if iCtl = wcSidePanel then
+      'printf(!"id=%i pct=%i , offset=%i\n",.tH.wRelID,.th.bIsPct,.tH.wOffset)
+    end if
+    
+    if .th.bIsPct=0 andalso .tH.wOffset >= 2048 then
+      var iFontHei = (tForm.pFnt[.bFont].bCurHei*(.tH.wOffset-4096))\100      
+      .iH += iFontHei      
+    else
+      .iH += iif( .tH.bIsPct , (.tH.wOffset*tForm.iCliHei)\(128*100) , .tH.wOffset )
+    end if
     
     'special height for controls like combobox
     .iH2 = 0
@@ -173,6 +185,8 @@ sub ControlUpdateLayout( byref tForm as FormStruct , iCtl as long , bResize as W
       .iH2 = (pRel->iY + iif(.tH2.bIsEnd , pRel->iH , 0 ))-.iY
     end if
     .iH2 += iif( .tH2.bIsPct , (.tH2.wOffset*tForm.iCliHei)\(128*100) , .tH2.wOffset )
+    
+    'if iCtl = wcSidePanel then puts("--------------------")
     
     'print .iX,.iY,.iW,.iH
     if bResize then SetWindowPos(.hwnd,0,.iX,.iY,.iW,iif(.iH2,.iH2,.iH),_SWP_Flags)    

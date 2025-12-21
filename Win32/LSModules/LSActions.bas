@@ -745,6 +745,18 @@ sub AutoFormat_Toggle()
     case meAutoFormat_Case : _Cfg( bAutoFmtCase ) = ((iToggledState and MFS_CHECKED)<>0)
   end select
 end sub
+sub Solution_ShowHide()
+  var iOpen = SendMessage( CTL(wcBtnSide) , BM_GETCHECK , 0 , 0 )     
+  g_tMainCtx.hCTL( wcSidePanel ).tW = iif(iOpen, _Pct(20) , _Pct(0))     
+  SetWindowText( CTL(wcBtnSide) , iif(iOpen,!"\x33",!"\x34") )
+  var hWnd = CTL(wcMain)
+  dim as RECT RcCli=any : GetClientRect(hWnd,@RcCli)      
+  ResizeLayout( hWnd , g_tMainCtx.tForm , RcCli.right , RcCli.bottom )
+  'if GetFocus() = CTL(wcBtnMinOut) then
+  '  var iOutput = SendMessage( CTL(wcRadOutput) , BM_GETCHECK , 0 , 0 )
+  '  SetFocus( iif(iOpen , CTL(iif(iOutput,wcOutput,wcQuery)) , CTL(wcEdit)) )
+  'end if   
+end sub
 
 sub View_ToggleGW()
    var iToggledState = g_CurItemState xor MFS_CHECKED
