@@ -499,15 +499,14 @@ sub Output_QueryExecute()
       end if
    end if
    'iCurTab = tab to process , iNewTab = tab to output
-   var sQuery = space(SendMessage( CTL(wcQuery) , WM_GETTEXTLENGTH , 0,0 ))
+   var sQuery = space(1+SendMessage( CTL(wcQuery) , WM_GETTEXTLENGTH , 0,0 ))
    SendMessage( CTL(wcQuery) , WM_GETTEXT , len(sQuery)+1 , cast(LPARAM,strptr(sQuery)) )      
    puts("'"+sQuery+"'")   
    var sText = space(SendMessage( g_tTabs( iCurTab ).hEdit , WM_GETTEXTLENGTH , 0,0 ))
    SendMessage( g_tTabs( iCurTab ).hEdit , WM_GETTEXT , len(sText)+1 , cast(LPARAM,strptr(sText)) )
-   
    SendMessage( g_tTabs(iNewTab).hEdit  , WM_SETTEXT , 0 , cast(LPARAM,strptr(sText)) )   
-   
    ChangeToTab( iNewTab )
+   
 end sub
 sub Output_Load()
    puts(__FUNCTION__)
