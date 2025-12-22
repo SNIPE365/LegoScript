@@ -647,7 +647,7 @@ do
              next N
           else 'if there isnt a model in the clipboard, then load this:
              sModel = _    
-             "1 1 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 60483.dat" EOL '39266p03.dat 
+             "1 1 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 3024.dat" EOL '60483 '39266p03.dat 
              
              'sModel = _    
              '"1 2 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 NotFound.dat" EOL _
@@ -930,8 +930,8 @@ do
         var pSubPart = g_tModels( g_pModel->tParts(I)._1.lModelIndex ).pModel                  
         SnapModel( pSubPart , tSnap )
         with tSnap
-           printf(!"Studs=%i Clutchs=%i Aliases=%i Axles=%i Axlehs=%i Bars=%i Barhs=%i Pins=%i Pinhs=%i\n", _            
-           .lStudCnt , .lClutchCnt , .lAliasCnt , .lAxleCnt , .lAxleHoleCnt ,.lBarCnt , .lBarHoleCnt , .lPinCnt , .lPinHoleCnt )
+           printf(!"Studs=%i Clutchs=%i Axles=%i Axlehs=%i Bars=%i Barhs=%i Pins=%i Pinhs=%i\n", _            
+           .lStudCnt , .lClutchCnt , .lAxleCnt , .lAxleHoleCnt ,.lBarCnt , .lBarHoleCnt , .lPinCnt , .lPinHoleCnt )
            SortSnap( tSnap )
            puts("---------- stud ----------")
            for N as long = 0 to .lStudCnt-1

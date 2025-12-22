@@ -10,7 +10,7 @@
 
 var IdPrevCtl=0 'previous control ID
   
-    
+
 #define _NextRow  _BtP(IdPrevCtl,0.5)    
 #define _NextRow0  _BtP(IdPrevCtl,0)    
 #define _NextRowB _BtP(IdPrevCtl,1.5)    

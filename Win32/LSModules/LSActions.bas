@@ -65,9 +65,7 @@ sub UpdateTabCloseButton()
    dim as SIZE tSz = any : GetTextExtentPoint32( hDC , @"        " , cCloseLen , @tSz )
    tPt(1).x += g_tMainCtx.hCTL( wcTabs ).iX
    with g_tMainCtx.hCTL( wcBtnClose )      
-      .iX = tPt(1).x-.iW : .iW = tSz.cx : .iH = tSz.cy
-      var fPX = (.iX*100)\tRc.right , fW = (.iW*100)\tRc.right , fH = (.iH*100)\tRc.bottom
-      .tX = _pct(fPX) : .tW = _pct(fW) : .tH = _pct(fH)
+      .iX = tPt(1).x-.iW : .iW = tSz.cx : .iH = tSz.cy : .iY = ((tPt(1).y-tPt(0).y)-.iH)\2
       SetWindowPos( CTL(wcBtnClose) , 0 , .iX,.iY , .iW,.iH , SWP_NOZORDER or SWP_NOACTIVATE )
       InvalidateRect( CTL(wcBtnClose) , NULL , true )
    end with
@@ -484,6 +482,7 @@ sub Output_SetMode()
    ShowWindow( CTL(wcQUery)  , iif(iOutput=0,SW_SHOWNA,SW_HIDE) )
    var hFocus = GetFocus()
    if hFocus = CTL(wcRadOutput) orelse hFocus = CTL(wcRadQuery) then
+      InvalidateRect( iif( iOutput , CTL(wcRadQuery) , CTL(wcRadOutput ) ) , NULL , TRUE )
       SetFocus( iif(iOutput , CTL(wcOutput) , CTL(wcQuery)) )
    end if   
 end sub
@@ -516,22 +515,24 @@ end sub
 sub Output_Save()
    puts(__FUNCTION__)
 end sub
-sub Output_ShowHide()
-   var iOpen = SendMessage( CTL(wcBtnMinOut) , BM_GETCHECK , 0 , 0 )   
-   g_tMainCtx.hCTL( wcEdit ).tH = iif(iOpen , _pct(53) , _BottomP(-5) )
-   g_tMainCtx.hCTL( wcLines ).tH = _pct(100) '_BottomP(-5) 'g_tMainCtx.hCTL( wcEdit ).tH
-   g_tMainCtx.hCTL( wcBtnMinOut ).tX = iif(iOpen, _RtP(wcOutput,-4) , _RtP(wcOutput,-3))   
-   for I as long = wcRadOutput to wcBtnMinOut-1
-      ShowWindow( CTL(I) , iif(iOpen,SW_SHOWNA,SW_HIDE) )
-   next I      
-   SetWindowText( CTL(wcBtnMinOut) , iif(iOpen,!"\x36",!"\x35") )
-   var hWnd = CTL(wcMain)
-   dim as RECT RcCli=any : GetClientRect(hWnd,@RcCli)      
-   ResizeLayout( hWnd , g_tMainCtx.tForm , RcCli.right , RcCli.bottom )
-   if GetFocus() = CTL(wcBtnMinOut) then
-      var iOutput = SendMessage( CTL(wcRadOutput) , BM_GETCHECK , 0 , 0 )
-      SetFocus( iif(iOpen , CTL(iif(iOutput,wcOutput,wcQuery)) , CTL(wcEdit)) )
-   end if   
+sub Output_ShowHide()  
+  var iOpen = SendMessage( CTL(wcBtnMinOut) , BM_GETCHECK , 0 , 0 )
+  static as byte bOnce = 0
+  static as typeof(g_tMainCtx.hCTL( wcEdit ).tH) tPrevHei  
+  if iOpen=0 orelse bOnce=0 then bOnce=1 : tPrevHei = g_tMainCtx.hCTL( wcEdit ).tH
+  g_tMainCtx.hCTL( wcEdit ).tH = iif(iOpen , tPrevHei , _BottomE(-1) )   
+  'g_tMainCtx.hCTL( wcBtnMinOut ).tX = iif(iOpen, _RtP(wcOutput,-4) , _RtP(wcOutput,-3))   
+  for I as long = wcRadOutput to wcBtnMinOut-1
+    ShowWindow( CTL(I) , iif(iOpen,SW_SHOWNA,SW_HIDE) )
+  next I      
+  SetWindowText( CTL(wcBtnMinOut) , iif(iOpen,!"\x36",!"\x35") )
+  var hWnd = CTL(wcMain)
+  dim as RECT RcCli=any : GetClientRect(hWnd,@RcCli)      
+  ResizeLayout( hWnd , g_tMainCtx.tForm , RcCli.right , RcCli.bottom )
+  if GetFocus() = CTL(wcBtnMinOut) then
+    var iOutput = SendMessage( CTL(wcRadOutput) , BM_GETCHECK , 0 , 0 )
+    SetFocus( iif(iOpen , CTL(iif(iOutput,wcOutput,wcQuery)) , CTL(wcEdit)) )
+  end if   
 end sub
 
 static shared as FINDREPLACE g_tFindRep
@@ -745,17 +746,17 @@ sub AutoFormat_Toggle()
     case meAutoFormat_Case : _Cfg( bAutoFmtCase ) = ((iToggledState and MFS_CHECKED)<>0)
   end select
 end sub
+
 sub Solution_ShowHide()
-  var iOpen = SendMessage( CTL(wcBtnSide) , BM_GETCHECK , 0 , 0 )     
-  g_tMainCtx.hCTL( wcSidePanel ).tW = iif(iOpen, _Pct(20) , _Pct(0))     
+  var iOpen = SendMessage( CTL(wcBtnSide) , BM_GETCHECK , 0 , 0 )       
+  static as typeof(g_tMainCtx.hCTL( wcSidePanel ).tW) tPrevWid
+  static as byte bOnce = 0 : if bOnce=0 then bOnce=1 : tPrevWid = _pct(30)
+  if iOpen=0 then tPrevWid = g_tMainCtx.hCTL( wcSidePanel ).tW
+  g_tMainCtx.hCTL( wcSidePanel ).tW = iif(iOpen , tPrevWid , _Pct(0) )     
   SetWindowText( CTL(wcBtnSide) , iif(iOpen,!"\x33",!"\x34") )
   var hWnd = CTL(wcMain)
   dim as RECT RcCli=any : GetClientRect(hWnd,@RcCli)      
-  ResizeLayout( hWnd , g_tMainCtx.tForm , RcCli.right , RcCli.bottom )
-  'if GetFocus() = CTL(wcBtnMinOut) then
-  '  var iOutput = SendMessage( CTL(wcRadOutput) , BM_GETCHECK , 0 , 0 )
-  '  SetFocus( iif(iOpen , CTL(iif(iOutput,wcOutput,wcQuery)) , CTL(wcEdit)) )
-  'end if   
+  ResizeLayout( hWnd , g_tMainCtx.tForm , RcCli.right , RcCli.bottom )  
 end sub
 
 sub View_ToggleGW()

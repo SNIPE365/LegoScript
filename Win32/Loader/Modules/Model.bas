@@ -1517,6 +1517,19 @@ type PartSnap
    as SnapPV ptr pPin ,pPinHole
 end type
 
+function AreSnapEqual( tLeft as SnapPV , tRight as SnapPV ) as boolean
+  #define CmpMember( _Name ) if abs( _Name - tRight##_Name ) > 1/2048 then return false
+  with tLeft
+    CmpMember( .tPos.X )
+    CmpMember( .tPos.Y )
+    CmpMember( .tPos.Z )
+    for N as long = 0 to 8
+      CmpMember( .tOriMat.m(N) )
+    next N
+  end with
+  return true
+end function
+
 sub SnapAddStud( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) )   
   with tSnap      
     for N as long = 0 to iCnt-1
@@ -1528,6 +1541,13 @@ sub SnapAddStud( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) )
 end sub
 sub SnapAddClutch( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) )
   with tSnap
+    for N as long = 0 to .lClutchCnt-1
+      'memcmp( @.pClutch[N] , @tPV , sizeof(tPV))=0
+      if AreSnapEqual( .pClutch[N] , tPV ) then
+        puts("!!! Duplicated clutch ignored. !!!")
+        exit sub
+      end if
+    next N
     for N as long = 0 to iCnt-1
       .lClutchCnt += 1
       .pClutch = MyReallocData(.pClutch,sizeof(tPV)*.lClutchCnt)
@@ -2263,7 +2283,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                   iPrevRec=.bRecurse '4
                   dim as Matrix3x3 tMatOri = any
                                     
-                  scope
+                  scope 'Draw Debug Elements
                      
                      'with tMatrixStack(g_CurrentMatrix)
                      if .bFlagOriMat then
@@ -2521,7 +2541,7 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                                     with *pMat
                                        ''puts("Female: " & iFemale)
                                        dim as SnapPV tPV = type(fPX+.fPosX , fPY+.fPosY , fPZ+.fPosZ) : tPV.tOriMat = tMatori
-                                       SnapAddClutch( tSnap , iConCnt , tPV )
+                                       SnapAddClutch( tSnap , 1 , tPV ) 'iConCnt
                                     end with
                                  end if
                                  DbgConnect(!"Clutch += %i (Square slide)\n",iConCnt)
@@ -2612,6 +2632,16 @@ sub SnapModel( pPart as DATFile ptr , tSnap as PartSnap , pRoot as DATFile ptr =
                                     end with
                                     bSecs -= 1                                    
                                  end if
+                              case sss_Square                                    
+                                 'if bDidClutch=0 then
+                                 '   bDidClutch=1
+                                    with *pMat                                      
+                                      dim as SnapPV tPV = type(fPX+.fPosX , fPY+.fPosY , fPZ+.fPosZ) : tPV.tOriMat = tMatori
+                                      SnapAddClutch( tSnap , 1 , tPV ) 'iConCnt
+                                    end with
+                                 'end if
+                                 DbgConnect(!"Clutch += %i (Square slide)\n",iConCnt)                                 
+                                 bSecs -= 1 'BARHOLE //bConType = spBarHole: exit for
                               end select
                            next I  
                            ''if bConType = spBarHole andalso .bCaps = sc_None then iConCnt *= 2 'dual for hollow

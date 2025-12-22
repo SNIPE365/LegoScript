@@ -82,7 +82,7 @@ type ControlStruct
   pData          as any ptr
   as ControlUnit tX,tY,tW,tH,tH2
   as short       iX,iY,iW,iH,iH2
-  as byte        bFont
+  as byte        bFont, bResize
 end type
 
 type FormStruct
@@ -117,13 +117,18 @@ end type
 #define _RightP( _P... ) _RtP( -1 , _P )
 #define _BottomP( _P... ) _BtP( -1 , _P )
 
+#define cEm(_N) _num(4096+cint((_N)*100))
+#define _BottomE(_Off) _BtN(-1, 4096+cint((_Off)*100))
+#define _BtE(_ID,_Off) _BtN(_ID,4096+cint((_Off)*100))
+
 const _SWP_Flags = SWP_NOZORDER or SWP_NOACTIVATE or SWP_NOCOPYBITS
-sub ControlUpdateLayout( byref tForm as FormStruct , iCtl as long , bResize as WINBOOL )
+function ControlUpdateLayout( byref tForm as FormStruct , iCtl as long , bResize as WINBOOL ) as byte
   const cFromEdges = (1 shl 14)-1  
   const cFromCenter = -32768
   with tForm.pCtl[iCtl]
     
     'if iCtl = wcSidePanel then puts("--------------------")
+    dim as long iOX=.iX , iOY=.IY , iOW=.iW , iOH=.iH
     
     var wOffset = .tX.wOffset : .iX = 0    
     if .tX.wRelID=cFromEdges then 
@@ -188,11 +193,15 @@ sub ControlUpdateLayout( byref tForm as FormStruct , iCtl as long , bResize as W
     
     'if iCtl = wcSidePanel then puts("--------------------")
     
-    'print .iX,.iY,.iW,.iH
-    if bResize then SetWindowPos(.hwnd,0,.iX,.iY,.iW,iif(.iH2,.iH2,.iH),_SWP_Flags)    
+    'print .iX,.iY,.iW,.iH    
+    if iOX<>.iX orelse iOY<>.IY orelse iOW=.iW orelse iOH<>.iH then
+      if bResize then SetWindowPos(.hwnd,0,.iX,.iY,.iW,iif(.iH2,.iH2,.iH),_SWP_Flags)
+      return true      
+    end if
+    return false
     
   end with
-end sub
+end function
 sub ResizeLayout( hWnd as HWND , tForm as FormStruct , iWidth as long , iHeight as long )
   
   'dim as double dTMR = timer
@@ -249,17 +258,21 @@ sub ResizeLayout( hWnd as HWND , tForm as FormStruct , iWidth as long , iHeight 
   'InvalidateRect( hwnd , null , true )
   'UpdateWindow( hwnd )
   
+  var Old = GetWindowLong(hWnd,GWL_EXSTYLE)
+  SetWindowLong( hWnd , GWL_EXSTYLE , Old or WS_EX_COMPOSITED )
+  
   var hResize = BeginDeferWindowPos(tForm.iCtlCnt)
   for R as long = 0 to 1
     var hCtl = GetWindow(hWnd,GW_CHILD)        
     do
       var N = GetDlgCtrlID( hCtl )
-      if N then
+      if N andalso N <> wcBtnClose then
          with tForm.pCtl[N]
-           if .hwnd then
-             ControlUpdateLayout( tForm , N, R )
-           end if
-           if R then DeferWindowPos(hResize,.hwnd,0,.iX,.iY,.iW,iif(.iH2,.iH2,.iH),_SWP_Flags)        
+          if .hwnd then
+            if R=0 then .bResize=0
+            .bResize or= ControlUpdateLayout( tForm , N, false )           
+            if R andalso .bResize then DeferWindowPos(hResize,.hwnd,0,.iX,.iY,.iW,iif(.iH2,.iH2,.iH),_SWP_Flags)        
+          end if
          end with
       end if
       hCtl = GetWindow( hCtl , GW_HWNDNEXT )
@@ -271,6 +284,9 @@ sub ResizeLayout( hWnd as HWND , tForm as FormStruct , iWidth as long , iHeight 
   ''RedrawWindow(hWnd, NULL , NULL , rFlags )
   'UpdateWindow(hWnd)
   'InvalidateRect(hWnd,null,true)
+  
+  UpdateWindow( hWnd )
+  SetWindowLong( hWnd , GWL_EXSTYLE , Old )        
   
   'print cint((timer-dTMR)*1000)
   

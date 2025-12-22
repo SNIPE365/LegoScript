@@ -100,7 +100,7 @@ if pCtx=0 andalso message <> WM_CREATE then Return DefWindowProc( hWnd, message,
 const cStyle = WS_CHILD 'Standard style for buttons class controls :)    
 const cStyleT = cStyle or WS_TABSTOP
 const cUpDnStyle = cStyleT or UDS_AUTOBUDDY' or UDS_SETBUDDYINT  
-const cButtonStyle = cStyleT
+const cButtonStyle = cStyleT or BS_NOTIFY
 const cListStyle = cStyleT or LBS_NOTIFY or LBS_NOINTEGRALHEIGHT
 const cCheckStyle = cStyleT or BS_AUTOCHECKBOX or BS_NOTIFY
 const cBtnChkStyle = cCheckStyle	or BS_PUSHLIKE
@@ -108,6 +108,7 @@ const cRadioStyle = cStyleT or BS_AUTORADIOBUTTON or BS_NOTIFY
 const cBtnRadStyle = cRadioStyle or BS_PUSHLIKE
 const cLabelStyle = cStyle or SS_RIGHT
 const cTextStyle = cStyle
+const cSplitStyle = cStyleT
 const cComboStyle = cStyleT or CBS_DROPDOWN or CBS_NOINTEGRALHEIGHT or WS_VSCROLL'or CBS_AUTOHSCROLL 
 const cDropStyle = cStyleT or CBS_DROPDOWNLIST or CBS_NOINTEGRALHEIGHT or CBS_AUTOHSCROLL
 const cFieldStyle = cStyleT or ES_AUTOHSCROLL
@@ -123,7 +124,7 @@ const cDateSTyle = cStyleT or DTS_SHORTDATECENTURYFORMAT
 const cRichStyle = cStyleT or ES_MULTILINE or ES_WANTRETURN
 const cStatStyle = cStyle or SBARS_SIZEGRIP
 
-const cBrd = WS_EX_CLIENTEDGE
+const cBrd = WS_EX_CLIENTEDGE , cDlg = cBrd or WS_EX_WINDOWEDGE
 const cTrn = WS_EX_TRANSPARENT
 const cLay = WS_EX_TRANSPARENT
 
@@ -171,6 +172,7 @@ const cLay = WS_EX_TRANSPARENT
 #define AddStatusW( _ID , _T , _S... )                   ControlW( _ID , null ,STATUSCLASSNAME,_T, cStatStyle , _num(0),_num(0) , _num(0),_num(0) , _S )
 #define AddTabsA(  _ID , _X , _Y , _W , _H , _H2 , _S...) pCtx->hCTL(_ID).tH2 = _H2 : ControlA( _ID , null ,WC_TABCONTROL,null, cTabsStyle  , _X , _Y , _W , _H , _S )
 #define AddTabsW(  _ID , _X , _Y , _W , _H , _H2 , _S...) pCtx->hCTL(_ID).tH2 = _H2 : ControlW( _ID , null ,WC_TABCONTROL,null, cTabsStyle  , _X , _Y , _W , _H , _S )
+#define AddSplitter( _ID , _X , _Y , _W , _H , _S... ) ControlA( _ID , 0 , "splitter" , null , cSplitStyle , _X , _Y , _W , _H , _S )
 
 #macro AddCtlA(   _ID , _X , _Y , _W , _H , _N , _S , _E , _P ) 
   #define __LinkedCtx _P
