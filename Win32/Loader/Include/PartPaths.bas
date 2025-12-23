@@ -2,55 +2,158 @@
   #error " Don't compile this one"
 #endif  
 
+#include once "win\Shlobj.bi"
+#include once "dir.bi"
+
 #ifndef NULL
 const NULL = 0
 #endif
 
-static shared as zstring ptr g_pzPaths(...) = { _
-   NULL            , _   
-   @"1:\unoff\p\48"  , _
-   @"2:\unoff\p"     , _   
-   @"3:\unoff\p\8"   , _
-   @"0:\unoff\parts" , _   
-   @"1:\p\8"         , _   
-   @"2:\p"           , _
-   @"3:\p\48"        , _         
-   @"0:\parts"        _
-}
-   '@"\parts\s", _
-   '@"\unoff\parts\s", _
-   '@"\parts\s\p", _
-   '@"\unoff\parts\s\p", _
-rem ------------------------------   
-
 static shared as long g_iExtraPathCount = 0
 redim shared as string g_sExtraPathList()
 
+static shared as zstring ptr g_pzPaths(...) = { _
+  NULL            , _   
+  @"1:\unoff\p\48"  , _
+  @"2:\unoff\p"     , _   
+  @"3:\unoff\p\8"   , _
+  @"0:\unoff\parts" , _   
+  @"1:\p\8"         , _   
+  @"2:\p"           , _
+  @"3:\p\48"        , _         
+  @"0:\parts"        _
+  }
+  '@"\parts\s", _
+  '@"\unoff\parts\s", _
+  '@"\parts\s\p", _
+  '@"\unoff\parts\s\p", _
+rem ------------------------------   
+
 static shared as string g_sPathList( ubound(g_pzPaths) )
 static shared as byte g_bPathQuality( ubound(g_pzPaths) )
-g_sPathList(0) = ".\" : g_bPathQuality( 0 ) = 0
-scope
-   var sPath = environ("userprofile")+"\Desktop\LDCAD\LDRAW"
-   for N as long = 1 to ubound(g_pzPaths)
-      g_bPathQuality( N ) = valint(*g_pzPaths(N))
-      g_sPathList(N) = sPath + mid(*g_pzPaths(N),3)
-   next N
-end scope   
+
+function OpenFolder( sTitle as string , sInit as string , sOutput as string ) as boolean
+  
+  #if 0
+    dim as OPENFILENAME tOpen
+    var pzFile = cptr(zstring ptr,malloc(65536)) : *pzFile = sInit
+    do
+      with tOpen
+        .lStructSize = sizeof(tOpen)
+        .hwndOwner = GetForegroundWindow()
+        .lpstrFilter = @ _
+          !"All Folders\0*\0\0"
+        .nFilterIndex = 0 'Supported 
+        .nFileExtension = 0
+        .lpstrFile = pzFile
+        .nMaxFile = 65536
+        .lpstrInitialDir = NULL
+        .lpstrTitle = strptr(sTitle)
+        .lpstrDefExt = NULL
+        .Flags = OFN_FILEMUSTEXIST or OFN_PATHMUSTEXIST or OFN_NOCHANGEDIR or OFN_EXPLORER or OFN_NOVALIDATE or OFN_DONTADDTORECENT
+        if GetOpenFileName( @tOpen ) then function=true : sOutput = *.lpstrFile
+        exit do
+      end with
+    loop
+    free(pzFile)
+  #else
+    var pzFolder = cptr(zstring ptr,malloc(65536)) : *pzFolder = sInit
+    dim as BROWSEINFOA tFolder
+    with tFolder
+      .hwndOwner      = GetForegroundWindow()
+      .pidlRoot       = NULL
+      .pszDisplayName = pzFolder
+      .lpszTitle      = strptr(sTitle) 
+      .ulFlags        = BIF_RETURNONLYFSDIRS or BIF_EDITBOX or BIF_VALIDATE or _
+                        BIF_NONEWFOLDERBUTTON 'or BIF_NEWDIALOGSTYLE or BIF_USENEWUI
+      var pResu = SHBrowseForFolderA( @tFolder ) 
+      if presu then        
+        SHGetPathFromIDListA( pResu , pzFolder )
+        function=true : sOutput = *pzFolder
+        CoTaskMemFree(pResu)
+      end if
+    end with
+    free(pzFolder)    
+  #endif
+  print sOutput
+    
+end function
+
+sub CheckPathLDRAW( byref sPath as string )  
+  #define chk(_s) (GetFileAttributes(sPath+_s) and FILE_ATTRIBUTE_DIRECTORY)
+  do
+    if instr(sPath,":\") andalso chk("") andalso chk("\unoff") andalso chk("\p") andalso chk("\part") then exit do
+    if OpenFolder("Locate LDRAW folder","ldraw",sPath)=false then end
+  loop
+    
+  g_sPathList(0) = ".\" : g_bPathQuality( 0 ) = 0  
+  'var sPath = "G:\Jogos\LDCad-1-7-Beta-1-Win\LDRAW"
+  for N as long = 1 to ubound(g_pzPaths)
+    g_bPathQuality( N ) = valint(*g_pzPaths(N))
+    g_sPathList(N) = sPath + mid(*g_pzPaths(N),3)
+  next N  
+end sub
 #undef g_pzPaths
 
-dim shared as zstring ptr g_pzShadowPaths(...) = { _
-   NULL      , _
-   @"\parts" , _
-   @"\p"     , _
-   @"\parts\s" _
+static shared as zstring ptr g_pzShadowPaths(...) = { _
+  NULL      , _
+  @"\parts" , _
+  @"\p"     , _
+  @"\parts\s" _
 }
+rem ----------------------------------------------
 
 dim shared as string g_sShadowPathList( ubound(g_pzShadowPaths) )
-scope
-   var sPath = environ("userprofile")+"\Desktop\LDCAD\shadow\offlib"
-   for N as long = 1 to ubound(g_pzShadowPaths)
-      g_sShadowPathList(N) = sPath + *g_pzShadowPaths(N)
-   next N
-end scope   
-
+sub CheckPathSHADOW( byref sPath as string )
+  #define chk(_s) (GetFileAttributes(sPath+_s) and FILE_ATTRIBUTE_DIRECTORY)
+  do
+    if instr(sPath,":\") andalso chk("") andalso chk("\offlib\p") andalso chk("\offlib\parts") then exit do
+    if OpenFolder("Locate LDRAW Shadow folder","shadow",sPath)=false then end
+  loop
+  
+  'var sPath = "G:\Jogos\LDCad-1-7-Beta-1-Win\shadow\offlib"
+  for N as long = 1 to ubound(g_pzShadowPaths)
+    g_sShadowPathList(N) = sPath + "\offlib" + *g_pzShadowPaths(N)
+  next N
+end sub
 #undef g_pzShadowPaths
+
+#macro ForEachPathSetting( _do )
+  _do( sPathLDRAW        , "Path"      , string   , ""                 , CheckPathLDRAW , _cfgVarName )
+  _do( sPathSHADOW       , "Path"      , string   , ""                 , CheckPathSHADOW , _cfgVarName )
+#endmacro
+
+#if __Main <> "LegoScript"
+  
+  #define   AddMember( _Name , __Section ,  _Type , __Default , __InitFunc... ) _Name as _Type  
+  #define InitDefault( _Name , __Section , __Type ,  _Default , __InitFunc... ) g_tCfg._Name = _Default
+  type PathSettings
+    ForEachPathSetting( AddMember )
+  end type
+  dim shared as PathSettings g_tCfg
+  ForEachPathSetting( InitDefault )
+  #undef AddMember
+  #undef InitDefault
+  
+  scope
+    
+    dim tSettings as PathSettings = g_tCfg
+    #define ReadStringSetting( _string ) _string      
+    #define CallSetupFunction( _Varname , _Function , _Parms... ) _Function( _Parms )
+    #macro LoadSetting( _Varname , _Section , _VarType , _Default , _SetupFunction... )    
+      cptr(integer ptr,@sSetting)[1] = GetPrivateProfileString( _Section , mid(#_Varname,2) , " " , strptr(sSetting) , 65535 , exepath+"\..\LegoScript.ini" )
+      if len(sSetting) then ._VarName = Read##_VarType##Setting( sSetting )
+      #define _cfgVarName ._Varname
+      CallSetupFunction( _VarName , _SetupFunction )
+      #undef _cfgVarName
+    #endmacro
+    
+    var sSetting = space(65536)
+    with tSettings
+      ForEachPathSetting( LoadSetting )
+    end with  
+    sSetting = ""
+    g_tCfg = tSettings
+  end scope
+    
+#endif

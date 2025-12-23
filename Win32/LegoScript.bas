@@ -131,8 +131,8 @@ declare sub RichEdit_Replace( hCtl as HWND , iStart as long , iEnd as long , sTe
 declare sub ChangeToTabByFile( sFullPath as string , iLine as long = -1 )
 
 #include "Loader\Modules\Matrix.bas"
-#include once "LSModules\Settings.bas"
 #include "Loader\LoadLDR.bas"
+#include once "LSModules\Settings.bas"
 #include "Loader\Include\Colours.bas"
 #include "Loader\Modules\Clipboard.bas"
 #include "Loader\Modules\InitGL.bas"

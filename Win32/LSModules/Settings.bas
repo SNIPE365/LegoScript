@@ -17,6 +17,7 @@
   _do( bAutoFmtCase      , "Editor"    , boolean  , true                , MenuTriggerIfTrue(meAutoFormat_Case)   )
   _do( bCompletionEnable , "Editor"    , boolean  , true                , MenuTriggerIfTrue(meCompletion_Enable) )
   _do( lChecksum         , "Config"    , ulong    , -cSettingVersion    )
+  ForEachPathSetting( _do )  
 #endmacro
 
 #macro AddStructMember( _Varname , _Section , _VarType , _Default , _SetupFunction... )
@@ -47,6 +48,7 @@ end sub
 
 function ReadLongSetting( sSetting as string ) as long : return valint(sSetting) : end function
 function ReadULongSetting( sSetting as string ) as ulong : return valint(sSetting) : end function
+function ReadStringSetting( sSetting as string ) as string : return sSetting : end function
 function ReadBooleanSetting( sSetting as string ) as boolean
   select case trim(lcase(sSetting))
   case "true","yes" : return true

@@ -84,7 +84,7 @@ rem ------------------------- configuration -----------------------------
    ForEachConfig( DeclareVariable )
    #undef DeclareVariable
    
-   const sConfigFilename = "LS_CLI.ini" , sConfigSection = "Config" 
+   const sConfigFilename = "LegoScript.ini" , sConfigSection = "Editor" 
    sub LoadConfig()
       var sConfigFile = exepath+"\"+sConfigFilename
       #macro ReadConfig( _Name , _UnusedType , _Variable , _Default )
