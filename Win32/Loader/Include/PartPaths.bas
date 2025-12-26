@@ -4,6 +4,7 @@
 
 #include once "win\Shlobj.bi"
 #include once "dir.bi"
+#include once "file.bi"
 
 #ifndef NULL
 const NULL = 0
@@ -31,6 +32,7 @@ rem ------------------------------
 
 static shared as string g_sPathList( ubound(g_pzPaths) )
 static shared as byte g_bPathQuality( ubound(g_pzPaths) )
+static shared as string g_sCfgFile
 
 function OpenFolder( sTitle as string , sInit as string , sOutput as string ) as boolean
   
@@ -80,9 +82,18 @@ function OpenFolder( sTitle as string , sInit as string , sOutput as string ) as
 end function
 
 sub CheckPathLDRAW( byref sPath as string )  
-  #define chk(_s) (GetFileAttributes(sPath+_s) and FILE_ATTRIBUTE_DIRECTORY)
+  #define chk(_s) ((GetFileAttributes(sPath+_s) and (&h80000000 or FILE_ATTRIBUTE_DIRECTORY))=FILE_ATTRIBUTE_DIRECTORY)
+  #define IsPath(_s) (mid(_s,2,2)=":\")
+  'orelse left(_s,2)=".\")
+  
+  if IsPath(sPath)=0 then sPath = g_sCfgFile+"\"+sPath
+  
+  'puts(sPath & " || " & GetFileAttributes(sPath)) & " || " & FILE_ATTRIBUTE_DIRECTORY
+  'puts(sPath+"\unoff" & " || " & GetFileAttributes(sPath+"\unoff"))
+  'puts(sPath+"\p" & " || " & GetFileAttributes(sPath+"\p"))
+  'puts(sPath+"\part" & " || " & GetFileAttributes(sPath+"\part"))
   do
-    if instr(sPath,":\") andalso chk("") andalso chk("\unoff") andalso chk("\p") andalso chk("\part") then exit do
+    if IsPath(sPath) andalso chk("") andalso chk("\unoff") andalso chk("\p") andalso chk("\parts") then exit do
     if OpenFolder("Locate LDRAW folder","ldraw",sPath)=false then end
   loop
     
@@ -105,9 +116,13 @@ rem ----------------------------------------------
 
 dim shared as string g_sShadowPathList( ubound(g_pzShadowPaths) )
 sub CheckPathSHADOW( byref sPath as string )
-  #define chk(_s) (GetFileAttributes(sPath+_s) and FILE_ATTRIBUTE_DIRECTORY)
+  #define chk(_s) ((GetFileAttributes(sPath+_s) and (&h80000000 or FILE_ATTRIBUTE_DIRECTORY))=FILE_ATTRIBUTE_DIRECTORY)
+  #define IsPath(_s) (mid(_s,2,2)=":\")
+  'orelse left(_s,2)=".\")
+  if IsPath(sPath)=0 then sPath = g_sCfgFile+"\"+sPath
+  
   do
-    if instr(sPath,":\") andalso chk("") andalso chk("\offlib\p") andalso chk("\offlib\parts") then exit do
+    if IsPath(sPath) andalso chk("") andalso chk("\offlib\p") andalso chk("\offlib\parts") then exit do
     if OpenFolder("Locate LDRAW Shadow folder","shadow",sPath)=false then end
   loop
   
@@ -123,6 +138,8 @@ end sub
   _do( sPathSHADOW       , "Path"      , string   , ""                 , CheckPathSHADOW , _cfgVarName )
 #endmacro
 
+g_sCfgFile = exepath()
+
 #if __Main <> "LegoScript"
   
   #define   AddMember( _Name , __Section ,  _Type , __Default , __InitFunc... ) _Name as _Type  
@@ -135,13 +152,21 @@ end sub
   #undef AddMember
   #undef InitDefault
   
-  scope
+  scope    
+    
+    if FileExists(g_sCfgFile+"\LegoScript.ini")=0 then
+      g_sCfgFile += "\.."
+      if FileExists(g_sCfgFile+"\LegoScript.ini")=0 then
+        MessageBox(null,"LegoScript.ini not found, please run 'legoscript.exe' to configure it",null,MB_ICONERROR or MB_SYSTEMMODAL)
+        system 2
+      end if
+    end if
     
     dim tSettings as PathSettings = g_tCfg
     #define ReadStringSetting( _string ) _string      
     #define CallSetupFunction( _Varname , _Function , _Parms... ) _Function( _Parms )
     #macro LoadSetting( _Varname , _Section , _VarType , _Default , _SetupFunction... )    
-      cptr(integer ptr,@sSetting)[1] = GetPrivateProfileString( _Section , mid(#_Varname,2) , " " , strptr(sSetting) , 65535 , exepath+"\..\LegoScript.ini" )
+      cptr(integer ptr,@sSetting)[1] = GetPrivateProfileString( _Section , mid(#_Varname,2) , " " , strptr(sSetting) , 65535 , g_sCfgFile+"\LegoScript.ini" )
       if len(sSetting) then ._VarName = Read##_VarType##Setting( sSetting )
       #define _cfgVarName ._Varname
       CallSetupFunction( _VarName , _SetupFunction )

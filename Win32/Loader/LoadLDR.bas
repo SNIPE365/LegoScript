@@ -14,7 +14,7 @@
 #define RGBA_B( c ) ( CUInt( c )        And 255 )
 #define RGBA_A( c ) ( CUInt( c ) Shr 24         )
 
-#define __DebugShadowLoad
+'#define __DebugShadowLoad
 '#define DebugPrimitive
 '#define DebugLoading
 #define IgnoreMissingDependencies

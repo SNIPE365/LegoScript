@@ -15,14 +15,14 @@
 '#define __Tester
 
 '#define DebugShadow
-#define DebugShadowConnectors
+'#define DebugShadowConnectors
 
 '#define ColorizePrimatives
 '#define RenderOptionals //broken
 '#define DebugLoading
 '#define PrimitiveWarnings
 
-'#define UseVBO
+#define UseVBO
 
 '#ifndef __NoRender
 
@@ -988,6 +988,10 @@ do
   dim as double dFrameCPU , dAccCPU , dSpeed = 1
   dim as double dFrameGL  , dAccGL
   dim iFPS as long , dFPS as double = timer
+  
+  #ifdef UseVBO 
+    if g_tModelArrays.lPieceCount > 2000 then bViewBorders = false
+  #endif
   
   do
     dFrameGL = timer
