@@ -4,6 +4,7 @@
 #cmdline "-Wl '--large-address-aware'"
 
 #define __Main "LegoScript"
+#define __DebugShadowLoad
 
 #include once "windows.bi"
 #include once "win\commctrl.bi"
@@ -869,6 +870,13 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
        ShowWindow( g_hContainer , SW_HIDE )
     end if
   #endif
+  case WM_DROPFILES
+    var hDrop = cast(HANDLE,wParam)
+    if wParam=0 then return 0
+    var iFiles = DragQueryFile( hDrop , &hFFFFFFFF , NULL , 0 )
+    MessageBox( hwnd , "Opening " & iFiles & " files" , sAppName , MB_ICONINFORMATION or MB_TASKMODAL )
+    DragFinish( hDrop )
+    return 1
   case WM_ENTERMENULOOP , WM_ENTERSIZEMOVE  
    ShowWindow( g_hContainer , SW_HIDE )
   case WM_CREATE  'Window was created
@@ -1028,15 +1036,12 @@ sub WinMain ()
     exit sub
   end if
   
-  '' Create the window and show it
-  'WS_EX_COMPOSITED or WS_EX_LAYERED
-  
   var hMenu = CreateMainMenu()
   var hAcceleratos = CreateMainAccelerators()
-       
-  'WS_EX_COMPOSITED , WS_EX_LAYERED
-  'or WS_CLIPCHILDREN
-  hWnd = CreateWindowEx(0,sAppName,sAppName, WS_TILEDWINDOW , _ 'or WS_MAXIMIZE
+
+  const cStyleEx = WS_EX_ACCEPTFILES 'WS_EX_COMPOSITED , WS_EX_LAYERED
+  const cStyle   = WS_TILEDWINDOW 'or WS_MAXIMIZE or WS_CLIPCHILDREN
+  hWnd = CreateWindowEx(cStyleEx,sAppName,sAppName, cStyle , _ 
   g_tCfg.lGuiX,g_tCfg.lGuiY,320,200,null,hMenu,g_AppInstance,0)   
   'SetClassLong( hwnd , GCL_HBRBACKGROUND , CLNG(GetSysColorBrush(COLOR_INFOBK)) )
   'SetLayeredWindowAttributes( hwnd , GetSysColor(COLOR_INFOBK) , 252 , LWA_COLORKEY )

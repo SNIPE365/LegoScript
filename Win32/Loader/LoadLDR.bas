@@ -162,12 +162,14 @@ function LoadShadow( pPart as DATFile ptr , sFromFile as string , bRecursion as 
             pFile += iResu
                      
             var suType = ucase(sType)
-            if suType = "//!LDCAD" then
-               #if (not defined(__Tester)) andalso defined(__DebugShadowLoad)               
-               puts("Unignoring commented !LDCAD")
-               #endif
-               suType = "!LDCAD"
-            end if
+            #if 0
+              if suType = "//!LDCAD" then
+                 #if (not defined(__Tester)) andalso defined(__DebugShadowLoad)
+                 puts("Unignoring commented !LDCAD")
+                 #endif
+                 suType = "!LDCAD"
+              end if
+            #endif
             'ignore all non !LDCAD comments
             if suType <> "!LDCAD" then 
                NextLine() : continue do
