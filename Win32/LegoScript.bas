@@ -874,7 +874,14 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
     var hDrop = cast(HANDLE,wParam)
     if wParam=0 then return 0
     var iFiles = DragQueryFile( hDrop , &hFFFFFFFF , NULL , 0 )
-    MessageBox( hwnd , "Opening " & iFiles & " files" , sAppName , MB_ICONINFORMATION or MB_TASKMODAL )
+    if iFiles > 9 then
+      var iResu = MessageBox( hwnd , "You're opening " & iFiles & " files, want to continue?" , sAppName , MB_ICONINFORMATION or MB_TASKMODAL or MB_YESNO )
+      if iResu = IDNO then iFiles=0
+    end if
+    for N as long = 0 to iFiles-1
+      dim as zstring*65536 zFile = any
+      if DragQueryFile( hDrop , N , zFile , 65535 ) then LoadScript( zFile )
+    next N  
     DragFinish( hDrop )
     return 1
   case WM_ENTERMENULOOP , WM_ENTERSIZEMOVE  

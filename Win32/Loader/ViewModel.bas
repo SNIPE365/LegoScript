@@ -1,5 +1,5 @@
 #define __Main "ViewModel.bas"
-'#cmdline "-gen gcc -fpu sse -O 3 -Wc '-Ofast -march=native' -Wl '--large-address-aware'"
+#cmdline "-gen gcc -fpu sse -O 3 -Wc '-Ofast -march=native' -Wl '--large-address-aware'"
 
 #include "windows.bi"
 
