@@ -199,7 +199,10 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
   Gfx.Resize(ScrWid,ScrHei)   
   dim as HWND hwndGFX
   screencontrol fb.GET_WINDOW_HANDLE , *cptr(uinteger ptr,@hwndGFX)   
-  InitRawInput( hwndGFX )
+  InitRawInput( hwndGFX )  
+  DragAcceptFiles( hwndGFX , TRUE )
+
+  'sFile
   
   #macro _InitExtension(_NAME) 
     _NAME = cast(any ptr, wglGetProcAddress(#_NAME))

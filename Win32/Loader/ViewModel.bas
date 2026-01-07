@@ -1,5 +1,5 @@
 #define __Main "ViewModel.bas"
-#cmdline "-gen gcc -fpu sse -O 3 -Wc '-Ofast -march=native' -Wl '--large-address-aware'"
+#cmdline "-gen gcc -fpu sse -O 3 -Wc '-O1 -march=native' -Wl '--large-address-aware'"
 
 #include "windows.bi"
 
@@ -25,6 +25,8 @@
 #define UseVBO
 
 '#ifndef __NoRender
+
+declare function DropFilesHandler( hDrop as HANDLE ) as LRESULT
 
 #include "Modules\Matrix.bas"
 #include "LoadLDR.bas"
@@ -96,7 +98,7 @@ TimeBeginPeriod(1)
 #endif
 
 var sPath = environ("userprofile")+"\Desktop\LDCAD\"
-dim as string sFile
+dim shared as string sFile
 
 scope 
    'sFile = "3023.dat"
@@ -264,7 +266,7 @@ scope
  'sFile = "light.dat"
  'sFile = "3001.dat"
  'sFile = "60483.dat"
- sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\ldraw\parts\s\60483s01.dat"
+ 'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\ldraw\parts\s\60483s01.dat"
  'sFile = "F:\10294 - Titanic.mpd"
  'sFile = "4070.dat" '4070 , 87087 , 26604 , 47905 , 4733 , 30414
  'sFile = "G:\Jogos\LegoScript-main\examples\cube\cube.ldr"
@@ -293,7 +295,7 @@ end scope
 
 dim as string sModel
 dim shared as DATFile ptr g_pModel
-dim shared as boolean bEditMode
+dim shared as boolean bEditMode,bFileDropped
 
 '///////////////////// free cam variables //////////////////
 static shared as single g_fCameraX,g_fCameraY,g_fCameraZ
@@ -304,6 +306,14 @@ static shared as single g_fUpX=0.0 , g_fUpY=1.0 , g_fUpZ = 0.0 ' World Up
 const cMovementSpeed = 2f , cLookSpeed = 4/20f , cWheelDivisor = 16
 const cPI180 = atn(1)/45
 
+function DropFilesHandler( hDrop as HANDLE ) as LRESULT
+  dim as zstring*65536 zFile = any
+  if DragQueryFile( hDrop , 0 , zFile , 65535 ) then
+    sFile = zFile : bFileDropped = true
+  end if
+  DragFinish( hDrop )
+  return TRUE
+end function
 sub UpdateCameraVectors()
     
     dim as single fRadYaw = g_fYaw * cPI180 , fRadPitch = g_fPitch * cPI180
@@ -351,8 +361,8 @@ dim shared as PartSnap tSnapID
 
 #ifdef UseVBO
 static shared as ModelDrawArrays g_tModelArrays
-static shared as GLuint iTriangleVBO,iColorTriVBO,iTrColTriVBO,iBorderVBO,iColorBrdVBO,iCubemapVBO
-static shared as GLuint iCubemapIdxVBO, iBorderIdxVBO, iTriangleIdxVBO
+static shared as GLuint iTriangleVBO=-1,iColorTriVBO=-1,iTrColTriVBO=-1,iBorderVBO=-1,iColorBrdVBO=-1,iCubemapVBO=-1
+static shared as GLuint iCubemapIdxVBO=-1, iBorderIdxVBO=-1, iTriangleIdxVBO=-1
 static shared as long g_uDrawParts , g_uDrawBoxes
 #else
 static shared as long g_iModels , g_iBorders
@@ -607,6 +617,8 @@ do
   for N as long = g_ModelCount-1 to 0 step -1
     FreeModel( g_tModels(N).pModel )
   next N
+  if g_pModel then FreeModel( g_pModel ): g_pModel=0
+  
   g_sFilenames = chr(0) : g_sFilesToLoad = chr(0)
   
   #ifdef LoadFromSFile '1 = Load File , 0 = Load From clipboard
@@ -617,10 +629,11 @@ do
        print "Failed to load '"+sFile+"'"
        sleep : system
     end if
+    print sFile
     g_pModel = LoadModel( strptr(sModel) , sFile )
     var sEndsExt = lcase(right(sFile,4))      
   #else
-    sModel = command(1)
+    if len(sFile)=0 then sModel = command(1) else sModel = sFile
     var sEndsExt = lcase(right(sModel,4)), sFilename = "Copy Paste.ldr"
     printf(!"[%s // %s]\n",sModel,sEndsExt)
     var IsFilename = (instr(sModel,chr(10))=0) andalso ((sEndsExt=".dat") orelse (sEndsExt=".ldr") orelse (sEndsExt=".mpd"))
@@ -684,9 +697,10 @@ do
   printf(!"File Load Time: %1.2f\n",g_TotalLoadFileTime)
   printf(!"Processing time: %1.2f\n",dLoadTime-g_TotalLoadFileTime)
   'getchar()
-    
+  
   if sEndsExt=".dat" then bEditMode = true : puts("Edit mode?")  
   bEditMode = false
+  
   if hGfxWnd=0 then
     hGfxWnd = InitOpenGL()
     if bLighting then glEnable( GL_LIGHTING ) else glDisable( GL_LIGHTING )
@@ -700,6 +714,21 @@ do
   
   dLoadTIme = timer
   #ifdef UseVBO           
+    with g_tModelArrays
+      'if iTriangleVBO then ,iColorTriVBO,iTrColTriVBO,iBorderVBO,iColorBrdVBO,iCubemapVBO
+      'static shared as GLuint iCubemapIdxVBO, iBorderIdxVBO, iTriangleIdxVBO
+      if .pTriangleVtx then MyDeallocVertex( .pTriangleVtx )
+      if .pBorderVtx   then MyDeallocVertex( .pBorderVtx   )
+      if .pColorTriVtx then MyDeallocVertex( .pColorTriVtx )
+      if .pTrColTriVtx then MyDeallocVertex( .pTrColTriVtx )
+      if .pColorBrdVtx then MyDeallocVertex( .pColorBrdVtx )
+      if .pCubemapVtx  then MyDeallocVertex( .pCubemapVtx  )      
+      if .pCubeMapIdx  then MyDeallocIndex ( .pCubeMapIdx  )
+      if .pTriangleIdx then MyDeallocIndex ( .pTriangleIdx )
+      if .pBorderIdx   then MyDeallocIndex ( .pBorderIdx   )
+      if .pPieces      then MyDeallocIndex ( .pPieces      )
+    end with
+    clear g_tModelArrays,,sizeof(g_tModelArrays)    
     GenModelDrawArrays( g_pModel , g_tModelArrays )
     #if 0
       with g_tModelArrays
@@ -715,9 +744,9 @@ do
     #endif
     #macro CreateVBO( _name )      
       with g_tModelArrays
-        if .l##_name##Cnt then glGenBuffers(1 , @i##_name##VBO)
+        if .l##_name##Cnt andalso clng(i##_name##VBO)=-1 then glGenBuffers(1 , @i##_name##VBO)
         #ifdef i##_name##IdxVBO
-        glGenBuffers(1 , @i##_name##IdxVBO)
+        if clng(i##_name##IdxVBO)=-1 then glGenBuffers(1 , @i##_name##IdxVBO)
         #endif
         if .p##_name##vtx andalso .l##_name##Cnt then
           #define vtxSz (.l##_name##Cnt * sizeof(typeof(*.p##_name##vtx)))
@@ -731,9 +760,9 @@ do
           #else
           printf(!"%s = %1.1fmb\n" , #_name , (vtxSz)/(1024*1024) )
           #endif
-          MyDeallocVertex( .p##_name##vtx )
+          MyDeallocVertex( .p##_name##vtx ) : .p##_name##vtx = NULL
           #ifdef i##_name##IdxVBO
-          MyDeallocIndex( .p##_name##Idx )
+          MyDeallocIndex( .p##_name##Idx ) : .p##_name##Idx = NULL
           #endif
         else          
           #ifdef i##_name##IdxVBO            
@@ -780,7 +809,8 @@ do
   
   dim as single xMid,yMid,zMid,g_zFar  
   dim as long g_PartCount = -1 , g_CurPart = -1
-    
+  
+  clear g_tSz ,, sizeof(g_tSz)
   SizeModel( g_pModel , g_tSz , , g_PartCount )
   
   with g_tSz
@@ -988,9 +1018,10 @@ do
   dim as double dFrameCPU , dAccCPU , dSpeed = 1
   dim as double dFrameGL  , dAccGL
   dim iFPS as long , dFPS as double = timer
+  g_bNeedUpdate = true
   
   #ifdef UseVBO 
-    if g_tModelArrays.lPieceCount > 2000 then bViewBorders = false
+    bViewBorders = g_tModelArrays.lPieceCount <= 2000
   #endif
   
   do
@@ -1103,46 +1134,46 @@ do
       end if
 
       while (ScreenEvent(@e))
-      Select Case e.type         
-      case fb.EVENT_MOUSE_BUTTON_PRESS
-         dim as long lDX=any,lDY=any : GetMouseDelta( lDX, lDY )            
-         g_bLocked = true : setmouse ,,,g_bLocked
-      case fb.EVENT_MOUSE_BUTTON_RELEASE
-         g_bLocked = false : setmouse ,,,g_bLocked
-      case fb.EVENT_KEY_PRESS
-         
-         ControlKeys()
-         
-         select case e.ascii
-         case 8: g_fCameraX = 0 : g_fCameraY = 0 : g_fCameraZ = 0
-         'case 8: if g_bLocked then g_bLocked = false : setmouse ,,,g_bLocked
-         end select
-         select case e.scancode         
-         case fb.SC_W      : bMoveForward  = true
-         case fb.SC_S      : bMoveBackward = true
-         case fb.SC_A      : bStrafeLeft   = true
-         case fb.SC_D      : bStrafeRight  = true
-         case fb.SC_SPACE  : bMoveUp       = true
-         case fb.SC_LSHIFT : bMoveDown     = true
-         end select
-      case fb.EVENT_KEY_RELEASE
-         select case e.scancode
-         case fb.SC_W      : bMoveForward  = false
-         case fb.SC_S      : bMoveBackward = false
-         case fb.SC_A      : bStrafeLeft   = false
-         case fb.SC_D      : bStrafeRight  = false
-         case fb.SC_SPACE  : bMoveUp       = false
-         case fb.SC_LSHIFT : bMoveDown     = false
-         end select      
-      case fb.EVENT_WINDOW_GOT_FOCUS
-         g_bFocus = true : bSkipMouse = 1
-         if g_bLocked then setmouse ,,,g_bLocked
-      case fb.EVENT_WINDOW_LOST_FOCUS
-         if g_bLocked then setmouse ,,,false
-         g_bFocus = false : bSkipMouse = 1
-      case fb.EVENT_WINDOW_CLOSE
-         exit do,do
-      end select
+        Select Case e.type         
+        case fb.EVENT_MOUSE_BUTTON_PRESS
+           dim as long lDX=any,lDY=any : GetMouseDelta( lDX, lDY )            
+           g_bLocked = true : setmouse ,,,g_bLocked
+        case fb.EVENT_MOUSE_BUTTON_RELEASE
+           g_bLocked = false : setmouse ,,,g_bLocked
+        case fb.EVENT_KEY_PRESS
+           
+           ControlKeys()
+           
+           select case e.ascii
+           case 8: g_fCameraX = 0 : g_fCameraY = 0 : g_fCameraZ = 0
+           'case 8: if g_bLocked then g_bLocked = false : setmouse ,,,g_bLocked
+           end select
+           select case e.scancode         
+           case fb.SC_W      : bMoveForward  = true
+           case fb.SC_S      : bMoveBackward = true
+           case fb.SC_A      : bStrafeLeft   = true
+           case fb.SC_D      : bStrafeRight  = true
+           case fb.SC_SPACE  : bMoveUp       = true
+           case fb.SC_LSHIFT : bMoveDown     = true
+           end select
+        case fb.EVENT_KEY_RELEASE
+           select case e.scancode
+           case fb.SC_W      : bMoveForward  = false
+           case fb.SC_S      : bMoveBackward = false
+           case fb.SC_A      : bStrafeLeft   = false
+           case fb.SC_D      : bStrafeRight  = false
+           case fb.SC_SPACE  : bMoveUp       = false
+           case fb.SC_LSHIFT : bMoveDown     = false
+           end select      
+        case fb.EVENT_WINDOW_GOT_FOCUS
+           g_bFocus = true : bSkipMouse = 1
+           if g_bLocked then setmouse ,,,g_bLocked
+        case fb.EVENT_WINDOW_LOST_FOCUS
+           if g_bLocked then setmouse ,,,false
+           g_bFocus = false : bSkipMouse = 1
+        case fb.EVENT_WINDOW_CLOSE
+           exit do,do
+        end select
       wend
        
     else
@@ -1259,7 +1290,7 @@ do
         case fb.EVENT_WINDOW_CLOSE
            exit do,do
         end select
-      wend
+      wend      
       
     end if
     
@@ -1295,6 +1326,13 @@ do
     else
       'if g_Vsync=0 then SleepEx(1,1)
       if g_bFocus=0 then SleepEx(100,1)
+    end if
+    
+    if bFileDropped then 
+      bFileDropped=false 
+      fRotationX = 120 : fRotationY = 20
+      fPositionX = 0 : fPositionY = 0 : fPositionZ = 0 : fZoom = -3
+      exit do
     end if
     
     if multikey(fb.SC_ESCAPE) then exit do,do

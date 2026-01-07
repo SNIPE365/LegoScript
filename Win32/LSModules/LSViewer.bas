@@ -7,6 +7,7 @@ namespace Viewer
    dim shared as any ptr g_Mutex
    dim shared as DATFile ptr g_pLoadedModel
    dim shared as boolean bShowCollision
+   common shared as DWORD Viewer_dwThisThread
    
    sub ReloadFile()
       MutexLock( g_Mutex )
@@ -38,8 +39,7 @@ namespace Viewer
   const CANRES = WS_THICKFRAME  
   const _TOOL = WS_EX_LAYERED
   
-  dim shared PreDetour as any ptr,llDetour as ulongint
-  dim shared as DWORD dwThisThread
+  dim shared PreDetour as any ptr,llDetour as ulongint  
   declare sub PreventWindowBlink(iUndo as integer=0)  
   private sub AutoUnDetour() destructor        
     'TimeEndPeriod(1)
@@ -51,7 +51,7 @@ namespace Viewer
       mov eax,[PreDetour]
       pusha
       call GetCurrentThreadID             '\ if we are not on the right THREAD
-      cmp eax,[dwThisThread]              '| then skip undoing the detour
+      cmp eax,[Viewer_dwThisThread]       '| then skip undoing the detour
       jnz 1f                              '/
       'push 1                                   
       'call PreventWindowBlink             ' undo detour
@@ -86,7 +86,7 @@ namespace Viewer
     else              
       if PreDetour=0 then                  
         'puts("detour")
-        dwThisThread = GetCurrentThreadID()
+        Viewer_dwThisThread = GetCurrentThreadID()
         PreDetour = pPtr+5 'mov esi | push ebp | mov ebp,esp
         llDetour = *cptr(ulongint ptr,pPtr)
         *cptr(ubyte ptr,pPtr+0) = &hE9

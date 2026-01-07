@@ -1,7 +1,9 @@
-#cmdline "res\LS.rc"
+'#cmdline "res\LS.rc"
 '#cmdline "Res\LS.rc  -gen gcc -O 3 -g"
-'#cmdline "Res\LS.rc  -gen gcc -O 3  -Wl '--large-address-aware' "
-#cmdline "-Wl '--large-address-aware'"
+#cmdline "Res\LS.rc  -gen gcc -O 3  -Wl '--large-address-aware' "
+'#cmdline "-Wl '--large-address-aware'"
+
+'-O 1
 
 #define __Main "LegoScript"
 #define __DebugShadowLoad
@@ -16,6 +18,11 @@
 #include once "win\shlwapi.bi"
 #include once "crt.bi"
 #include once "fbthread.bi"
+
+#if __FB_DEBUG__
+  '#include once "MyTDT\Exceptions.bas"
+  'StartExceptions()
+#endif
 
 #undef File_Open
 #define Errorf(p...)
@@ -505,6 +512,8 @@ sub ResizeMainWindow( bInit as boolean = false )
   'puts("...")
 end sub
 
+
+
 static shared as any ptr OrgEditProc
 function WndProcEdit ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LPARAM ) as LRESULT   
    static as long iMod   
@@ -556,6 +565,9 @@ function WndProcEdit ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam a
       g_iPrevRowCount = 0
       RichEdit_TopRowChange( hWnd )
       return iResu   
+   case WM_CONTEXTMENU
+     Edit_ContextMenu( hWnd , wParam , lParam )
+     return 0
    end select
    if OrgEditProc=0 then return 0
    return CallWindowProc( OrgEditProc , hWnd , message , wParam, lParam )   

@@ -175,7 +175,7 @@ function LoadPartModel( byref tPart as PartStructLS ) as long
       'generate snap if not generated yet
       'var pModel = g_tModels(.iModelIndex).pModel
       if pModel->pData = 0 then   
-         pModel->pData = new PartSnap
+         pModel->pData = MyAllocData(sizeof(PartSnap))
          var pSnap = cptr(PartSnap ptr,pModel->pData)
          SnapModel( pModel , *pSnap )         
          SortSnap( *pSnap )

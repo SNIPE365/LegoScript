@@ -690,9 +690,9 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
             'add to list
             iFilenameOffset = LoadedList_AddFile( sFilename , iModelIndex )
             pNew->iModelIndex = iModelIndex
-            'pNew->iShadowCount = 0
-            'pNew->pData = NULL
-            'pNew->paShadow = NULL
+            pNew->iShadowCount = 0
+            pNew->pData = NULL
+            pNew->paShadow = NULL
             with pNew->tSize
                .xMin = fUnused : .xMax = fUnused
                .yMin = fUnused : .yMax = fUnused

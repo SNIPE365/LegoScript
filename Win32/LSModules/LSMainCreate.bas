@@ -18,7 +18,7 @@ AddButtonA ( wcButton    , _NextCol  , _SameRow  , cMarginR , cRow(1.25) , "Buil
 AddButtonA ( wcSidePanel , _Num(0)   , _NextRow0 , _pct(0)  , _BottomE(-1.15) , "Solutions" , BS_OWNERDRAW or WS_DLGFRAME )
 AddSplitter( wcSideSplit , _NextCol0 , _SameRow  , _pct(0.5)  , _NextRow0 )
 AddRichA   ( wcLines     , cLeftSide , _TpN(wcSidePanel,0)  , _pct(1.9*(2+1)) , _BtN(wcEdit,0) ,  "" , WS_DISABLED or ES_RIGHT ) 'SS_OWNERDRAW )
-AddRichA   ( wcEdit      , _NextCol0 , _SameRow  , cMarginR , _pct(53) , "" , WS_HSCROLL or WS_VSCROLL or ES_AUTOHSCROLL or ES_DISABLENOSCROLL or ES_NOHIDESEL )            
+AddRichA   ( wcEdit      , _NextCol0 , _SameRow  , cMarginR , _pct(53) , "" , WS_HSCROLL or WS_VSCROLL or ES_AUTOHSCROLL or ES_DISABLENOSCROLL or ES_NOHIDESEL )
 AddSplitter( wcOutSplit  , _SameCol  , _NextRow0 , _NextCol0, _pct(1) )
 AddButtonAT( wcBtnSide  , _RtP( wcSideSplit , 1 ) , _NextRow0  , _pct(4)  , cEm(1.1) , !"\x34" , BS_AUTOCHECKBOX or BS_PUSHLIKE ) '_RtP(wcSidePanel,-4)
 AddButtonA ( wcRadOutput , _RtN(wcLines,0) , _SameRow  , _pct(11) , cEm(1.1) , "Output" , WS_GROUP or BS_AUTORADIOBUTTON or BS_PUSHLIKE )

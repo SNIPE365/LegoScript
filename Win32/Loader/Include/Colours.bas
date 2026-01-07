@@ -432,8 +432,8 @@
    _Do(Fabric_Cream                     ,10000     ,&hEBDFD1,&h333333, 255 , -1 , "" )
 #endmacro
 
-static shared as ulong g_Colours(11000)
-static shared as ulong g_EdgeColours(11000)
+static shared as ulong g_Colours(32767) '11000)
+static shared as ulong g_EdgeColours(32767) '11000)
 
 #define DeclareConstants( _Name , _Id , _Color , _Edge , _Alpha , _Lumi , _Material ) const c_##_Name = _Id
 ForEachColor( DeclareConstants )

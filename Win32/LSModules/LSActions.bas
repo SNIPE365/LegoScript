@@ -464,7 +464,7 @@ sub Do_Compile( bDoLock as boolean = true )
    end if
    if len(sError) then SendMessage( CTL(wcRadOutput) , BM_CLICK , 0,0 )
    SetWindowText( CTL(wcStatus) , iif(len(sOutput),"Ready.",iif(len(sError),"Script error.","No output generated!")))
-   
+   SetFocus( CTL(wcEdit) )
 end sub
 sub Button_Compile()
    Try()
@@ -687,6 +687,40 @@ sub Edit_Copy()
 end sub
 sub Edit_Paste()
    SendMessage( GetFocus() , WM_PASTE , 0,0 )
+end sub
+sub Edit_ContextMenu( hRichEdit as HWND , wParam as WPARAM , lParam as LPARAM)
+  
+  var hMenu = CreatePopupMenu()
+        
+  '// 1. Add standard items
+  AppendMenu(hMenu, MF_STRING   , WM_UNDO , @"&Undo"      )
+  AppendMenu(hMenu, MF_SEPARATOR,    0    , NULL          )
+  AppendMenu(hMenu, MF_STRING   , WM_CUT  , @"Cu&t"       )
+  AppendMenu(hMenu, MF_STRING   , WM_COPY , @"&Copy"      )
+  AppendMenu(hMenu, MF_STRING   , WM_PASTE, @"&Paste"     )
+  AppendMenu(hMenu, MF_STRING   , WM_CLEAR, @"&Delete"    )
+  AppendMenu(hMenu, MF_SEPARATOR,    0    , NULL          )
+  AppendMenu(hMenu, MF_STRING   ,   1001  , @"Select &All") '// Custom ID for Select All
+
+  '// 2. Logic to enable/disable items based on selection/undo-stack
+  if (SendMessage(hRichEdit, EM_CANUNDO, 0, 0)=0) then
+    EnableMenuItem(hMenu, WM_UNDO, MF_BYCOMMAND or MF_GRAYED)
+  end if
+
+  '// 3. Display the menu
+  var x = cshort(loword(lParam)) , y = cshort(hiword(lParam))
+  
+  '// TrackPopupMenu returns the ID of the clicked item
+  var cmd = TrackPopupMenu(hMenu, TPM_LEFTALIGN or TPM_RIGHTBUTTON or TPM_RETURNCMD, x, y, 0, hRichEdit, NULL)
+  
+  '// 4. Send the command to the RichEdit
+  if cmd=1001 then
+    SendMessage(hRichEdit, EM_SETSEL, 0, -1)
+  elseif cmd>0 then
+    SendMessage(hRichEdit, cmd, 0, 0)
+  end if
+
+  DestroyMenu(hMenu)
 end sub
 
 sub Code_ClearOutput()

@@ -163,6 +163,12 @@ namespace gfx
       'const CANRES = WS_THICKFRAME
       'const BETRANS = WS_EX_TRANSPARENT
       'const NOTASK = WS_EX_TOOLWINDOW
+    case WM_DROPFILES  
+      var hDROP = cast(HANDLE, wParam)
+      if hDROP=0 then return 0
+      #ifdef DropFilesHandler
+      return DropFilesHandler( hDrop )
+      #endif        
     case else
       'printf "%i(%x) ",iMsg,iMsg
       'return DefWindowProc(hwnd,imsg,wparam,lparam)
@@ -281,5 +287,5 @@ sub GetMouseDelta( byref lX as long , byref lY as long )
    InterlockedExchangeAdd( @gfx.g_DeltaX , -lX )
    InterlockedExchangeAdd( @gfx.g_DeltaY , -lY )
 end sub
-  
+
 
