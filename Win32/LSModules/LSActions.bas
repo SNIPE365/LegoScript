@@ -1,3 +1,46 @@
+#ifndef _u
+  #define _u(_text) @wstr(_text)
+#endif
+function MsgBox cdecl ( pwText as wstring ptr , pwCaption as wstring ptr  = _u("Attention!") , iIcon as long = 0 , iButtons as long = 1 , pwBtn1 as wstring ptr = _u("ok") , pwBtn2 as wstring ptr = NULL , pwBtn3 as wstring ptr = NULL ) as long
+  Dim tdc as TASKDIALOGCONFIG = type( sizeof(TASKDIALOGCONFIG) )
+  Dim as long nButton = (iButtons and 7)
+  
+  if nButton < 0 then nButton = 0
+  if nButton > 3 then nButton = 3
+  
+  '' Define the custom buttons
+  Dim buttons(0 to 2) as TASKDIALOG_BUTTON
+  for N as long = 0 to nButton-1    
+    buttons(N).nButtonID = 101+N
+    buttons(N).pszButtonText = (@pwBtn1)[N]
+  next N  
+  
+  dim as HICON hQuest = LoadIcon(NULL, IDI_QUESTION)
+
+  '' Setup the Config Structure
+  with tdc    
+    .hwndParent = GetDesktopWindow() 'CTL(wcMain))
+    .dwFlags = TDF_ALLOW_DIALOG_CANCELLATION' or TDF_POSITION_RELATIVE_TO_WINDOW
+    '.dwFlags or= TDF_SIZE_TO_CONTENT
+    .pszWindowTitle = pwCaption : .pszMainInstruction = pwText
+    .pszContent = NULL '@wstr("???") '@wstr("If you don't save, your work will be lost.")
+    select case iIcon
+    case MB_ICONWARNING     : .hMainIcon = cast(any ptr,TD_WARNING_ICON)
+    case MB_ICONINFORMATION : .hMainIcon = cast(any ptr,TD_INFORMATION_ICON) 
+    case MB_ICONERROR       : .hMainIcon = cast(any ptr,TD_ERROR_ICON)
+    case MB_ICONQUESTION    : .hMainIcon = hQuest : .dwFlags or= TDF_USE_HICON_MAIN
+    end select
+    .cButtons = nButton : .pButtons = @buttons(0)
+  end with
+  
+  TaskDialogIndirect(@tdc, @nButton, NULL, NULL)
+  if hQuest then DestroyIcon( hQuest )
+  
+  if nButton >= 101 andalso nButton < (101+iButtons) then return nButton-100
+  return -1  
+
+End function
+
 sub NotifySelChange( iID as long )   
    var hCTL = CTL( iID ), hParent = GetParent(hCTL)
    dim as SELCHANGE tSelChange           
@@ -174,8 +217,8 @@ function NewTab( sNewFile as string , iLinked as long = -1 , iReplaceTab as long
       SendMessage( hWnd , EM_EXLIMITTEXT , 0 , 16*1024*1024 ) '16mb text limit
       SendMessage( hWnd , EM_SETEVENTMASK , 0 , ENM_CLIPFORMAT or ENM_SELCHANGE or ENM_KEYEVENTS ) ' or ENM_SCROLL )
       SendMessage( hWnd , EM_SETMODIFY , 0 , 0 )
-      dim as TC_ITEM tItem = type( TCIF_TEXT , 0,0 , @"   " , 0,-1 , 0 ) 
-      TabCtrl_InsertItem( CTL(wcTabs) , iNewTab , @tItem )         
+      dim as TC_ITEM tItem = type( TCIF_TEXT , 0,0 , @"   " , 0,-1 , 0 )
+      TabCtrl_InsertItem( CTL(wcTabs) , iNewTab , @tItem )
    else
       'puts("Same tab")
    end if
@@ -359,8 +402,8 @@ end sub
 sub File_Close()
       
    if Sendmessage( CTL(wcEdit) , EM_GETMODIFY , 0,0 ) then
-      #define sMsg !"All unsaved data will be lost, continue?"
-      if MessageBox( CTL(wcMain) , sMsg , "File->Open" , MB_ICONQUESTION or MB_YESNO or MB_DEFBUTTON2 ) <> IDYES then exit sub
+      #define sMsg "All unsaved data will be lost, continue?"
+      if MsgBox( sMsg , _u("File->Open") , MB_ICONQUESTION , 3 or MB_DEFBUTTON2 , _u("Save") , _u("Don't Save") , _u("Cancel")  ) <> 1 then exit sub
    end if   
    
    if g_iTabCount = 1 then 
@@ -403,11 +446,11 @@ function File_Quit() as boolean
    for N as long = g_iTabCount-1 to 0 step -1
       ChangeToTab( N )
       if SendMessage( CTL(wcEdit) , EM_GETMODIFY , 0,0 ) then         
-         #define sMsg !"this file is modified, save it?"
-         select case MessageBox( CTL(wcMain) , sMsg , "File->Quit" , MB_ICONQUESTION or MB_YESNOCANCEL or MB_DEFBUTTON1 )
-         case IDYES    : File_Save()
-         case IDNO     : Sendmessage( CTL(wcEdit) , EM_SETMODIFY , 0,0 ) : File_Close()
-         case IDCANCEL : return FALSE
+         #define sMsg !"this file is modified, save it?"         
+         select case MsgBox( sMsg , _u("File->Open") , MB_ICONQUESTION , 3 or MB_DEFBUTTON1 , _u("Save") , _u("Don't Save") , _u("Cancel")  )
+         case 1 : File_Save()
+         case 2 : Sendmessage( CTL(wcEdit) , EM_SETMODIFY , 0,0 ) : File_Close()
+         case 3 : return FALSE
          end select
       else
          File_Close()
@@ -521,9 +564,10 @@ sub Output_ShowHide()
   if iOpen=0 orelse bOnce=0 then bOnce=1 : tPrevHei = g_tMainCtx.hCTL( wcEdit ).tH
   g_tMainCtx.hCTL( wcEdit ).tH = iif(iOpen , tPrevHei , _BottomE(-1) )   
   'g_tMainCtx.hCTL( wcBtnMinOut ).tX = iif(iOpen, _RtP(wcOutput,-4) , _RtP(wcOutput,-3))   
-  for I as long = wcRadOutput to wcBtnMinOut-1
+  for I as long = wcRadOutput to wcStatus-1
+    if I = wcBtnMinOut then continue for
     ShowWindow( CTL(I) , iif(iOpen,SW_SHOWNA,SW_HIDE) )
-  next I      
+  next I
   SetWindowText( CTL(wcBtnMinOut) , iif(iOpen,!"\x36",!"\x35") )
   var hWnd = CTL(wcMain)
   dim as RECT RcCli=any : GetClientRect(hWnd,@RcCli)      
@@ -786,6 +830,12 @@ sub Solution_ShowHide()
   static as byte bOnce = 0 : if bOnce=0 then bOnce=1 : tPrevWid = _pct(30)
   if iOpen=0 then tPrevWid = g_tMainCtx.hCTL( wcSidePanel ).tW
   g_tMainCtx.hCTL( wcSidePanel ).tW = iif(iOpen , tPrevWid , _Pct(0) )     
+  
+  for I as long = wcSidePanel to wcSideSplit-1
+    if I = wcBtnMinOut then continue for
+    ShowWindow( CTL(I) , iif(iOpen,SW_SHOWNA,SW_HIDE) )
+  next I
+  
   SetWindowText( CTL(wcBtnSide) , iif(iOpen,!"\x33",!"\x34") )
   var hWnd = CTL(wcMain)
   dim as RECT RcCli=any : GetClientRect(hWnd,@RcCli)      

@@ -111,6 +111,7 @@ const cTextStyle = cStyle
 const cSplitStyle = cStyleT
 const cComboStyle = cStyleT or CBS_DROPDOWN or CBS_NOINTEGRALHEIGHT or WS_VSCROLL'or CBS_AUTOHSCROLL 
 const cDropStyle = cStyleT or CBS_DROPDOWNLIST or CBS_NOINTEGRALHEIGHT or CBS_AUTOHSCROLL
+const cSearchStyle = cStyleT or CBS_SIMPLE or CBS_NOINTEGRALHEIGHT or CBS_AUTOHSCROLL
 const cFieldStyle = cStyleT or ES_AUTOHSCROLL
 const cFNumbStyle = cStyleT or ES_AUTOHSCROLL or ES_NUMBER
 const cEditStyle =  cStyleT or WS_VSCROLL or ES_MULTILINE or ES_WANTRETURN
@@ -145,6 +146,8 @@ const cLay = WS_EX_TRANSPARENT
 #define AddDatePick(_ID , _X , _Y , _W , _H , _S...)     ControlA( _ID , cBrd,DATETIMEPICK_CLASS,null, cDateStyle   , _X , _Y , _W , _H , _S )
 #define AddDropA(  _ID , _X , _Y , _W , _H , _H2 , _S... ) pCtx->hCTL(_ID).tH2 = _H2 : ControlA( _ID , null , "combobox" ,null, cDropStyle  , _X , _Y , _W , _H , _S )
 #define AddDropW(  _ID , _X , _Y , _W , _H , _H2 , _S... ) pCtx->hCTL(_ID).tH2 = _H2 : ControlW( _ID , null , "combobox" ,null, cDropStyle  , _X , _Y , _W , _H , _S )
+#define AddSearchA(  _ID , _X , _Y , _W , _H , _S... ) ControlA( _ID , null , "combobox" ,null, cSearchStyle  , _X , _Y , _W , _H , _S )
+#define AddSearchW(  _ID , _X , _Y , _W , _H , _S... ) ControlW( _ID , null , "combobox" ,null, cSearchStyle  , _X , _Y , _W , _H , _S )
 #define AddEditA(  _ID , _X , _Y , _W , _H , _T , _S... ) ControlA( _ID , cBrd , "edit"      , _T , cEditStyle  , _X , _Y , _W , _H , _S )
 #define AddEditW(  _ID , _X , _Y , _W , _H , _T , _S...) ControlW( _ID , cBrd , "edit"      , _T , cEditStyle  , _X , _Y , _W , _H , _S )
 #define AddFieldA( _ID , _X , _Y , _W , _H , _T , _S...) ControlA( _ID , cBrd , "edit"      , _T , cFieldStyle , _X , _Y , _W , _H , _S )

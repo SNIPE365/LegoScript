@@ -632,7 +632,7 @@ do
     print sFile
     g_pModel = LoadModel( strptr(sModel) , sFile )
     var sEndsExt = lcase(right(sFile,4))      
-  #else
+  #else    
     if len(sFile)=0 then sModel = command(1) else sModel = sFile
     var sEndsExt = lcase(right(sModel,4)), sFilename = "Copy Paste.ldr"
     printf(!"[%s // %s]\n",sModel,sEndsExt)

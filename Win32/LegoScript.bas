@@ -1,13 +1,14 @@
-'#cmdline "res\LS.rc"
 '#cmdline "Res\LS.rc  -gen gcc -O 3 -g"
-#cmdline "Res\LS.rc  -gen gcc -O 3  -Wl '--large-address-aware' "
-'#cmdline "-Wl '--large-address-aware'"
+'#cmdline "Res\LS.rc  -gen gcc -O 3  -Wl '--large-address-aware' "
+#cmdline "res\LS.rc -gen gcc -O 2 -Wl '--large-address-aware'"
 
 '-O 1
 
 #define __Main "LegoScript"
 #define __DebugShadowLoad
+#define SearchIsInPanel
 
+#define _WIN32_WINNT &h0600
 #include once "windows.bi"
 #include once "win\commctrl.bi"
 #include once "win\commdlg.bi"
@@ -20,8 +21,8 @@
 #include once "fbthread.bi"
 
 #if __FB_DEBUG__
-  '#include once "MyTDT\Exceptions.bas"
-  'StartExceptions()
+  #include once "MyTDT\Exceptions.bas"
+  StartExceptions()
 #endif
 
 #undef File_Open
@@ -31,7 +32,7 @@
 ' !!! some pieces have unmatched studs vs clutch (and i suspect that's their design problem) !!!
 ' !!! because when using ldraw it does not matter the order, so they never enforced that     !!!
 
-'TODO (21/12/25): make the errors bar height changable on mouseover
+'TODO (12/01/26): add option for rotate on cursor pos instead of model center
 'TODO (21/12/25): make the buttons smaller / change colors
 'TODO (21/12/25): the gray parts should now be very dark gray / buttons should be yellow
 'TODO (21/12/25): fix 3005 B1 s1 = 3024 P1 c1
@@ -57,11 +58,16 @@ enum WindowControls
   wcTabs
   wcButton  
   wcSidePanel
-  wcSideSplit
+  'Side Panel search tab
+  wcSearchEdit
+  wcSearchList  
+  wcSideSplit  
   wcBtnSide
+  'editor
   wcLines
-  wcEdit
-  wcOutSplit
+  wcEdit  
+  wcOutSplit  
+  'output
   wcRadOutput
   wcRadQuery
   wcBtnExec
@@ -80,6 +86,7 @@ enum WindowFonts
    wfDefault
    wfEdit
    wfStatus
+   wfSmall
    wfArrows
    wfLast
 end enum
@@ -339,41 +346,41 @@ sub RichEdit_SelChange( hCtl as HWND , iRow as long , iCol as long )
       'if .iCur < 0 then .iCur = iSz-2
    end with
    sLastSearch = zRow
-   
+
+   #ifndef SearchIsInPanel
    Try()
       HandleTokens( sLastSearch , g_SQCtx )
       Catch()
          LogError( "Auto completion Crashed!!!" )
       EndCatch()
    EndTry()
+   #endif
    
 end sub
 function RichEdit_KeyPress( hCtl as HWND , iKey as long , iMod as long ) as long
-   
-   'puts(__FUNCTION__)
-   
-   select case iKey     
-   case VK_TAB
-      if iMod=_Shift orelse iMod=0 then 'andalso len(.sToken)>1 then
-         var iCount = SendMessage( g_hSearch , LB_GETCOUNT , 0 , 0 )
-         var iSel   = SendMessage( g_hSearch , LB_GETCURSEL , 0 , 0 )
-         var iSelOrg = iSel
-         if iSel = LB_ERR then iSel=0 else iSel = (iSel+iCount+iif(iMod=0,1,-1)) mod iCount
-         SendMessage( g_hSearch , LB_SETCURSEL , iSel , 0 )
-         g_SearchChanged = true         
-      end if      
-   end select
-   
-   if g_SearchChanged<>0 andalso g_CompletionEnable then      
-      Try()
-         HandleTokens( sLastSearch , g_SQCtx )
-         Catch()
-            LogError( "Auto completion Crashed!!!" )
-         EndCatch()
-      EndTry()
-   end if
-   
-   return 0
+  #ifndef SearchIsInPanel
+  select case iKey     
+  case VK_TAB
+    if iMod=_Shift orelse iMod=0 then 'andalso len(.sToken)>1 then
+       var iCount = SendMessage( g_hSearch , LB_GETCOUNT , 0 , 0 )
+       var iSel   = SendMessage( g_hSearch , LB_GETCURSEL , 0 , 0 )
+       var iSelOrg = iSel
+       if iSel = LB_ERR then iSel=0 else iSel = (iSel+iCount+iif(iMod=0,1,-1)) mod iCount
+       SendMessage( g_hSearch , LB_SETCURSEL , iSel , 0 )
+       g_SearchChanged = true         
+    end if      
+  end select
+  
+  if g_SearchChanged<>0 andalso g_CompletionEnable then      
+    Try()
+       HandleTokens( sLastSearch , g_SQCtx )
+       Catch()
+          LogError( "Auto completion Crashed!!!" )
+       EndCatch()
+    EndTry()
+  end if
+  #endif   
+  return 0
 end function
 sub RichEdit_IncDec( hCtl as HWND , bIsInc as boolean )
    'puts(hCtl & " " & bIsInc)
@@ -497,13 +504,13 @@ sub ResizeMainWindow( bInit as boolean = false )
   end if
   
   'recalculate control sizes based on window size
-  ShowWindow( g_hContainer , SW_HIDE )      
+  if g_hContainer then ShowWindow( g_hContainer , SW_HIDE )      
   var iModify = SendMessage( CTL(wcEdit) , EM_GETMODIFY , 0 , 0 )   
   ResizeLayout( hWnd , g_tMainCtx.tForm , RcCli.right , RcCli.bottom )   
   UpdateTabCloseButton() 
   SendMessage( CTL(wcEdit) , EM_SETMODIFY , iModify , 0 )
     
-  if g_hSearch then UpdateSearchWindowFont( g_tMainCtx.hFnt(wfStatus).HFONT )      
+  if g_hSearch andalso g_hContainer then UpdateSearchWindowFont( g_tMainCtx.hFnt(wfStatus).HFONT )      
   MoveWindow( CTL(wcStatus) ,0,0 , 0,0 , TRUE )
   dim as long aWidths(2-1) = {RcCli.right*.85,-1}
   SendMessage( CTL(wcStatus) , SB_SETPARTS , 2 , cast(LPARAM,@aWidths(0)) )
@@ -511,8 +518,6 @@ sub ResizeMainWindow( bInit as boolean = false )
   bResize=false   
   'puts("...")
 end sub
-
-
 
 static shared as any ptr OrgEditProc
 function WndProcEdit ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LPARAM ) as LRESULT   
@@ -672,7 +677,7 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
       var hWnd = CTL(wcMain)
       dim as long iX = pnmh->code
       dim as RECT RcCli=any : GetClientRect(hWnd,@RcCli)
-      with g_tMainCtx.hCTL( wID-1 )
+      with g_tMainCtx.hCTL( wcSidePanel )
         var iWid = iX-.iX , iMinWid = g_tMainCtx.tForm.pCtl[wcButton].iH
         var iMaxWid = (RcCli.Right-.iX)-iMinWid
         if iWid < iMinWid then iWid = iMinWid
@@ -774,17 +779,30 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
              SetTimer( hwnd , wcEdit*256 , 100 , NULL )            
           end if            
        case EN_SETFOCUS               
-          if g_CompletionEnable then ShowWindow( g_hContainer , g_SearchVis   )               
+          if g_CompletionEnable<>0 andalso g_hContainer<>0 then ShowWindow( g_hContainer , g_SearchVis   )               
        case EN_KILLFOCUS
           'printf(!"%p (%p) (%p)\n",GetFocus(),g_hContainer,CTL(wcEdit))
           'if GetForegroundWindow() <> g_hContainer then 
           var hFocus = GetFocus()
           if hFocus=0 orelse (hFocus <> g_hSearch andalso hFocus<>g_hContainer andalso hFocus <> CTL(wcEdit)) then
-             ShowWindow( g_hContainer , SW_HIDE )
+             if g_hContainer then ShowWindow( g_hContainer , SW_HIDE )
           end if
        case EN_VSCROLL
           RichEdit_TopRowChange( hwndCtl )
        end select
+    case wcSearchEdit
+      #ifdef SearchIsInPanel
+        select case wNotifyCode 
+        case EN_UPDATE
+          dim as string sText
+          scope
+            dim as zstring*1024 zText = any : zText[0]=0
+            GetWindowText( hwndCTL , @zText , 1023 )
+            sText = zText
+          end scope
+          UpdateSearch(sText)
+        end select
+      #endif
     end select      
     return 0
   
@@ -804,6 +822,7 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
   case WM_ERASEBKGND    
     return 1  
   case WM_PAINT
+    puts(timer & "WM_PAINT")
     dim as PAINTSTRUCT tPaint    
     BeginPaint( hWnd , @tPaint )        
     PostMessage( hwnd , WM_USER+4 , 0 , 0 )    
@@ -846,6 +865,9 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
     ReleaseDC(hwnd, hdc)
     
     return 0
+  case WM_USER+80 'InvalidateRect( hWnd , NULL , TRUE )
+    dim as RECT RcCli=any : GetClientRect(hWnd,@RcCli)            
+    ResizeLayout( hWnd , g_tMainCtx.tForm , RcCli.right , RcCli.bottom )
   case WM_MENUSELECT 'track newest menu handle/item/state
     var iID = cuint(LOWORD(wParam)) , fuFlags = cuint(HIWORD(wParam)) , hMenu = cast(HMENU,lParam) 
     if hMenu then g_CurItemID = iID : g_hCurMenu = hMenu            
@@ -1058,8 +1080,9 @@ sub WinMain ()
   var hMenu = CreateMainMenu()
   var hAcceleratos = CreateMainAccelerators()
 
-  const cStyleEx = WS_EX_ACCEPTFILES 'WS_EX_COMPOSITED , WS_EX_LAYERED
-  const cStyle   = WS_TILEDWINDOW 'or WS_MAXIMIZE or WS_CLIPCHILDREN
+  const cStyleEx = WS_EX_ACCEPTFILES 'or WS_EX_LAYERED 'or WS_EX_COMPOSITED
+  const cStyle   = WS_TILEDWINDOW 'or WS_CLIPCHILDREN 'or WS_MAXIMIZE or WS_CLIPCHILDREN
+  
   hWnd = CreateWindowEx(cStyleEx,sAppName,sAppName, cStyle , _ 
   g_tCfg.lGuiX,g_tCfg.lGuiY,320,200,null,hMenu,g_AppInstance,0)   
   'SetClassLong( hwnd , GCL_HBRBACKGROUND , CLNG(GetSysColorBrush(COLOR_INFOBK)) )
@@ -1070,8 +1093,9 @@ sub WinMain ()
   
   ShowWindow( hWnd , SW_SHOW )
   UpdateWindow( hWnd )
-   
-   
+  
+  PostMessage( hWnd , WM_USER+80 , 0,0 )  
+  
   dim as HWND hOldFocus = cast(HWND,-1)
   while( GetMessage( @tMsg, NULL, 0, 0 ) <> FALSE )    
     if TranslateAccelerator( hWnd , hAcceleratos , @tMsg ) then continue while      
@@ -1091,7 +1115,7 @@ sub WinMain ()
        end if
     end if
   wend 
-    
+
   puts("Checking settings")
   if IsWindow( hWnd ) then
     dim as boolean bMaximized = (IsZoomed( hWnd )<>0)
@@ -1133,9 +1157,11 @@ if ParseCmdLine()=0 then
      end
    end if
    g_FindRepMsg = RegisterWindowMessage(FINDMSGSTRING)
-   g_AppInstance = GetModuleHandle(null)
+   g_AppInstance = GetModuleHandle(null)  
+   
    WinMain() '<- main function
 end if
+
 g_DoQuit = 1
 puts("Waiting viewer thread")
 if g_ViewerThread then ThreadWait( g_ViewerThread )

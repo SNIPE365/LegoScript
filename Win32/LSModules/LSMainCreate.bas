@@ -1,3 +1,4 @@
+
 if CTL(wcMain) then return 0
 _InitForm()
 
@@ -6,20 +7,29 @@ g_hResizeEvent = CreateEvent( NULL , FALSE , FALSE , NULL )
 g_ViewerThread = ThreadCreate( @Viewer.MainThread , hEventGfxReady )
 
 InitFont( wfDefault , g_sMainFont   , 12 ) 'default application font
-InitFont( wfStatus  , g_sMainFont   , 10 )  'status bar font
+InitFont( wfStatus  , g_sMainFont   , 10 ) 'status bar font
+InitFont( wfSmall   , g_sMainFont  ,  8 )
 InitFont( wfEdit    , g_sFixedFont  , 16 ) 'edit controls font
 InitFont( wfArrows  , g_sArrowFont  , 12 )
 
 #define cLeftSide _RtN( wcSideSplit , 0 )
 
 AddButtonA (wcBtnClose  , _pct(10)  , _num(0) , _pct(3)  , cEm(1.1) , !"\x72" )
-AddTabsA   ( wcTabs      , _Num(0)   , cMarginT  , _Rtp(-1,-10) , cRow(1.25) , cRow(1.25) , WS_CLIPSIBLINGS )
+AddTabsA   ( wcTabs      , _Num(0)   , cMarginT  , _Rtp(-1,-10) , cEm(1.25) , cRow(1.25) , WS_CLIPSIBLINGS )
+
 AddButtonA ( wcButton    , _NextCol  , _SameRow  , cMarginR , cRow(1.25) , "Build" )
-AddButtonA ( wcSidePanel , _Num(0)   , _NextRow0 , _pct(0)  , _BottomE(-1.15) , "Solutions" , BS_OWNERDRAW or WS_DLGFRAME )
-AddSplitter( wcSideSplit , _NextCol0 , _SameRow  , _pct(0.5)  , _NextRow0 )
+AddTabsA   ( wcSidePanel , _Num(0)   , _NextRow0  , _Num(1) , cEm(2) , cEm(2) ) ', TBSTYLE_WRAPABLE )
+'search combo controls in the side panel
+AddFieldA( wcSearchEdit , _Num(0)  , _NextRow0 , _NextCol0 , cEm(1.2) , 0 )
+AddListW ( wcSearchList , _SameCol , _NextRow0 , _NextCol0 , _BottomE(-1.15) , LBS_NOTIFY or WS_VSCROLL )
+
+AddSplitter( wcSideSplit , _Rtn(wcSidePanel,0) , _SameRow  , _pct(0.5)  , _NextRow0 )
+
+'editor
 AddRichA   ( wcLines     , cLeftSide , _TpN(wcSidePanel,0)  , _pct(1.9*(2+1)) , _BtN(wcEdit,0) ,  "" , WS_DISABLED or ES_RIGHT ) 'SS_OWNERDRAW )
 AddRichA   ( wcEdit      , _NextCol0 , _SameRow  , cMarginR , _pct(53) , "" , WS_HSCROLL or WS_VSCROLL or ES_AUTOHSCROLL or ES_DISABLENOSCROLL or ES_NOHIDESEL )
 AddSplitter( wcOutSplit  , _SameCol  , _NextRow0 , _NextCol0, _pct(1) )
+'output panel
 AddButtonAT( wcBtnSide  , _RtP( wcSideSplit , 1 ) , _NextRow0  , _pct(4)  , cEm(1.1) , !"\x34" , BS_AUTOCHECKBOX or BS_PUSHLIKE ) '_RtP(wcSidePanel,-4)
 AddButtonA ( wcRadOutput , _RtN(wcLines,0) , _SameRow  , _pct(11) , cEm(1.1) , "Output" , WS_GROUP or BS_AUTORADIOBUTTON or BS_PUSHLIKE )
 AddButtonA ( wcRadQuery  , _NextCol0 , _SameRow  , _pct(9)  , cEm(1.1) , "Query"  , BS_AUTORADIOBUTTON or BS_PUSHLIKE )
@@ -51,11 +61,24 @@ OrgTabsProc  = cast(any ptr,SetWindowLongPtr( CTL(wcTabs)  , GWLP_WNDPROC , cast
 dim as TC_ITEM tItem = type( TCIF_TEXT or TCIF_PARAM , 0,0 , @"Unnamed" , 0,-1 , 0 ) 
 with g_tTabs(0)
    TabCtrl_InsertItem( CTL(wcTabs) , 0 , @tItem )
-   .hEdit = CTL(wcEdit) : .sFilename = ""
+   .hEdit = CTL(wcEdit) : .sFilename = "" 
 end with
-SetControlsFont( wfStatus, wcTabs )
+static as zstring ptr pzPanels(...) = {@"Project",@"Parts Bin",@"Solution"}
+for N as long = 0 to ubound(pzPanels)
+  tItem.pszText = pzPanels(N)
+  TabCtrl_InsertItem( CTL(wcSidePanel) , N , @tItem )
+next N
+TabCtrl_SetCurSel( CTL(wcSidePanel) , 1 )
 
-InitSearchWindow()
+
+SetControlsFont( wfStatus, wcTabs )
+SetControlsFont( wfSmall , wcSidePanel )
+
+#ifdef SearchIsInPanel
+  InitSearchWindow( CTL(wcSearchList) )
+#else
+  InitSearchWindow( )
+#endif
 
 ColoredControl.Colorize( CTL(wcRadOutput) , &HFF8844 )
 ColoredControl.Colorize( CTL(wcRadQuery)  , &HFF8844 )
@@ -71,10 +94,6 @@ ColoredControl.Colorize( CTL(wcBtnClose)  , &H0000FF )
 'ColoredControl.Colorize( CTL(wcOutput)    , &HFFF0F0 )
 'ColoredControl.Colorize( CTL(wcQuery)     , &HFF8888 )
 
-SendMessage( CTL(wcRadQuery) , BM_CLICK , 0,0 )
-'SendMessage( CTL(wcRadOutput) , BM_CLICK , 0,0 )
-SendMessage( CTL(wcBtnMinOut) , BM_CLICK , 0,0 )
-
 WaitForSingleObject( hEventGfxReady , INFINITE )    
 CloseHandle( hEventGfxReady )
 if g_GfxHwnd = 0 then return -1 'failed
@@ -83,6 +102,10 @@ if g_GfxHwnd = 0 then return -1 'failed
 'ShowWindow( g_hContainer , SW_SHOW )
 'puts "IniWid: " & g_tCfg.lGuiWid : puts "IniHei: " & g_tCfg.lGuiHei
 ResizeMainWindow( true )
+
+'SendMessage( CTL(wcRadQuery) , BM_CLICK , 0,0 )
+'SendMessage( CTL(wcRadOutput) , BM_CLICK , 0,0 )
+'SendMessage( CTL(wcBtnMinOut) , BM_CLICK , 0,0 )
 
 File_New()    
 'LoadFileIntoEditor( exePath+"\sample.ls" )

@@ -57,7 +57,7 @@
 'LS -> LDCAD
 
 
-dim shared as HWND g_hCon=any,g_hContainer=any  'console/container
+dim shared as HWND g_hCon=any,g_hContainer 'console/container
 dim shared as HWND g_hSearch=any,g_hStatus=any 'controls
 dim shared as HFONT g_hFontSearch
 dim shared as RECT g_rcCon = any , g_rcSearch
@@ -143,55 +143,64 @@ sub UpdateSearchWindowFont( hFont as HFONT )
    DestroyWindow( hTemp )
    SendMessage( g_hSearch , WM_SETFONT , cast(WPARAM,hFont) , false )
 end sub
+
+#define _u(_text) @wstr(_text)
+declare function MsgBox cdecl ( pwText as wstring ptr , pwCaption as wstring ptr  = _u("Attention!") , iIcon as long = 0 , iButtons as long = 1 , pwBtn1 as wstring ptr = _u("ok") , pwBtn2 as wstring ptr = NULL , pwBtn3 as wstring ptr = NULL ) as long
+
+sub InitSearchWindow( hUseThisList as HWND = 0 )
    
-sub InitSearchWindow()
-   
-   _ifstandalone
-      g_hCon = GetConsoleWindow()
-      var lWidHei = Width()
-      g_ConWid = loword(lWidHei) : g_ConHei = hiword(lWidHei)
-      GetClientRect(g_hCon,@g_rcCon)
-      g_FntWid = g_rcCon.Right\g_ConWid
-      g_FntHei = g_rcCon.Bottom\g_ConHei
-   _else
-      g_hCon = Ctl(wcEdit)
-   _endif
-   
-   const SearchContainer = "SearchContainer"
-   dim as WNDCLASSEX wx
-   var hInstance = GetModuleHandle(0)
-   with wx
+  _ifstandalone
+    g_hCon = GetConsoleWindow()
+    var lWidHei = Width()
+    g_ConWid = loword(lWidHei) : g_ConHei = hiword(lWidHei)
+    GetClientRect(g_hCon,@g_rcCon)
+    g_FntWid = g_rcCon.Right\g_ConWid
+    g_FntHei = g_rcCon.Bottom\g_ConHei
+  _else
+    g_hCon = Ctl(wcEdit)
+  _endif
+  
+  const SearchContainer = "SearchContainer"  
+  var hInstance = GetModuleHandle(0)
+  if hUseThisList=0 then    
+    dim as WNDCLASSEX wx
+    with wx
       .cbSize = sizeof(WNDCLASSEX)
       .lpfnWndProc = cast(any ptr,@SearchContainerMessages)
       .hInstance = hInstance
       .lpszClassName = @SearchContainer
-   end with   
-   if RegisterClassEx(@wx)=0 then print "Failed to register Class": sleep: system
-
-   const cMainStyle = WS_POPUPWINDOW
-   const cStatusStyle = WS_POPUPWINDOW or SS_LEFT or WS_DISABLED or WS_VISIBLE
-   const cMainStyleEx = WS_EX_LAYERED or WS_EX_TOPMOST
-   const cStyle = WS_CHILD or WS_VISIBLE
-   const cListBoxStyle = cStyle or WS_HSCROLL or LBS_MULTICOLUMN or LBS_NOTIFY or LBS_NOINTEGRALHEIGHT 'LBS_DISABLENOSCROLL
-   const cTextStyle = cStyle or SS_LEFT ' or SS_SIMPLE
-   
-   dim as POINT tStatusPT = (0,g_rcCon.Bottom-24)
-   ClientToScreen( g_hCon , @tStatusPT )
-   _ifStandalone
-      g_hStatus = CreateWindowEx( cMainStyleEx , "edit" , NULL , cStatusStyle , tStatusPT.x,tStatusPT.y , g_rcCon.Right,24, g_hCon , NULL , hInstance , NULL)
-      SetLayeredWindowAttributes( g_hStatus , 0 , 192 , LWA_ALPHA )
-   _else
-      g_hStatus = CTL(wcStatus)
-   _endif
-   g_hContainer = CreateWindowEx( cMainStyleEx, SearchContainer, SearchContainer ,cMainStyle,0, 0, 0, 0,g_hCon , NULL, hInstance, NULL ) 'HWND_MESSAGE   
-   g_hSearch = CreateWindowExW( 0 , "listbox" , NULL , cListBoxStyle , 0,0,300,100 , g_hContainer , NULL, hInstance, NULL )
-   SetLayeredWindowAttributes( g_hContainer , 0 , 192 , LWA_ALPHA )   
-         
-   UpdateSearchWindowFont( GetStockObject(DEFAULT_GUI_FONT) )
-      
-   _ifStandalone
-   SetForegroundWindow( g_hCon )
-   _endif
+    end with   
+    if RegisterClassEx(@wx)=0 then print "Failed to register Class": sleep: system
+  end if
+  
+  const cMainStyle = WS_POPUPWINDOW
+  const cStatusStyle = WS_POPUPWINDOW or SS_LEFT or WS_DISABLED or WS_VISIBLE
+  const cMainStyleEx = WS_EX_LAYERED or WS_EX_TOPMOST
+  const cStyle = WS_CHILD or WS_VISIBLE
+  const cListBoxStyle = cStyle or WS_HSCROLL or LBS_MULTICOLUMN or LBS_NOTIFY or LBS_NOINTEGRALHEIGHT 'LBS_DISABLENOSCROLL
+  const cTextStyle = cStyle or SS_LEFT ' or SS_SIMPLE
+  
+  dim as POINT tStatusPT = (0,g_rcCon.Bottom-24)
+  ClientToScreen( g_hCon , @tStatusPT )
+  _ifStandalone
+    g_hStatus = CreateWindowEx( cMainStyleEx , "edit" , NULL , cStatusStyle , tStatusPT.x,tStatusPT.y , g_rcCon.Right,24, g_hCon , NULL , hInstance , NULL)
+    SetLayeredWindowAttributes( g_hStatus , 0 , 192 , LWA_ALPHA )
+  _else
+    g_hStatus = CTL(wcStatus)
+  _endif
+  
+  if hUseThisList then
+    g_hSearch = hUseThisList : g_hContainer = 0
+  else
+    g_hContainer = CreateWindowEx( cMainStyleEx, SearchContainer, SearchContainer ,cMainStyle,0, 0, 0, 0,g_hCon , NULL, hInstance, NULL ) 'HWND_MESSAGE   
+    g_hSearch = CreateWindowExW( 0 , "listbox" , NULL , cListBoxStyle , 0,0,300,100 , g_hContainer , NULL, hInstance, NULL )
+    SetLayeredWindowAttributes( g_hContainer , 0 , 192 , LWA_ALPHA )
+    UpdateSearchWindowFont( GetStockObject(DEFAULT_GUI_FONT) )
+  end if
+  
+  _ifStandalone
+  SetForegroundWindow( g_hCon )
+  _endif
       
 end sub
 sub ProcessMessage( tMsg as MSG )
@@ -265,7 +274,6 @@ sub ProcessMessages()
       wend
    _endif
 end sub
-
 type FilteredListDump
    #define DeclareStringPerFlag( _Name , _Bit ) as string sIs##_Name
    ForEachPartFlag( DeclareStringPerFlag )
@@ -277,7 +285,9 @@ static shared as long g_iFilteredCount
 
 function GetPartDescription( iPart as long , byref bUnnoficial as byte=0 ) as string
    var pPart = PartStructFromIndex(iPart)   
-   var sDesc = trim(pPart->zDesc), iPos=0      
+   if pPart=0 then return "???"
+   var sDesc = trim(pPart->zDesc), iPos=0
+   return sDesc
    'if g_FilterParts then return sDesc
    while sDesc[iPos] = asc("~") 'process special command
       const sMoved = "moved to "
@@ -333,59 +343,64 @@ function UpdateSearch(sSearch as string) as long
    SendMessage( g_hSearch , WM_SETREDRAW , false , 0 )
    SendMessage( g_hSearch , LB_RESETCONTENT , 0,0 )
    
-   var hDC = GetDC(g_hSearch)
    'var hFont = cast(HFONT , SendMessage( g_hSearch , WM_GETFONT , 0 , 0 ))
    var iBigWid = 0, iCharWid = 0
-   SelectObject( hDC , g_hFontSearch )
+      
+   var hDC = GetDC(g_hSearch)
+   if g_hContainer then SelectObject( hDC , g_hFontSearch )
    
    dim as SIZE tSize
    dim as string sShowDesc
    g_iFilteredCount = 0
-   for N as long = 0 to (1 shl 24) 'cfg_MaxSearchParts-1      
-      iPart = SearchPart(sSearch,iPart)
-      if iPart<0 then exit for
-      var pPart = PartStructFromIndex(iPart)         
-      var sName = pPart->zName
-      if IsPartFiltered(pPart) then 
-         if g_DoFilterDump then
-            #macro AddToFlagListDump( _Name , _Bit ) 
-               if ((pPart->wFlags and g_FilterFlags) and wIs##_Name) then tFilteredDump.sIs##_Name &= !"\n" & sName
-            #endmacro        
-            ForEachPartFlag( AddToFlagListDump )
-         end if
-         g_iFilteredCount += 1 : continue for
-      end if      
-      dim as byte bIsUnnoficial = any
-      var sDesc = GetPartDescription(iPart,bIsUnnoficial)
-      'sDesc[0]=asc("~")
-      if g_FilterParts andalso (sDesc[0]=asc("=") orelse sDesc[0]=asc("_")) then g_iFilteredCount += 1 : continue for
-      if N >= cfg_MaxSearchParts then continue for
-      
-      'if SendMessage( g_hSearch , LB_FINDSTRING , 0 , cast(LPARAM,strptr(sName)) ) <> LB_ERR then         
-      '   sName = "Unoff\"+sName
-      'end if
-      
-      dim as wstring*512 wName = any
-      if bIsUnnoficial then      
-         dim as long N
-         for N = 0 to len(sName)-1
-            wName[N*2] = sName[N]
-            wName[N*2+1] = &h332 '35E
-         next N
-         wName[N*2]=0
-      else
-         wName = sName
-      end if      
-      
-      GetTextExtentPoint32( hDC , sName , len(sName) , @tSize )
-      if iCharWid=0 then iCharWid = (tSize.CX+(len(sName)-1))\len(sName)
-      if tSize.CX >  iBigWid then iBigWid = tSize.CX      
-      
-      var iIdx = SendMessageW( g_hSearch , LB_ADDSTRING , 0 , cast(LPARAM,@wName) )
-      SendMessage( g_hSearch , LB_SETITEMDATA  , iIdx , iPart )                  
-      if iFound=0 then sShowDesc = sDesc 
-      iFound += 1      
-   next    
+   if len(sSearch) then
+     for N as long = 0 to (1 shl 24) 'cfg_MaxSearchParts-1      
+        iPart = SearchPart(sSearch,iPart)
+        if iPart<0 then exit for
+        var pPart = PartStructFromIndex(iPart)         
+        var sName = pPart->zName
+        if IsPartFiltered(pPart) then 
+           if g_DoFilterDump then
+              #macro AddToFlagListDump( _Name , _Bit ) 
+                 if ((pPart->wFlags and g_FilterFlags) and wIs##_Name) then tFilteredDump.sIs##_Name &= !"\n" & sName
+              #endmacro        
+              ForEachPartFlag( AddToFlagListDump )
+           end if
+           g_iFilteredCount += 1 : continue for
+        end if      
+        dim as byte bIsUnnoficial = any
+        var sDesc = GetPartDescription(iPart,bIsUnnoficial)
+        'sDesc[0]=asc("~")
+        if g_FilterParts andalso (sDesc[0]=asc("=") orelse sDesc[0]=asc("_")) then g_iFilteredCount += 1 : continue for
+        if N >= cfg_MaxSearchParts then continue for
+        
+        'if SendMessage( g_hSearch , LB_FINDSTRING , 0 , cast(LPARAM,strptr(sName)) ) <> LB_ERR then         
+        '   sName = "Unoff\"+sName
+        'end if
+        
+        dim as wstring*512 wName = any
+        if bIsUnnoficial then      
+           dim as long N
+           for N = 0 to len(sName)-1
+              wName[N*2] = sName[N]
+              wName[N*2+1] = &h332 '35E
+           next N
+           wName[N*2]=0
+        else
+           wName = sName
+        end if      
+        
+        if g_hContainer then 
+          GetTextExtentPoint32( hDC , sName , len(sName) , @tSize )
+          if iCharWid=0 then iCharWid = (tSize.CX+(len(sName)-1))\len(sName)
+          if tSize.CX >  iBigWid then iBigWid = tSize.CX      
+        end if
+        
+        var iIdx = SendMessageW( g_hSearch , LB_ADDSTRING , 0 , cast(LPARAM,@wName) )
+        SendMessage( g_hSearch , LB_SETITEMDATA  , iIdx , iPart )                  
+        if iFound=0 then sShowDesc = sDesc 
+        iFound += 1      
+     next
+    end if
    
    if g_iFilteredCount then sShowDesc = "(" & g_iFilteredCount & " Filtered) "+sShowDesc
    SetWindowText( g_hStatus , " " & sShowDesc )   
@@ -395,28 +410,30 @@ function UpdateSearch(sSearch as string) as long
    var iCols = (iFound+(cfg_SearchBoxRows-1))\cfg_SearchBoxRows
    var iScrollHei = iif( iCols>(cfg_SearchBoxCols-1)  , GetSystemMetrics(SM_CYVTHUMB)+2 , 0 )
    if iCols > (cfg_SearchBoxCols-1) then iCols = (cfg_SearchBoxCols-1)
-   if iScrollHei then 'force enable/disable scroll to prevent control calculating wrong
-      SetWindowLong( g_hSearch , GWL_STYLE , GetWindowLong( g_hSearch ,GWL_STYLE) or WS_HSCROLL )
-   else
-      SetWindowLong( g_hSearch , GWL_STYLE , GetWindowLong( g_hSearch ,GWL_STYLE) and (not WS_HSCROLL) )
-   end if
-   SetWindowPos( g_hSearch , NULL , 0,0 , (iBigWid+iCharWid)*iCols , iRows*g_SearchRowHei+iScrollHei+g_SearchRowHei\8 , SWP_NOMOVE or SWP_NOZORDER or SWP_NOACTIVATE ) 
    
-   dim as POINT rCpt = g_rcCursor
-   ClientToScreen( g_hCon , @rCpt )
-   GetWindowRect( g_hSearch , @g_rcSearch )
-   g_rcSearch.right -= g_rcSearch.left : g_rcSearch.bottom -= g_rcSearch.top   
-   SetWindowPos( g_hContainer , NULL , rcPt.x , rcPt.y , g_rcSearch.right , g_rcSearch.bottom , SWP_NOZORDER or SWP_NOACTIVATE )
+  if g_hContainer then
+     if iScrollHei then 'force enable/disable scroll to prevent control calculating wrong
+        SetWindowLong( g_hSearch , GWL_STYLE , GetWindowLong( g_hSearch ,GWL_STYLE) or WS_HSCROLL )
+     else
+        SetWindowLong( g_hSearch , GWL_STYLE , GetWindowLong( g_hSearch ,GWL_STYLE) and (not WS_HSCROLL) )
+     end if
+     SetWindowPos( g_hSearch , NULL , 0,0 , (iBigWid+iCharWid)*iCols , iRows*g_SearchRowHei+iScrollHei+g_SearchRowHei\8 , SWP_NOMOVE or SWP_NOZORDER or SWP_NOACTIVATE )    
+     dim as POINT rCpt = g_rcCursor
+     ClientToScreen( g_hCon , @rCpt )
+     GetWindowRect( g_hSearch , @g_rcSearch )
+     g_rcSearch.right -= g_rcSearch.left : g_rcSearch.bottom -= g_rcSearch.top   
+     SetWindowPos( g_hContainer , NULL , rcPt.x , rcPt.y , g_rcSearch.right , g_rcSearch.bottom , SWP_NOZORDER or SWP_NOACTIVATE )
+  end if
    
-   SendMessage( g_hSearch , WM_SETREDRAW , true , 0 )
-   if iFound then
-      SendMessage( g_hSearch , LB_SETCOLUMNWIDTH , iBigWid+iCharWid , 0 )
-      var sStemp = sSearch+".dat"
-      var iIdx = SendMessage( g_hSearch , LB_FINDSTRINGEXACT , 0 , cast(lparam,strptr(sStemp)) )
-      if iIDX <> LB_ERR then SendMessage( g_hSearch , LB_SETCURSEL , iIdx , iIdx )
-   end if   
+  SendMessage( g_hSearch , WM_SETREDRAW , true , 0 )
+  if iFound then
+    if g_hContainer then SendMessage( g_hSearch , LB_SETCOLUMNWIDTH , iBigWid+iCharWid , 0 )
+    var sStemp = sSearch+".dat"
+    var iIdx = SendMessage( g_hSearch , LB_FINDSTRINGEXACT , 0 , cast(lparam,strptr(sStemp)) )
+    if iIDX <> LB_ERR then SendMessage( g_hSearch , LB_SETCURSEL , iIdx , iIdx )
+  end if   
    'InvalidateRect( g_hSearch , NULL , TRUE )
-   return iFound
+  return iFound
 end function
 sub ShowDumpTextFile( Dummy as any ptr )
    var sDumpFile = exepath()+"\FilteredParts.txt"
@@ -644,7 +661,7 @@ sub InitEditContext( tCtx as ConEditContext )
    end with
    _endif
 end sub
-   
+
 function RowEdit( tCtx as ConEditContext ) as long   
    
    _ifStandalone
