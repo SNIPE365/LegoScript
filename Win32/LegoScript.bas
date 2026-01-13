@@ -1,6 +1,7 @@
 '#cmdline "Res\LS.rc  -gen gcc -O 3 -g"
 '#cmdline "Res\LS.rc  -gen gcc -O 3  -Wl '--large-address-aware' "
 #cmdline "res\LS.rc -gen gcc -O 2 -Wl '--large-address-aware'"
+'#cmdline "res\LS.rc -Wl '--large-address-aware'"
 
 '-O 1
 
@@ -822,7 +823,6 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
   case WM_ERASEBKGND    
     return 1  
   case WM_PAINT
-    puts(timer & "WM_PAINT")
     dim as PAINTSTRUCT tPaint    
     BeginPaint( hWnd , @tPaint )        
     PostMessage( hwnd , WM_USER+4 , 0 , 0 )    

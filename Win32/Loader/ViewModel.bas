@@ -1,4 +1,4 @@
-#define __Main "ViewModel.bas"
+#define __Main "ViewModel.bas" '-mavx
 #cmdline "-gen gcc -fpu sse -O 3 -Wc '-O1 -march=native' -Wl '--large-address-aware'"
 
 #include "windows.bi"
@@ -17,6 +17,7 @@
 '#define DebugShadow
 '#define DebugShadowConnectors
 
+'#define IgnoreStudSubparts
 '#define ColorizePrimatives
 '#define RenderOptionals //broken
 '#define DebugLoading
@@ -349,8 +350,8 @@ dim as boolean bMoveForward , bMoveBackward , bStrafeLeft , bStrafeRight , bMove
 dim shared as single fRotationX = 120 , fRotationY = 20
 dim shared as single fPositionX , fPositionY , fPositionZ , fZoom = -3
 dim shared as long iWheel , iPrevWheel , g_CurDraw = -1
-dim shared as byte g_Vsync=2
-dim shared as boolean bBoundingBox,bViewBorders=true,bLighting=true,bCulling=true
+dim shared as byte g_Vsync=2, bBorderMode=1
+dim shared as boolean bBoundingBox,bLighting=true,bCulling=true
 dim shared as boolean bLeftPressed,bRightPressed,bWheelPressed
 dim shared as hwnd hGfxWnd
 dim shared as boolean g_FreeCam = false  
@@ -431,7 +432,7 @@ sub RenderScenery()
         DrawPieces( Triangle , Triangle , GL_TRIANGLES , false )
         DrawPieces( ColorTri , ColorTri , GL_TRIANGLES , true  )
         glEnable( GL_BLEND )
-        if bViewBorders then           
+        if bBorderMode > 0 then           
           glDisableClientState(GL_NORMAL_ARRAY)
           #ifdef iBorderIdxVBO
           DrawPieces( Border   , Triangle , GL_LINES   , false )
@@ -460,7 +461,7 @@ sub RenderScenery()
     RenderModel( g_pModel , 0 , , g_CurDraw )
   end if
   #ifndef UseVBO
-    if bViewBorders then
+    if bBorderMode then
       'if g_CurDraw<0 then
       'else
       'end if
@@ -1021,8 +1022,10 @@ do
   g_bNeedUpdate = true
   
   #ifdef UseVBO 
-    bViewBorders = g_tModelArrays.lPieceCount <= 2000
-  #endif
+    bBorderMode = iif(g_tModelArrays.lPieceCount <= 2000,1,-1)
+  #endif  
+  glPolygonMode( GL_BACK , iif(bBorderMode<0,GL_LINE,GL_FILL) )
+  if bBorderMode < 0 then glDisable( GL_CULL_FACE )
   
   do
     dFrameGL = timer
@@ -1062,12 +1065,23 @@ do
           dim as long lDummy=any : GetMouseDelta(lDummy,lDummy)
         end if
       case asc("B")-asc("@") 'Border Toggle
-        bViewBorders = not bViewBorders
-        printf(!"Borders: %s\n",iif(bViewBorders,"ENABLED","DISABLED"))
+        bBorderMode = ((bBorderMode+2) mod 3)-1
+        static as zstring ptr pzBorder(-1 to 1) = {@"GENERATED",@"DISABLED",@"ENABLED"}        
+        glPolygonMode( GL_BACK , iif(bBorderMode<0,GL_LINE,GL_FILL) )
+        if bBorderMode < 0 then
+          glDisable( GL_CULL_FACE )
+        else
+          if bCulling then glEnable( GL_CULL_FACE ) else glDisable( GL_CULL_FACE )
+        end if        
+        printf(!"Borders: %s\n",pzBorder(bBorderMode))
       case asc("C")-asc("@") 'Cull Toggle
         bCulling = (0=bCulling)
         printf(!"Culling: %s\n",iif(bCulling,"ENABLED","DISABLED"))
-        if bCulling then glEnable( GL_CULL_FACE ) else glDisable( GL_CULL_FACE )
+        if bBorderMode < 0 then
+          puts("Changing culling wont have an effect while border is in 'GENERATED' mode")
+        else
+          if bCulling then glEnable( GL_CULL_FACE ) else glDisable( GL_CULL_FACE )
+        end if
       case asc("L")-asc("@") 'Light Toggle
         bLighting = not bLighting
         printf(!"Lighting: %s\n",iif(bLighting,"ENABLED","DISABLED"))

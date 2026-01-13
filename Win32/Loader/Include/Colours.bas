@@ -439,10 +439,16 @@ static shared as ulong g_EdgeColours(32767) '11000)
 ForEachColor( DeclareConstants )
 #undef DeclareConstants
 
-for N as long = 0 to 11000
+for N as long = 0 to ubound(g_Colours)
    g_Colours(N) = rgb(255,0,255)
    g_EdgeColours(N) = rgb(255,0,255)
 next N
+
+scope
+  dim as string sColourFile = "..\LDConfig.ldr"
+  print FindFile( sColourFile )
+  puts(sColourFile )
+end scope
 
 scope
    #define InitColors( _Name , _Id , _Color , _Edge , _Alpha , _Lumi , _Material ) g_Colours( _Id ) = (((_Color) and &hFF) shl 16) or (((_Color) and &hFF00)) or (((_Color) and &hFF0000) shr 16) or ((_Alpha) shl 24)

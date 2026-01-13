@@ -182,6 +182,12 @@ function LoadFile( sFile as string , byref sFileContents as string , bAddPathToS
       end if
    end if
    
+   #ifdef IgnoreStudSubparts
+     if instr(lcase(sFile),"stud") then 
+       sFileContents = " ": return true
+     end if
+   #endif
+   
    var f = freefile()
    if open(sFile for input as #f) then
       puts "Failed to open file '"+sFile+"'": getchar():system
@@ -211,7 +217,7 @@ function LoadFile( sFile as string , byref sFileContents as string , bAddPathToS
    g_TotalLoadFileTime += timer-dLoadTime
    return true
 end function
-function FindFile( sFile as string ) as long
+function FindFile( sFile as string ) as long   
    if len(sFile)=0 then return FALSE
    const cPathLastIndex = ubound(g_sPathList)
    dim as byte bTried( cPathLastIndex )
@@ -222,7 +228,7 @@ function FindFile( sFile as string ) as long
          var sFullPathFile = g_sPathList(I)
          if sFile[0] <> asc("\") then sFullPathFile += "\"
          sFullPathFile += sFile
-         'puts("#" & I & ": " & sFullPathFile)
+         'puts("#" & I & ": " & sFullPathFile)         
          if FileExists( sFullPathFile ) then
             sFile = lcase(sFullPathFile) : return TRUE         
          end if
@@ -232,7 +238,7 @@ function FindFile( sFile as string ) as long
       var sFullPathFile = g_sExtraPathList(N)
       if sFile[0] <> asc("\") then sFullPathFile += "\"
       sFullPathFile += sFile
-      'puts("#" & I & ": " & sFullPathFile)
+      'puts("#" & N & ": " & sFullPathFile)
       if FileExists( sFullPathFile ) then
          sFile = lcase(sFullPathFile) : return TRUE         
       end if

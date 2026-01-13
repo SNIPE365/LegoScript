@@ -81,7 +81,7 @@ function OpenFolder( sTitle as string , sInit as string , sOutput as string ) as
     
 end function
 
-sub CheckPathLDRAW( byref sPath as string )  
+sub CheckPathLDRAW( byref sPath as string )        
   #define chk(_s) ((GetFileAttributes(sPath+_s) and (&h80000000 or FILE_ATTRIBUTE_DIRECTORY))=FILE_ATTRIBUTE_DIRECTORY)
   #define IsPath(_s) (mid(_s,2,2)=":\")
   'orelse left(_s,2)=".\")
@@ -133,7 +133,7 @@ sub CheckPathSHADOW( byref sPath as string )
 end sub
 #undef g_pzShadowPaths
 
-#macro ForEachPathSetting( _do )
+#macro ForEachPathSetting( _do )  
   _do( sPathLDRAW        , "Path"      , string   , ""                 , CheckPathLDRAW , _cfgVarName )
   _do( sPathSHADOW       , "Path"      , string   , ""                 , CheckPathSHADOW , _cfgVarName )
 #endmacro

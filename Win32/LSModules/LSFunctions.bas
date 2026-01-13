@@ -26,7 +26,9 @@ function ReadTokenNumber( sToken as string , iStart as long = 0 , bSigned as lon
    lError = 0 : return iResult*iSign
 end function
 function IsTokenNumeric( sToken as string , iStart as long = 0 ) as long
-   for N as long = iStart to len(sToken)-1
+   var iLen = len(sToken)-1
+   if iStart <= iLen andalso sToken[iStart] = asc("-") then iStart += 1
+   for N as long = iStart to iLen
       if (cuint(sToken[N])-asc("0")) > 9 then return false
    next N
    return true
@@ -48,7 +50,7 @@ function IsPrimative( sToken as string ) as long
    
    for N as long = 1 to len(sToken)-1
       select case sToken[N]
-      case asc("A") to asc("Z"),asc("a") to asc("z"),asc("0") to asc("9"),asc("_")
+      case asc("A") to asc("Z"),asc("a") to asc("z"),asc("0") to asc("9"),asc("_"),asc("-")
          rem valid chars for primatives
       case else
          return false
@@ -59,7 +61,7 @@ end function
 function IsValidPartName( sToken as string ) as long   
    if len(sToken)=0 then return false
    select case sToken[0]   
-   case asc("A") to asc("Z")
+   case asc("A") to asc("Z"),asc("_")
       rem valid initial chars for part names
    case else
       return false
@@ -68,7 +70,7 @@ function IsValidPartName( sToken as string ) as long
       select case sToken[N]
       case asc("A") to asc("Z"),asc("a") to asc("z")
          rem valid chars for part names
-      case asc("0") to asc("9"),asc("_")
+      case asc("0") to asc("9"),asc("_"),asc("-")
          rem valid chars for part names
       case else
          return false

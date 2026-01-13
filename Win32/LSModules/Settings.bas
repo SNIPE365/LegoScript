@@ -141,3 +141,17 @@ end sub
 
 DefaultSettings()
 LoadSettings()
+
+scope
+  #define CallSetupFunction( _Varname , _Function , _Parms... ) _Function( _Parms )
+  #macro CheckSetupFunction( _Varname , _Section , _VarType , _Default , _SetupFunction... )
+    #if len(#_SetupFunction)
+      #define _cfgVarName ._VarName
+      CallSetupFunction( _Varname , _SetupFunction )
+      #undef _cfgVarName
+    #endif
+  #endmacro
+  with g_tCfg  
+    ForEachPathSetting( CheckSetupFunction )
+  end with
+end scope
