@@ -369,7 +369,7 @@
    _Do(Metallic_Pink                    ,10046     ,&hAD659A,&h333333, 255 , -1 , "METAL" )
    _Do(Metallic_Light_Pink              ,10049     ,&hFECCCF,&h333333, 255 , -1 , "METAL" )
    _Do(Milky_White                      ,79        ,&hEEEEEE,&hBABABA, 240 , -1 , "" )
-   _Do(Glow_In_Dark_Opaque              ,21        ,&hE0FFB0,&hB8FF4D, 240 , 15 , "" )
+   _Do(Glow_In_Dark_Opaque              ,21        ,&hE0FFB0,&hB8FF4D, 240 , 15 , "" )   
    _Do(Glow_In_Dark_Trans               ,294       ,&hBDC6AD,&h8D9D72, 240 , 15 , "" )
    _Do(Glow_In_Dark_White               ,329       ,&hF5F3D7,&hE0DA85, 240 , 15 , "" )
    _Do(Glitter_Trans_Dark_Pink          ,114       ,&hDF6695,&hB9275F, 128 , -1 , "MATERIAL GLITTER VALUE &hB92790 FRACTION 0.17 VFRACTION 0.2 SIZE 1" )
@@ -432,8 +432,11 @@
    _Do(Fabric_Cream                     ,10000     ,&hEBDFD1,&h333333, 255 , -1 , "" )
 #endmacro
 
-static shared as ulong g_Colours(32767) '11000)
-static shared as ulong g_EdgeColours(32767) '11000)
+const cLastColor = 32767
+static shared as ulong      g_Colours(cLastColor) '11000)
+static shared as ulong      g_EdgeColours(cLastColor) '11000)
+static shared as string ptr g_psColourNames(cLastColor)
+static shared as ulong      g_MaxColor = 0
 
 #define DeclareConstants( _Name , _Id , _Color , _Edge , _Alpha , _Lumi , _Material ) const c_##_Name = _Id
 ForEachColor( DeclareConstants )
@@ -441,18 +444,70 @@ ForEachColor( DeclareConstants )
 
 for N as long = 0 to ubound(g_Colours)
    g_Colours(N) = rgb(255,0,255)
-   g_EdgeColours(N) = rgb(255,0,255)
+   g_EdgeColours(N) = rgb(253,0,254)   
 next N
 
 scope
-  dim as string sColourFile = "..\LDConfig.ldr"
-  print FindFile( sColourFile )
-  puts(sColourFile )
+  #define InitColors( _Name , _Id , _Color , _Edge , _Alpha , _Lumi , _Material ) g_Colours( _Id ) = (((_Color) and &hFF) shl 16) or (((_Color) and &hFF00)) or (((_Color) and &hFF0000) shr 16) or ((_Alpha) shl 24)
+  ForEachColor( InitColors )
+  #define InitEdgeColors( _Name , _Id , _Color , _Edge , _Alpha , _Lumi , _Material ) g_EdgeColours( _Id ) = (((_Edge) and &hFF) shl 16) or (((_Edge) and &hFF00)) or (((_Edge) and &hFF0000) shr 16) or ((_Alpha) shl 24)
+  ForEachColor( InitEdgeColors )  
 end scope
-
+do   'scope
+  dim as string sColourFile = "..\LDConfig.ldr"
+  if FindFile( sColourFile ) then
+    puts("settings (colour) file:")
+    puts(sColourFile )
+    dim as string sColours , sNum
+    if LoadFile( sColourFile , sColours , false ) = 0 then
+      puts("Failed to load colours file..."): exit do
+    end if
+    dim as long iLineBegin , iNextLine , iPos , iAdded
+    do
+      iLineBegin = instr( iNextLine+1 , sColours , " !COLOUR " )
+      if iLineBegin = 0 then exit do else iLineBegin += 9
+      iNextLine = instr( iLineBegin , sColours , !"\n" ) : if iNextLine=0 then iNextLine = len(sColours)      
+      iPos = instr( iLineBegin , sColours , " ")   : if iPos=0 orelse iPos >= iNextLine then puts("Name not found"): exit do
+      var sName = mid( sColours , iLineBegin , iPos-iLineBegin ) : var iAtt = iPos
+      iPos = instr( iAtt , sColours , " CODE " )   : if iPos=0 orelse iPos >= iNextLine then puts("Code not found"): exit do
+      sNum = mid(sColours,iPos+6,8) : var iCode  = valint(sNum)
+      iPos = instr( iAtt , sColours , " VALUE #" ) : if iPos=0 orelse iPos >= iNextLine then puts("Value not found"): exit do
+      sNum = mid(sColours,iPos+8,8) : var iValue = valint("&h"+sNum)
+      iPos = instr( iAtt , sColours , " EDGE #" )  : if iPos=0 orelse iPos >= iNextLine then puts("Edge not found"): exit do
+      sNum = mid(sColours,iPos+8,8) : var iEdge  = valint("&h"+sNum)
+      iPos = instr( iAtt , sColours , " ALPHA " )  : var iAlpha = -1
+      if iPos andalso iPos < iNextLine then 
+        sNum = mid(sColours,iPos+7,8) :   iAlpha = valint(sNum)
+      end if      
+      
+      if iCode < lbound(g_Colours) orelse iCode > ubound(g_Colours) then         
+        puts("BAD COLOR ID!")
+        printf(!"'%-30s' Code=%5i Color=%06X Edge=%06X\n",sName,iCode,iValue,iEdge)
+        continue do
+      end if      
+      if iAlpha >= 0 then
+        'printf(!"'%-30s' Code=%5i Color=%06X Edge=%06X Alpha=%i\n",sName,iCode,iValue,iEdge,iAlpha)
+      else
+        'printf(!"'%-30s' Code=%5i Color=%06X Edge=%06X\n",sName,iCode,iValue,iEdge)
+        iAlpha = 255
+      end if
+      
+      iAdded += 1
+      g_psColourNames( iCode ) = new string ( sName )
+      g_Colours( iCode ) = (((iValue) and &hFF) shl 16) or (((iValue) and &hFF00)) or (((iValue) and &hFF0000) shr 16) or ((iAlpha) shl 24)
+      g_EdgeColours( iCode ) = (((iEdge) and &hFF) shl 16) or (((iEdge) and &hFF00)) or (((iEdge) and &hFF0000) shr 16) or ((iAlpha) shl 24)
+      
+    loop
+    
+    printf(!"%i colours added from file\n",iAdded)
+      
+    '0 !COLOUR Glow_In_Dark_Trans                                    CODE 294   VALUE #BDC6AD   EDGE #8D9D72   ALPHA 240   LUMINANCE 15
+    
+  end if
+  exit do
+loop 'end scope
 scope
-   #define InitColors( _Name , _Id , _Color , _Edge , _Alpha , _Lumi , _Material ) g_Colours( _Id ) = (((_Color) and &hFF) shl 16) or (((_Color) and &hFF00)) or (((_Color) and &hFF0000) shr 16) or ((_Alpha) shl 24)
-   ForEachColor( InitColors )
-   #define InitEdgeColors( _Name , _Id , _Color , _Edge , _Alpha , _Lumi , _Material ) g_EdgeColours( _Id ) = (((_Edge) and &hFF) shl 16) or (((_Edge) and &hFF00)) or (((_Edge) and &hFF0000) shr 16) or ((_Alpha) shl 24)
-   ForEachColor( InitEdgeColors )
+  for N as long = 0 to ubound(g_EdgeColours)
+    if g_EdgeColours(N) <> rgb(253,0,254) then g_MaxColor = N
+  next N    
 end scope

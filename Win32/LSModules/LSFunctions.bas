@@ -138,7 +138,7 @@ function ParseColor( sToken as string ) as long
       case asc("0") to asc("9"): uColor = uColor*10+sToken[N]-asc("0")
       case else: return ErrInfo(ecFailedToParse)
       end select      
-      if uColor > 10999 then return ErrInfo(ecFailedToParse)
+      if uColor > g_MaxColor then return ErrInfo(ecFailedToParse)
    next N
    return uColor
 end function
@@ -376,7 +376,10 @@ sub LS_InitDefineList( tDefineList as TreeNode )
    var pDefineList = @tDefineList
    if tDefineList.iCount = 0 then
       #define AddColorDefine( _Name , _Code , Unused... ) AddEntry( pDefineList , "#" #_Name , "#" #_Code , true )
-      ForEachColor( AddColorDefine )  
+      ForEachColor( AddColorDefine )
+      for I as long = 0 to ubound( g_psColourNames )
+        if g_psColourNames(I) then AddEntry( pDefineList , "#"+*g_psColourNames(I) , "#" & I , true )
+      next I      
    end if
 end sub
 

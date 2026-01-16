@@ -134,3 +134,109 @@ namespace ColoredControl
   
 end namespace
 
+function FlickerFreeSubClass(hwnd as hwnd,msg as integer,wparam as wparam,lparam as lparam) as lresult    
+  var pProc = GetPropA(hwnd,"OrgProc")
+  
+  #macro CheckFlick()    
+    if cint(GetPropA(hwnd,"Redraw"))=false then
+      return CallWindowProc(pProc,hwnd,msg,wparam,lparam)
+    end if
+    var hFlickDC = GetPropA(hwnd,"FlickDC")
+    var hFlickBMP = GetPropA(hwnd,"FlickBMP")
+    dim as Rect FlickRect = any
+    GetClientRect(hwnd,@FlickRect)  
+    if hFlickDC = 0 then    
+      var TempDC = GetDC(hwnd)
+      hFlickDC = CreateCompatibleDC(TempDC)
+      hFlickBMP = CreateCompatibleBitmap(TempDC,FlickRect.right,FlickRect.bottom)    
+      ReleaseDC(hwnd,TempDC)    
+    else
+      dim as size FlickSize = any
+      GetBitmapDimensionEx(hFlickBMP,@FlickSize)
+      if FlickSize.cx <> FlickRect.right or FlickSize.cy <> FlickRect.bottom then      
+        var TempDC = GetDC(hwnd)
+        DeleteObject(hFlickBMP) : DeleteObject(hFlickDC)
+        hFlickDC = CreateCompatibleDC(TempDC)
+        var hTempBMP = CreateCompatibleBitmap(TempDC,FlickRect.right,FlickRect.bottom)
+        ReleaseDC(hwnd,TempDC) : hFlickBMP = hTempBMP      
+      end if    
+    end if
+    SelectObject(hFlickDC,hFlickBMP)
+    SetBitmapDimensionEx(hFlickBMP,FlickRect.right,FlickRect.bottom,null)    
+    SetPropA(hwnd,"FlickDC",hFlickDC)
+    SetPropA(hwnd,"FlickBMP",hFlickBMP)    
+  #endmacro
+  
+  printf(!"%lf\r",timer)
+  
+  select case msg  
+  case WM_ERASEBKGND
+    return true
+    'if lparam <> -1 then return true
+    'CheckFlick() 
+    'return CallWindowProc(pProc,hwnd,msg,cuint(hFlickDC),lparam)
+  case WM_LBUTTONDOWN
+    if cint(GetProp(hwnd,"Redraw")) then 
+      SendMessage( hwnd , WM_SETREDRAW , false , 0  )
+    end if
+  case WM_MOUSEMOVE           
+    if cint(GetProp(hwnd,"Redraw"))=false then
+      PostMessage( hwnd , WM_SETREDRAW , true , 0  )
+      PostMessage( hwnd , WM_PAINT , 0,0 )
+      PostMessage( hwnd , WM_SETREDRAW , false , 0  )
+    end if
+  case WM_LBUTTONUP    
+    if cint(GetProp(hwnd,"Redraw"))=false then 
+      SendMessage( hwnd , WM_SETREDRAW , true , 0  ) 
+    end if
+  case WM_PAINT    
+    CheckFlick()    
+    'SendMessage(hwnd,WM_ERASEBKGND,cuint(hFlickDC),-1)
+    dim as PAINTSTRUCT tPaint        
+    'BeginPaint( hwnd , @tPaint )    
+    if GetUpdateRect( hwnd , @tPaint.rcPaint , false )=0 orelse IsRectEmpty(@tPaint.rcPaint) then
+      tPaint.rcPaint.left = 0 : tPaint.rcPaint.right = FlickRect.right
+      tPaint.rcPaint.top = 0 : tPaint.rcPaint.left = FlickRect.bottom
+    end if
+    CallWindowProc(pProc,hwnd,WM_ERASEBKGND,cast(wparam,hFlickDC),lparam)    
+    var iResu = CallWindowProc(pProc,hwnd,msg,cast(wparam,hFlickDC),lparam)    
+    tPaint.hDC = GetDC(hwnd)
+    with tPaint.RcPaint      
+      var hDC = cast(HDC,iif(wparam,cast(HDC,wparam),cast(HDC,tPaint.hDC)))
+      'FillRect( hDC , @type<rect>(0,0,640,480), GetStockOBject(BLACK_BRUSH) )
+      'BitBlt(hDC,0,0,FlickRect.Right,FlickRect.Bottom,hFlickDC,0,0,SRCCOPY)
+      BitBlt(hDC,.Left,.top,.Right,.Bottom,hFlickDC,.Left,.Top,SRCCOPY)
+    end with    
+    ReleaseDC(hwnd,tPaint.hDC)
+    'EndPaint( hwnd , @tPaint )
+    ValidateRect(hwnd,null)
+    return iResu
+  case WM_NCDESTROY
+    var hFlickDC = GetProp(hwnd,"FlickDC")
+    var hFlickBMP = GetProp(hwnd,"FlickBMP")
+    SetWindowLong(hwnd,GWL_WNDPROC,cuint(pProc))    
+    RemoveProp(hwnd,"FlickDC")
+    RemoveProp(hwnd,"FlickBMP")
+    RemoveProp(hwnd,"OrgProc")
+    RemoveProp(hwnd,"Redraw")
+    if hFlickDC then
+      DeleteObject(hFlickBMP)
+      DeleteObject(hFlickDC)
+    end if  
+  case WM_SETREDRAW
+    SetProp(hwnd,"Redraw",cast(any ptr,wparam))
+  end select
+  return CallWindowProc(pProc,hwnd,msg,wparam,lparam)
+end function
+sub SetDoubleBuffer(hwnd as hwnd)
+  var OldProc = GetWindowLong(hwnd,GWL_WNDPROC)
+  var NewProc = cuint(@FlickerFreeSubClass)
+  if OldProc = 0 then exit sub
+  if OldProc = NewProc then exit sub  
+  SetProp(hwnd,"OrgProc",cast(any ptr,OldProc))
+  SetProp(hwnd,"Redraw",cast(any ptr,1))
+  'SendMessage(hwnd,WM_SETREDRAW,true,0)
+  SetWindowLong(hwnd,GWL_WNDPROC,NewProc)
+end sub
+
+

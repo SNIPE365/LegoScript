@@ -1,7 +1,7 @@
 '#cmdline "Res\LS.rc  -gen gcc -O 3 -g"
 '#cmdline "Res\LS.rc  -gen gcc -O 3  -Wl '--large-address-aware' "
 #cmdline "res\LS.rc -gen gcc -O 2 -Wl '--large-address-aware'"
-'#cmdline "res\LS.rc -Wl '--large-address-aware'"
+'cmdline "res\LS.rc -Wl '--large-address-aware'"
 
 '-O 1
 
@@ -822,7 +822,7 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
     DockGfxWindow()
   case WM_ERASEBKGND    
     return 1  
-  case WM_PAINT
+  case WM_PAINT    
     dim as PAINTSTRUCT tPaint    
     BeginPaint( hWnd , @tPaint )        
     PostMessage( hwnd , WM_USER+4 , 0 , 0 )    
@@ -866,7 +866,7 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
     
     return 0
   case WM_USER+80 'InvalidateRect( hWnd , NULL , TRUE )
-    dim as RECT RcCli=any : GetClientRect(hWnd,@RcCli)            
+    dim as RECT RcCli=any : GetClientRect(hWnd,@RcCli)                
     ResizeLayout( hWnd , g_tMainCtx.tForm , RcCli.right , RcCli.bottom )
   case WM_MENUSELECT 'track newest menu handle/item/state
     var iID = cuint(LOWORD(wParam)) , fuFlags = cuint(HIWORD(wParam)) , hMenu = cast(HMENU,lParam) 
@@ -1080,13 +1080,13 @@ sub WinMain ()
   var hMenu = CreateMainMenu()
   var hAcceleratos = CreateMainAccelerators()
 
-  const cStyleEx = WS_EX_ACCEPTFILES 'or WS_EX_LAYERED 'or WS_EX_COMPOSITED
+  const cStyleEx = WS_EX_ACCEPTFILES or WS_EX_LAYERED 'or WS_EX_COMPOSITED
   const cStyle   = WS_TILEDWINDOW 'or WS_CLIPCHILDREN 'or WS_MAXIMIZE or WS_CLIPCHILDREN
   
   hWnd = CreateWindowEx(cStyleEx,sAppName,sAppName, cStyle , _ 
   g_tCfg.lGuiX,g_tCfg.lGuiY,320,200,null,hMenu,g_AppInstance,0)   
   'SetClassLong( hwnd , GCL_HBRBACKGROUND , CLNG(GetSysColorBrush(COLOR_INFOBK)) )
-  'SetLayeredWindowAttributes( hwnd , GetSysColor(COLOR_INFOBK) , 252 , LWA_COLORKEY )
+  SetLayeredWindowAttributes( hwnd , GetSysColor(COLOR_INFOBK) , 252 , LWA_COLORKEY )
   
   '' Process windows messages
   ' *** all messages(events) will be read converted/dispatched here ***

@@ -369,6 +369,7 @@ sub File_Save()
    g_tTabs(g_iCurTab).sFilename = g_CurrentFilePath
    UpdateTabName( g_iCurTab )
    UpdateMainWindowCaption()
+   SendMessage( CTL(wcEdit) , EM_SETMODIFY , 0 , 0 )
 end sub
 sub File_SaveAs()
    dim as OPENFILENAME tOpen
@@ -402,8 +403,11 @@ end sub
 sub File_Close()
       
    if Sendmessage( CTL(wcEdit) , EM_GETMODIFY , 0,0 ) then
-      #define sMsg "All unsaved data will be lost, continue?"
-      if MsgBox( sMsg , _u("File->Open") , MB_ICONQUESTION , 3 or MB_DEFBUTTON2 , _u("Save") , _u("Don't Save") , _u("Cancel")  ) <> 1 then exit sub
+      #define sMsg "This file was modified, what you want to do?"
+      select case MsgBox( sMsg , _u("File->Open") , MB_ICONQUESTION , 3 or MB_DEFBUTTON1 , _u("Save") , _u("Don't Save") , _u("Cancel")  ) 
+      case 1: File_Save()
+      case 3: exit sub
+      end select
    end if   
    
    if g_iTabCount = 1 then 
