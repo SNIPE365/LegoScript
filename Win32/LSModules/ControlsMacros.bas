@@ -23,6 +23,7 @@ var IdPrevCtl=0 'previous control ID
 #define _SameColR _LtP(IdPrevCtl,0.5)
 #define _SameColL _LtP(IdPrevCtl,-.0.5)
 #define _SameRow  _TpN(IdPrevCtl,0)
+#define _SameRowP(_N) _TpP(IdPrevCtl,_N)
 
 #define _SameRowU _TpP(IdPrevCtl,-0.5)
 #define _SameRowD _TpP(IdPrevCtl,+0.5)

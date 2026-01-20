@@ -1,13 +1,13 @@
 '#cmdline "Res\LS.rc  -gen gcc -O 3 -g"
 '#cmdline "Res\LS.rc  -gen gcc -O 3  -Wl '--large-address-aware' "
 #cmdline "res\LS.rc -gen gcc -O 2 -Wl '--large-address-aware'"
-'cmdline "res\LS.rc -Wl '--large-address-aware'"
+'#cmdline "res\LS.rc -Wl '--large-address-aware'"
 
 '-O 1
 
 #define __Main "LegoScript"
 #define __DebugShadowLoad
-#define SearchIsInPanel
+'#define SearchIsInPanel
 
 #define _WIN32_WINNT &h0600
 #include once "windows.bi"
@@ -82,7 +82,6 @@ enum WindowControls
   wcStatus
   wcLast
 end enum
-
 enum WindowFonts
    wfDefault
    wfEdit
@@ -767,6 +766,11 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
        case wcBtnMinOut : Output_ShowHide()
        case wcBtnSide   : Solution_ShowHide()
        end select
+    case BN_DBLCLK  'double clicked in rapid fire buttons
+      select case wID
+      case wcBtnDec    : RichEdit_IncDec( CTL(wcEdit) , false )
+      case wcBtnInc    : RichEdit_IncDec( CTL(wcEdit) , true )
+      end select    
     end select      
     select case wID
     case wcEdit     'Main editor control actions
@@ -838,7 +842,8 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
   case WM_USER+3 'Resize Number border
     dim as single fMul = 1.9
     if g_ZoomNum andalso g_ZoomDiv then fMul = (fMul*g_ZoomNum)/g_zoomDiv      
-    SetControl( wcLines , cMarginL , _BtP(wcButton,0.5) , _pct(fMul*(g_RowDigits+1)) , _pct(100) , CTL(wcLines) )      
+    #define cLeftSide _RtN( wcSideSplit , 0 )
+    SetControl( wcLines , cLeftSide , _TpN(wcSidePanel,0) , _pct(fMul*(g_RowDigits+1)) , _BtP(wcEdit,-3.5) , CTL(wcLines) )    
     ResizeMainWindow()      
     return 0
   case WM_USER+4 'late erase bkgnd
@@ -1081,12 +1086,13 @@ sub WinMain ()
   var hAcceleratos = CreateMainAccelerators()
 
   const cStyleEx = WS_EX_ACCEPTFILES or WS_EX_LAYERED 'or WS_EX_COMPOSITED
-  const cStyle   = WS_TILEDWINDOW 'or WS_CLIPCHILDREN 'or WS_MAXIMIZE or WS_CLIPCHILDREN
+  const cStyle   = WS_TILEDWINDOW or WS_CLIPSIBLINGS 'or WS_MAXIMIZE or WS_CLIPCHILDREN
   
   hWnd = CreateWindowEx(cStyleEx,sAppName,sAppName, cStyle , _ 
   g_tCfg.lGuiX,g_tCfg.lGuiY,320,200,null,hMenu,g_AppInstance,0)   
   'SetClassLong( hwnd , GCL_HBRBACKGROUND , CLNG(GetSysColorBrush(COLOR_INFOBK)) )
   SetLayeredWindowAttributes( hwnd , GetSysColor(COLOR_INFOBK) , 252 , LWA_COLORKEY )
+  
   
   '' Process windows messages
   ' *** all messages(events) will be read converted/dispatched here ***

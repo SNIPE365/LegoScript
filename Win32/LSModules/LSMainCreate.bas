@@ -26,21 +26,22 @@ AddListW ( wcSearchList , _SameCol , _NextRow0 , _NextCol0 , _BottomE(-1.15) , L
 AddSplitter( wcSideSplit , _Rtn(wcSidePanel,0) , _SameRow  , _pct(0.5)  , _NextRow0 )
 
 'editor
-AddRichA   ( wcLines     , cLeftSide , _TpN(wcSidePanel,0)  , _pct(1.9*(2+1)) , _BtN(wcEdit,0) ,  "" , WS_DISABLED or ES_RIGHT ) 'SS_OWNERDRAW )
+AddRichA   ( wcLines     , cLeftSide , _TpN(wcSidePanel,0)  , _pct(1.9*(2+1)) , _BtP(wcEdit,-3.5) ,  "" , WS_DISABLED or ES_RIGHT ) 'SS_OWNERDRAW )
 AddRichA   ( wcEdit      , _NextCol0 , _SameRow  , cMarginR , _pct(53) , "" , WS_HSCROLL or WS_VSCROLL or ES_AUTOHSCROLL or ES_DISABLENOSCROLL or ES_NOHIDESEL )
 AddSplitter( wcOutSplit  , _SameCol  , _NextRow0 , _NextCol0, _pct(1) )
 'output panel
-AddButtonAT( wcBtnSide  , _RtP( wcSideSplit , 1 ) , _NextRow0  , _pct(4)  , cEm(1.1) , !"\x34" , BS_AUTOCHECKBOX or BS_PUSHLIKE ) '_RtP(wcSidePanel,-4)
-AddButtonA ( wcRadOutput , _RtN(wcLines,0) , _SameRow  , _pct(11) , cEm(1.1) , "Output" , WS_GROUP or BS_AUTORADIOBUTTON or BS_PUSHLIKE )
+'AddButtonA ( wcRadOutput , _RtN(wcLines,0) , _SameRow  , _pct(11) , cEm(1.1) , "Output" , WS_GROUP or BS_AUTORADIOBUTTON or BS_PUSHLIKE )
+AddButtonA ( wcRadOutput , _RtP( wcSideSplit , 1 ) , _NextRow0  , _pct(11) , cEm(1.1) , "Output" , WS_GROUP or BS_AUTORADIOBUTTON or BS_PUSHLIKE )
 AddButtonA ( wcRadQuery  , _NextCol0 , _SameRow  , _pct(9)  , cEm(1.1) , "Query"  , BS_AUTORADIOBUTTON or BS_PUSHLIKE )
 AddButtonA ( wcBtnExec   , _NextCol3 , _SameRow  , _pct(12) , cEm(1.1) , "Execute" , WS_GROUP )
 AddButtonA ( wcBtnLoad   , _NextCol  , _SameRow  , _pct(8)  , cEm(1.1) , "Load"  )
 AddButtonA ( wcBtnSave   , _NextCol  , _SameRow  , _pct(8)  , cEm(1.1) , "Save" )
-AddButtonA ( wcBtnDec    , _NextCol3 , _SameRow  , _pct(5)  , cEm(1.1) , "--" , WS_DISABLED )
-AddButtonA ( wcBtnInc    , _NextCol0 , _SameRow  , _pct(5)  , cEm(1.1) , "++" , WS_DISABLED )
-AddButtonAT( wcBtnMinOut , _RtP(wcOutput,-4) , _SameRow , _pct(4) , cEm(1.1) , !"\x36" , BS_AUTOCHECKBOX or BS_PUSHLIKE )
+AddButtonA ( wcBtnDec    , _NextCol3 , _SameRow  , _pct(5)  , cEm(1.1) , "--" , WS_DISABLED or BS_NOTIFY )
+AddButtonA ( wcBtnInc    , _NextCol0 , _SameRow  , _pct(5)  , cEm(1.1) , "++" , WS_DISABLED or BS_NOTIFY )
 AddEditA   ( wcOutput    , cLeftSide , _NextRow  , cMarginR , _BottomE(-1.15) , "" , WS_HSCROLL or WS_VSCROLL or ES_AUTOHSCROLL or ES_READONLY )
 AddEditA   ( wcQuery     , cLeftSide , _SameRow  , cMarginR , _BottomE(-1.15) , "" , WS_HSCROLL or WS_VSCROLL or ES_AUTOHSCROLL )
+AddButtonA( wcBtnSide  , _LtN( wcRadOutput,0) , _BtP(wcEdit,-3.5) , _pct(4) , _pct(3.5) , !"\x34" , BS_AUTOCHECKBOX or BS_PUSHLIKE ) '_RtP(wcSidePanel,-4)
+AddButtonA( wcBtnMinOut , _RightP(-4)         , _BtP(wcEdit,-3.5) , _pct(4) , _pct(3.5) , !"\x36" , BS_AUTOCHECKBOX or BS_PUSHLIKE )
 AddStatusA ( wcStatus    , "Ready." )
 'SetParent( CTL(wcBtnMinOut) , CTL(wcOutput) )
 Setparent( CTL(wcBtnClose) , CTL(wcTabs) )
@@ -57,6 +58,12 @@ SendMessage( CTL(wcEdit) , EM_SETEVENTMASK , 0 , ENM_CLIPFORMAT or ENM_SELCHANGE
 OrgEditProc  = cast(any ptr,SetWindowLongPtr( CTL(wcEdit)  , GWLP_WNDPROC , cast(LONG_PTR,@WndProcEdit) ) )
 OrgLinesProc = cast(any ptr,SetWindowLongPtr( CTL(wcLines) , GWLP_WNDPROC , cast(LONG_PTR,@WndProcLines)) )
 OrgTabsProc  = cast(any ptr,SetWindowLongPtr( CTL(wcTabs)  , GWLP_WNDPROC , cast(LONG_PTR,@WndProcTabs) ) )
+
+dim as long lTop(...) = { wcBtnClose , wcBtnSide , wcBtnMinOut }
+for N as long = 0 to ubound(lTop)
+  SetWindowPos( CTL(lTop(N)) , HWND_TOPMOST , 0,0,0,0 , SWP_NOMOVE or SWP_NOSIZE )
+  SetWindowPos( CTL(lTop(N)) , HWND_TOP , 0,0,0,0 , SWP_NOMOVE or SWP_NOSIZE )
+next N
 
 dim as TC_ITEM tItem = type( TCIF_TEXT or TCIF_PARAM , 0,0 , @"Unnamed" , 0,-1 , 0 ) 
 with g_tTabs(0)
@@ -107,7 +114,7 @@ ResizeMainWindow( true )
 
 'SendMessage( CTL(wcRadQuery) , BM_CLICK , 0,0 )
 'SendMessage( CTL(wcRadOutput) , BM_CLICK , 0,0 )
-'SendMessage( CTL(wcBtnMinOut) , BM_CLICK , 0,0 )
+PostMessage( CTL(wcBtnMinOut) , BM_CLICK , 0,0 )
 
 File_New()    
 'LoadFileIntoEditor( exePath+"\sample.ls" )

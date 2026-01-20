@@ -167,7 +167,7 @@ function FlickerFreeSubClass(hwnd as hwnd,msg as integer,wparam as wparam,lparam
     SetPropA(hwnd,"FlickBMP",hFlickBMP)    
   #endmacro
   
-  printf(!"%lf\r",timer)
+  'printf(!"%lf\r",timer)
   
   select case msg  
   case WM_ERASEBKGND

@@ -51,7 +51,12 @@ sub NotifySelChange( iID as long )
    end with
    SendMessage( hParent , WM_NOTIFY , iID , cast(LPARAM,@tSelChange) )   
 end sub
-   
+#if 0
+sub Btn_Trigger( iID as long )
+  if iID=0 then exit sub
+  PostMessage( CTL(iID) , BM_CLICK , 0 , 0 )
+end sub
+#endif
 function LoadFileIntoEditor( sFile as string , bCreate as boolean=false ) as boolean
    
    dim as string sScript   
@@ -563,6 +568,7 @@ sub Output_Save()
 end sub
 sub Output_ShowHide()  
   var iOpen = SendMessage( CTL(wcBtnMinOut) , BM_GETCHECK , 0 , 0 )
+  g_tcfg.bShowOutput = iOpen<>0  
   static as byte bOnce = 0
   static as typeof(g_tMainCtx.hCTL( wcEdit ).tH) tPrevHei  
   if iOpen=0 orelse bOnce=0 then bOnce=1 : tPrevHei = g_tMainCtx.hCTL( wcEdit ).tH
@@ -581,6 +587,36 @@ sub Output_ShowHide()
     SetFocus( iif(iOpen , CTL(iif(iOutput,wcOutput,wcQuery)) , CTL(wcEdit)) )
   end if   
 end sub
+sub Output_ToggleOutput()
+  var iToggledState = g_CurItemState and (not MFS_CHECKED)
+  SendMessage( CTL(wcBtnMinOut) , BM_CLICK , 0,0 )
+  if g_tCfg.bShowOutput then iToggledState or= MFS_CHECKED  
+  Menu.MenuState( g_hCurMenu,g_CurItemID,iToggledState )  
+end sub
+sub Solution_ShowHide()
+  var iOpen = SendMessage( CTL(wcBtnSide) , BM_GETCHECK , 0 , 0 )       
+  g_tCfg.bShowSolutions = iOpen<>0
+  static as typeof(g_tMainCtx.hCTL( wcSidePanel ).tW) tPrevWid
+  static as byte bOnce = 0 : if bOnce=0 then bOnce=1 : tPrevWid = _pct(30)
+  if iOpen=0 then tPrevWid = g_tMainCtx.hCTL( wcSidePanel ).tW
+  g_tMainCtx.hCTL( wcSidePanel ).tW = iif(iOpen , tPrevWid , _Pct(0) )     
+  
+  for I as long = wcSidePanel to wcSideSplit-1
+    if I = wcBtnMinOut then continue for
+    ShowWindow( CTL(I) , iif(iOpen,SW_SHOWNA,SW_HIDE) )
+  next I
+  
+  SetWindowText( CTL(wcBtnSide) , iif(iOpen,!"\x33",!"\x34") )
+  var hWnd = CTL(wcMain)
+  dim as RECT RcCli=any : GetClientRect(hWnd,@RcCli)      
+  ResizeLayout( hWnd , g_tMainCtx.tForm , RcCli.right , RcCli.bottom )  
+end sub
+sub Code_ToggleSidePanel()
+  var iToggledState = g_CurItemState and (not MFS_CHECKED)
+  SendMessage( CTL(wcBtnSide) , BM_CLICK , 0,0 )
+  if g_tCfg.bShowSolutions  then iToggledState or= MFS_CHECKED  
+  Menu.MenuState( g_hCurMenu,g_CurItemID,iToggledState )  
+end sub      
 
 static shared as FINDREPLACE g_tFindRep
 static shared as long g_FindRepMsg
@@ -775,7 +811,7 @@ sub Code_ClearOutput()
    SetWindowText( CTL(wcOutput) , "" )
 end sub
 
-sub Completion_Enable()   
+sub Completion_Enable()
    var iToggledState = g_CurItemState xor MFS_CHECKED
    g_CompletionEnable = (iToggledState and MFS_CHECKED)<>0
    puts(__FUNCTION__ & ":" & iif(g_CompletionEnable,"Enabled","Disabled"))
@@ -826,24 +862,6 @@ sub AutoFormat_Toggle()
   select case g_CurItemID
     case meAutoFormat_Case : _Cfg( bAutoFmtCase ) = ((iToggledState and MFS_CHECKED)<>0)
   end select
-end sub
-
-sub Solution_ShowHide()
-  var iOpen = SendMessage( CTL(wcBtnSide) , BM_GETCHECK , 0 , 0 )       
-  static as typeof(g_tMainCtx.hCTL( wcSidePanel ).tW) tPrevWid
-  static as byte bOnce = 0 : if bOnce=0 then bOnce=1 : tPrevWid = _pct(30)
-  if iOpen=0 then tPrevWid = g_tMainCtx.hCTL( wcSidePanel ).tW
-  g_tMainCtx.hCTL( wcSidePanel ).tW = iif(iOpen , tPrevWid , _Pct(0) )     
-  
-  for I as long = wcSidePanel to wcSideSplit-1
-    if I = wcBtnMinOut then continue for
-    ShowWindow( CTL(I) , iif(iOpen,SW_SHOWNA,SW_HIDE) )
-  next I
-  
-  SetWindowText( CTL(wcBtnSide) , iif(iOpen,!"\x33",!"\x34") )
-  var hWnd = CTL(wcMain)
-  dim as RECT RcCli=any : GetClientRect(hWnd,@RcCli)      
-  ResizeLayout( hWnd , g_tMainCtx.tForm , RcCli.right , RcCli.bottom )  
 end sub
 
 sub View_ToggleGW()

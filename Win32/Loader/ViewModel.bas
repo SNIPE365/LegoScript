@@ -255,7 +255,7 @@ scope
  'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\LDraw\models\car.ldr"
  'sFile = "C:\Users\greg\Desktop\LDCAD\examples\cube10x10x10.ldr"
  'sFile = "C:\Users\greg\Desktop\LS\TLG_Map\TrainStationEntranceA.ldr"
- 'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map0\Build\Blocks\B1\Eldon Square.ldr"   
+ sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map0\Build\Blocks\B1\Eldon Square.ldr"   
  'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\TestMap2.ldr"
  'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\Blocks\10190-1 Market Street.ldr"   
  'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\Blocks\10232 - Palace Cinema.mpd"
@@ -347,7 +347,7 @@ dim as boolean g_bFocus = true , g_bNeedUpdate = true , g_bLocked = false , g_bR
 dim as boolean bMoveForward , bMoveBackward , bStrafeLeft , bStrafeRight , bMoveUp , bMoveDown
 '///////////////////////////////////////////////////////////
 
-dim shared as single fRotationX = 120 , fRotationY = 20
+dim shared as single fRotationX = 120 , fRotationY = 20 , fvRotationX , fvRotationY
 dim shared as single fPositionX , fPositionY , fPositionZ , fZoom = -3
 dim shared as long iWheel , iPrevWheel , g_CurDraw = -1
 dim shared as byte g_Vsync=2, bBorderMode=1
@@ -1098,23 +1098,122 @@ do
     
     if g_FreeCam then
       
-      if g_bNeedUpdate then g_bNeedUpdate=false : UpdateCameraVectors()   
-      dim as single fTargetX=g_fCameraX+g_fFrontX , fTargetY=g_fCameraY+g_fFrontY , fTargetZ=g_fCameraZ+g_fFrontZ
+      #if 0 'garbage
+        ' --- 1. SETUP ---
+        ' We control the TARGET, not the camera directly.
+        static As Single fTargetX = 0.0f, fTargetY = 0.0f, fTargetZ = 0.0f
+        static As Single fDist = 1.0f   ' The "Pivot" distance you liked
+        'static As Single fYaw = 0.0f, fPitch = 0.0f
+        #define fYaw (g_fYaw)
+        #define fPitch (g_fPitch)
       
-      'dim as GLfloat lightPos(...) = {g_fCameraX,g_fCameraY,g_fCameraZ, 1.0f}'; // (x, y, z, w), w=1 for positional light
-      dim as GLfloat lightPos(...) = {0,0,0, 1.0f}
-      glLightfv(GL_LIGHT0, GL_POSITION, @lightPos(0))
-      
-      ' gluLookAt(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ)
-      Matrix4x4LookAt( tCur , _
-        g_fCameraX, g_fCameraY, g_fCameraZ, _  ' Camera Position (P)
-        fTargetX  , fTargetY  , fTargetZ  , _  ' Look Target (P + D)
-        g_fUpX    , g_fUpY    , g_fUpZ      _  ' World Up Vector
-      )
+        ' Movement Speed
+        Const MOVE_SPEED As Single = 10.0f
+        ' --- 2. INPUT & UPDATE LOOP ---
+
+        ' A. Calculate the Direction Vectors based on current Yaw
+        '    (We need these to know which way is "Forward" for the WASD keys)
+        Dim As Single radYaw = fYaw * 0.0174533f ' Deg to Rad
+        Dim As Single camFwdX = Sin(radYaw)
+        Dim As Single camFwdZ = Cos(radYaw)
+        Dim As Single camRightX = Cos(radYaw) ' 90 deg offset for strafing
+        Dim As Single camRightZ = -Sin(radYaw)
+        
+        ' B. Move the TARGET (The pivot point)
+        '    Note: We move the pivot, so the camera follows it naturally.
+        If MultiKey(fb.SC_W) Then 
+            fTargetX += camFwdX * MOVE_SPEED
+            fTargetZ += camFwdZ * MOVE_SPEED
+        End If
+        If MultiKey(fb.SC_S) Then 
+            fTargetX -= camFwdX * MOVE_SPEED
+            fTargetZ -= camFwdZ * MOVE_SPEED
+        End If
+        If MultiKey(fb.SC_A) Then 
+            fTargetX -= camRightX * MOVE_SPEED
+            fTargetZ -= camRightZ * MOVE_SPEED
+        End If
+        If MultiKey(fb.SC_D) Then 
+            fTargetX += camRightX * MOVE_SPEED
+            fTargetZ += camRightZ * MOVE_SPEED
+        End If
+        
+        ' Optional: Vertical movement for the target (Space/C)
+        If MultiKey(fb.SC_SPACE) Then fTargetY += MOVE_SPEED
+        If MultiKey(fb.SC_LSHIFT) Then fTargetY -= MOVE_SPEED
+        
+        ' C. Calculate Camera Position (Orbit Logic)
+        '    Camera is placed 'fDist' units BEHIND the target
+        Dim As Single radPitch = fPitch * 0.0174533f
+        
+        ' Calculate offset from target
+        Dim As Single offsetX = Sin(radYaw) * Cos(radPitch) * fDist
+        Dim As Single offsetY = Sin(radPitch) * fDist
+        Dim As Single offsetZ = Cos(radYaw) * Cos(radPitch) * fDist
+        
+        ' Set final Camera Eye position
+        g_fCameraX = fTargetX - offsetX
+        g_fCameraY = fTargetY - offsetY
+        g_fCameraZ = fTargetZ - offsetZ
+        
+        ' --- 3. RENDER ---
+        Matrix4x4LookAt( tCur, _
+            g_fCameraX, g_fCameraY, g_fCameraZ, _  ' Camera (Eye)
+            fTargetX,   fTargetY,   fTargetZ,   _  ' Target (LookAt)
+            0.0f,       1.0f,       0.0f        _  ' Up Vector
+        )
+      #endif      
+      #if 1 'original
+        if g_bNeedUpdate then g_bNeedUpdate=false : UpdateCameraVectors()   
+        dim as single fTargetX=g_fCameraX+g_fFrontX , fTargetY=g_fCameraY+g_fFrontY , fTargetZ=g_fCameraZ+g_fFrontZ
+        
+        'dim as GLfloat lightPos(...) = {g_fCameraX,g_fCameraY,g_fCameraZ, 1.0f}'; // (x, y, z, w), w=1 for positional light
+        dim as GLfloat lightPos(...) = {0,0,0, 1.0f}
+        glLightfv(GL_LIGHT0, GL_POSITION, @lightPos(0))
+        
+        ' gluLookAt(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ)
+        Matrix4x4LookAt( tCur , _
+          g_fCameraX, g_fCameraY, g_fCameraZ, _  ' Camera Position (P)
+          fTargetX  , fTargetY  , fTargetZ  , _  ' Look Target (P + D)
+          g_fUpX    , g_fUpY    , g_fUpZ      _  ' World Up Vector
+        )
+      #endif
+      #if 0 'close but no camera
+        if g_bNeedUpdate then g_bNeedUpdate=false : UpdateCameraVectors()   
+        ' Configuration
+        Dim As Single fDist = 500.0f      ' Distance to the pivot point (depth)
+        'Dim As Single fYaw = 0.0f, fPitch = 0.0f
+        #define fYaw (g_fYaw/10)
+        #define fPitch (g_fPitch/10)
+        Dim As Single fTargetX = 0.0f, fTargetY = 0.0f, fTargetZ = 0.0f
+        '#define fTargetX g_fCameraX
+        '#define fTargetY g_fCameraY
+        '#define fTargetZ g_fCameraZ
+        
+        ' --- Inside update loop ---
+        
+        ' 1. Calculate Camera position based on the Pivot Point
+        var fCameraX = fTargetX - fDist * Cos(fPitch) * Sin(fYaw) 
+        var fCameraY = fTargetY - fDist * Sin(fPitch)             
+        var fCameraZ = fTargetZ - fDist * Cos(fPitch) * Cos(fYaw) 
+        
+        ' 2. Apply to your Matrix
+        ' Note: Eye is now calculated, Target is the fixed pivot
+        Matrix4x4LookAt( tCur , _
+            fCameraX, fCameraY, fCameraZ, _  
+            fTargetX  , fTargetY  , fTargetZ  , _  
+            0.0f      , 1.0f      , 0.0f        _  
+        )
+      #endif      
       
       #ifndef UseVBO
       glLoadMatrixf( @tCur.m(0) )
       #endif
+      
+      Matrix4x4Translate( tCur , 0 , 0 , 0 )
+      Matrix4x4RotateZ( tCur , tCur , fvRotationY*-cPI180 )
+      Matrix4x4RotateY( tCur , tCur , fvRotationX*-cPI180 )
+      Matrix4x4Translate( tCur , 0 , 0 , 0 )
       
       glPushMatrix()
       RenderScenery()
@@ -1124,14 +1223,21 @@ do
       Dim e as fb.EVENT = any
       dim as boolean bSkipMouse = not g_bFocus
       
-      #define fSpd (cMovementSpeed*dSpeed)
-      'printf(!"%1.2f\r",dSpeed)
-      if bMoveForward  then g_fCameraX += g_fFrontX*fSpd : g_fCameraY += g_fFrontY*fSpd : g_fCameraZ += g_fFrontZ*fSpd   
-      if bMoveBackward then g_fCameraX -= g_fFrontX*fSpd : g_fCameraY -= g_fFrontY*fSpd : g_fCameraZ -= g_fFrontZ*fSpd   
-      if bStrafeLeft   then g_fCameraX += g_fRightX*fSpd : g_fCameraZ += g_fRightZ*fSpd
-      if bStrafeRight  then g_fCameraX -= g_fRightX*fSpd : g_fCameraZ -= g_fRightZ*fSpd
-      if bMoveUp       then g_fCameraY -= fSpd
-      if bMoveDown     then g_fCameraY += fSpd
+      #if 1
+        #define fSpd (cMovementSpeed*dSpeed)
+        'printf(!"%1.2f\r",dSpeed)
+        if bMoveForward  then g_fCameraX += g_fFrontX*fSpd : g_fCameraY += g_fFrontY*fSpd : g_fCameraZ += g_fFrontZ*fSpd   
+        if bMoveBackward then g_fCameraX -= g_fFrontX*fSpd : g_fCameraY -= g_fFrontY*fSpd : g_fCameraZ -= g_fFrontZ*fSpd   
+        if bStrafeLeft   then g_fCameraX += g_fRightX*fSpd : g_fCameraZ += g_fRightZ*fSpd
+        if bStrafeRight  then g_fCameraX -= g_fRightX*fSpd : g_fCameraZ -= g_fRightZ*fSpd
+        if bMoveUp       then g_fCameraY -= fSpd
+        if bMoveDown     then g_fCameraY += fSpd
+      #endif
+      
+      if multikey(fb.SC_J) then fvRotationX -= fSpd
+      if multikey(fb.SC_L) then fvRotationX += fSpd
+      if multikey(fb.SC_I) then fvRotationY -= fSpd
+      if multikey(fb.SC_K) then fvRotationY += fSpd
        
       if g_bLocked then
         dim as long lDX=any,lDY=any : GetMouseDelta( lDX, lDY )
