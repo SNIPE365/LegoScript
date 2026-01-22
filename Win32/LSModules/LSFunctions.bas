@@ -147,6 +147,7 @@ function FindPartName( sName as string ) as long
    if len(sName) < 1 then return ErrInfo(ecNotFound)
    for N as long = 1 to g_iPartCount-1
       with g_tPart(N)
+        puts(.sName)
          if .sName = sName then return N
       end with
    next N

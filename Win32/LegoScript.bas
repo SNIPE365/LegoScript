@@ -7,7 +7,7 @@
 
 #define __Main "LegoScript"
 #define __DebugShadowLoad
-'#define SearchIsInPanel
+#define SearchIsInPanel
 
 #define _WIN32_WINNT &h0600
 #include once "windows.bi"
@@ -346,15 +346,17 @@ sub RichEdit_SelChange( hCtl as HWND , iRow as long , iCol as long )
       'if .iCur < 0 then .iCur = iSz-2
    end with
    sLastSearch = zRow
-
-   #ifndef SearchIsInPanel
-   Try()
-      HandleTokens( sLastSearch , g_SQCtx )
+   
+   Try()      
+      #ifdef SearchIsInPanel
+        HandleTokens( sLastSearch , g_SQCtx , true )
+      #else
+        HandleTokens( sLastSearch , g_SQCtx , false )
+      #endif
       Catch()
          LogError( "Auto completion Crashed!!!" )
       EndCatch()
    EndTry()
-   #endif
    
 end sub
 function RichEdit_KeyPress( hCtl as HWND , iKey as long , iMod as long ) as long
@@ -521,61 +523,67 @@ end sub
 
 static shared as any ptr OrgEditProc
 function WndProcEdit ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LPARAM ) as LRESULT   
-   static as long iMod   
-   
-   if OrgEditProc=0 then return 0
-
-   select case message
-   case WM_KEYDOWN      
-      select case wParam
-      case VK_SHIFT   : iMod or= FSHIFT
-      case VK_MENU    : iMod or= FALT
-      case VK_CONTROL : iMod or= FCONTROL
-      case else
-         var iResu = RichEdit_KeyPress( hWnd , wParam , iMod ) 
-         if iResu then return iResu
-      end select      
-      if wParam=VK_ESCAPE then 
-         if OrgEditProc = 0 then return 0
-         return CallWindowProc( OrgEditProc , hWnd , EM_SETSEL , -1 , 0 )
+  static as long iMod   
+  
+  if OrgEditProc=0 then return 0
+  
+  select case message
+  case WM_KEYDOWN      
+    select case wParam
+    case VK_SHIFT   : iMod or= FSHIFT
+    case VK_MENU    : iMod or= FALT
+    case VK_CONTROL : iMod or= FCONTROL
+    case else
+       var iResu = RichEdit_KeyPress( hWnd , wParam , iMod ) 
+       if iResu then return iResu
+    end select      
+    if wParam=VK_ESCAPE then 
+       if OrgEditProc = 0 then return 0
+       return CallWindowProc( OrgEditProc , hWnd , EM_SETSEL , -1 , 0 )
+    end if
+  case WM_KEYUP
+    select case wParam
+    case VK_SHIFT   : iMod and= (not FSHIFT)
+    case VK_MENU    : iMod and= (not FALT)
+    case VK_CONTROL : iMod and= (not FCONTROL)
+    end select
+  case WM_ACTIVATE
+    iMod = 0
+  case WM_CHAR
+    select case wParam      
+    case asc(" ")        
+      if g_CompletionEnable then
+        #ifdef SearchIsInPanel
+          var iOldVis = g_SearchVis : g_SearchVis = SW_SHOW
+        #endif
+        var sFix = "" : SearchAddPartSuffix( sFix , g_SQCtx )
+        #ifdef SearchIsInPanel
+          g_SearchVis = iOldVis
+        #endif
+        'puts("'"+sFix+"'")
+        if len(sFix) then
+           for N as long = 0 to len(sFix)
+              PostMessage( hWnd , WM_CHAR , sFix[N] , 0 )
+           next N         
+        end if
       end if
-   case WM_KEYUP
-      select case wParam
-      case VK_SHIFT   : iMod and= (not FSHIFT)
-      case VK_MENU    : iMod and= (not FALT)
-      case VK_CONTROL : iMod and= (not FCONTROL)
-      end select
-   case WM_ACTIVATE
-      iMod = 0
-   case WM_CHAR
-      select case wParam      
-      case asc(" ")
-         if g_CompletionEnable then
-            var sFix = "" : SearchAddPartSuffix( sFix , g_SQCtx )
-            puts("'"+sFix+"'")
-            if len(sFix) then
-               for N as long = 0 to len(sFix)
-                  PostMessage( hWnd , WM_CHAR , sFix[N] , 0 )
-               next N         
-            end if
-         end if
-      case 3,24 'Ctrl-C / Ctrl-X
-         if OrgEditProc=0 then return 0
-         var lResu = CallWindowProc( OrgEditProc , hWnd , message , wParam, lParam )      
-         GetClipboard() : return lResu
-      end select      
-   case WM_VSCROLL
+    case 3,24 'Ctrl-C / Ctrl-X
       if OrgEditProc=0 then return 0
-      var iResu = CallWindowProc( OrgEditProc , hWnd , message , wParam, lParam )
-      g_iPrevRowCount = 0
-      RichEdit_TopRowChange( hWnd )
-      return iResu   
-   case WM_CONTEXTMENU
-     Edit_ContextMenu( hWnd , wParam , lParam )
-     return 0
-   end select
-   if OrgEditProc=0 then return 0
-   return CallWindowProc( OrgEditProc , hWnd , message , wParam, lParam )   
+      var lResu = CallWindowProc( OrgEditProc , hWnd , message , wParam, lParam )      
+      GetClipboard() : return lResu
+    end select      
+  case WM_VSCROLL
+    if OrgEditProc=0 then return 0
+    var iResu = CallWindowProc( OrgEditProc , hWnd , message , wParam, lParam )
+    g_iPrevRowCount = 0
+    RichEdit_TopRowChange( hWnd )
+    return iResu   
+  case WM_CONTEXTMENU
+   Edit_ContextMenu( hWnd , wParam , lParam )
+   return 0
+  end select
+  if OrgEditProc=0 then return 0
+  return CallWindowProc( OrgEditProc , hWnd , message , wParam, lParam )   
 end function
 
 static shared as any ptr OrgLinesProc
@@ -666,6 +674,16 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
        end with
        Viewer.LoadMemory( zOutput , "memory.ldr" )
     end select
+  case WM_CTLCOLOREDIT
+    var hDC = cast(HDC,wParam), hCtl = cast(HWND,lParam)
+    select case hCtl
+    case CTL(wcSearchEdit)
+      if GetWindowTextLength(hCtl)=0 then
+        SetTextColor( hDC , &hCCCCCC )
+        TextOut( hDC , 0 , 0 , "Search..." , 9 )
+        return cast(LRESULT,GetStockObject(NULL_BRUSH))
+      end if
+    end select
   case WM_NOTIFY     'notification from window/control
     var wID = cast(long,wParam) , pnmh = cptr(LPNMHDR,lParam)
     select case wID
@@ -732,12 +750,14 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
              RichEdit_SelChange( CTL(wID) , iRow , iCol )
           end with
        end select
+    case wcSearchList
+      puts("???")
     end select
     return 0
   case WM_COMMAND    'Event happened to a control (child window)
     var wNotifyCode = cint(HIWORD(wParam)), wID = LOWORD(wParam) , hwndCtl = cast(.HWND,lParam)      
     if hwndCtl=0 andalso wNotifyCode=0 then wNotifyCode = -1      
-    'if hwndCtl andalso wNOtifyCode=1 then wNotifyCode = -2
+    if hwndCtl=0 andalso wNotifyCode=1 then wNotifyCode = -2
     select case wNotifyCode
     case -1         'Command from Menu
        if wID <> g_CurItemID then return 0 'not valid menu event
@@ -749,7 +769,7 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
          MenuItemCallback()        
        end if
        g_CurItemID = 0 : g_hCurMenu = 0 : return 0
-    case  1         'Accelerator
+    case -2         'Accelerator
        ProcessAccelerator( wID )
        return 0
     case BN_CLICKED 'Clicked action for different buttons
@@ -808,6 +828,18 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
           UpdateSearch(sText)
         end select
       #endif
+    case wcSearchList      
+      select case wNotifyCode 
+      case LBN_SELCHANGE        
+        UpdateStatusBarPartDescription()
+      case LBN_DBLCLK
+        var sPart = UpdateStatusBarPartDescription()
+        sPart[len(sPart)]=asc(" ") 'send space as well
+        SetFocus( CTL(wcEdit) )
+        for N as long = 0 to len(sPart)
+          SendMessage( CTL(wcEdit) , WM_CHAR , sPart[N] , 1 )
+        next N        
+      end select
     end select      
     return 0
   

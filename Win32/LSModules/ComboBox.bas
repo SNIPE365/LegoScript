@@ -57,8 +57,8 @@
 'LS -> LDCAD
 
 
-dim shared as HWND g_hCon=any,g_hContainer 'console/container
-dim shared as HWND g_hSearch=any,g_hStatus=any 'controls
+dim shared as HWND g_hCon,g_hContainer 'console/container
+dim shared as HWND g_hSearch,g_hStatus 'controls
 dim shared as HFONT g_hFontSearch
 dim shared as RECT g_rcCon = any , g_rcSearch
 dim shared as POINT g_rcCursor 
@@ -286,16 +286,16 @@ static shared as long g_iFilteredCount
 function GetPartDescription( iPart as long , byref bUnnoficial as byte=0 ) as string
    var pPart = PartStructFromIndex(iPart)   
    if pPart=0 then return "???"
-   var sDesc = trim(pPart->zDesc), iPos=0
-   return sDesc
+   var sDesc = trim(pPart->zDesc), iPos=0   
    'if g_FilterParts then return sDesc
-   while sDesc[iPos] = asc("~") 'process special command
+   while iPos<len(sDesc) andalso sDesc[iPos] = asc("~") 'process special command
       const sMoved = "moved to "
       var iMoved = instr(iPos+1,lcase(sDesc),sMoved)
       if iMoved then
          var iPart2 = SearchPart(mid(sDesc,iMoved+len(sMoved)))         
-         if iPart2 then            
+         if iPart2 > 0 then        
             pPart = PartStructFromIndex(iPart2)                  
+            if pPart=0 then exit while            
             var iPos2 = len(sDesc)+2
             sDesc = left(sDesc,iPos)+mid(sDesc,iPos+2) & " > " & pPart->zDesc
             iPos = iPos2
@@ -303,9 +303,8 @@ function GetPartDescription( iPart as long , byref bUnnoficial as byte=0 ) as st
          end if
       end if
       exit while
-   wend
-   'print pPart->zName
-   if pPart->iFolder=2 then bUnnoficial = 1 : return "[Unnoficial] "+sDesc
+   wend   
+   if pPart->iFolder=cUnnofficialPathIndex then bUnnoficial = 1 : return "[Unnoficial] "+sDesc
    bUnnoficial = 0 : return " "+sDesc
 end function
 function IsPartFiltered( pPart as SearchPartStruct ptr ) as boolean   
@@ -367,7 +366,7 @@ function UpdateSearch(sSearch as string) as long
            end if
            g_iFilteredCount += 1 : continue for
         end if      
-        dim as byte bIsUnnoficial = any
+        dim as byte bIsUnnoficial = 0
         var sDesc = GetPartDescription(iPart,bIsUnnoficial)
         'sDesc[0]=asc("~")
         if g_FilterParts andalso (sDesc[0]=asc("=") orelse sDesc[0]=asc("_")) then g_iFilteredCount += 1 : continue for
@@ -457,6 +456,15 @@ sub DumpFilteredParts( sSearch as string )
    close #f
    ThreadDetach(ThreadCreate( @ShowDumpTextFile , NULL ))
 end sub
+function UpdateStatusBarPartDescription() as string
+  var iSel   = SendMessage( g_hSearch , LB_GETCURSEL , 0 , 0 )
+  'puts("Sel=" & iSel)
+  var iPart = SendMessage( g_hSearch , LB_GETITEMDATA , iSel , 0 )
+  var pPart = PartStructFromIndex(iPart), sPart = pPart->zName
+  sPart = left(sPart,instrrev(sPart,".")-1)
+  SetWindowText( g_hStatus , GetPartDescription(iPart) )
+  return sPart
+end function
 
 type SearchQueryContext
    as byte bChanged=1 , bRecalcTokens=TRUE , iTokCnt=any , iCurTok=any , iMaxTok = 8
@@ -505,10 +513,9 @@ function HandleCasing( sText as string , tCtx as SearchQueryContext ) as long
    return bChanged
 end function
 
-function HandleTokens( sText as string , tCtx as SearchQueryContext ) as long   
+function HandleTokens( sText as string , tCtx as SearchQueryContext , bDontSearch as byte = 0 ) as long   
          
-   function = 0
-   dim as byte bDontSearch = 0   
+   function = 0   
    with tCtx
       'split tokens and count
       if .bChanged orelse .bReCalcTokens then         
@@ -546,11 +553,7 @@ function HandleTokens( sText as string , tCtx as SearchQueryContext ) as long
       
       if g_SearchChanged then 'if search selection changed update everything else
          g_SearchChanged = false
-         var iSel   = SendMessage( g_hSearch , LB_GETCURSEL , 0 , 0 )
-         var iPart = SendMessage( g_hSearch , LB_GETITEMDATA , iSel , 0 )
-         var pPart = PartStructFromIndex(iPart), sPart = pPart->zName
-         sPart = left(sPart,instrrev(sPart,".")-1)
-         SetWindowText( g_hStatus , GetPartDescription(iPart) )         
+         var sPart = UpdateStatusBarPartDescription()         
          sText = left(sText,.iTokStart-1)+sPart+mid(sText,.iTokEnd+1)
          _ifnotStandalone
             'update text in edit box without sending selection changed messages
@@ -605,28 +608,36 @@ function HandleTokens( sText as string , tCtx as SearchQueryContext ) as long
 end function
 
 sub SearchAddPartSuffix( sText as string , tCtx as SearchQueryContext )
-   with tCtx
-      'puts(g_SearchVis & "," & SW_HIDE & "," & .iCur & "," & .iTokEnd)
-      if g_SearchVis<>SW_HIDE andalso .iCur=.iTokEnd then
-         var iSel  = SendMessage( g_hSearch , LB_GETCURSEL , 0 , 0 )               
-         if iSel <> LB_ERR then               
-            var iPart = SendMessage( g_hSearch , LB_GETITEMDATA , iSel , 0 )                  
-            var sDesc = GetPartDescription( iPart )
-            for N as long = 0 to len(sDesc)-1
-               select case sDesc[N]
-               case asc("0") to asc("9"),asc("A") to asc("Z"),asc("a") to asc("z"): exit for
-               end select
-               sDesc[N]=asc(" ")
-            next N                  
-            if instr(sDesc,"hinge")=0 then
-               if instr(sDesc," plate") then 
-                  sText += "P"                  
-               elseif instr(sDesc," brick") then
-                  sText += "B"
-               end if
-            end if
-         end if
+  with tCtx
+    'puts(g_SearchVis & "," & SW_HIDE & "," & .iCur & "," & .iTokEnd)
+    if g_SearchVis<>SW_HIDE andalso .iCur=.iTokEnd then
+      'puts("" & __LINE__ & " '" & tCtx.sToken & "'")
+      var iPart = FindPartIndex( tCtx.sToken ), iSel=-1
+      if iPart < 0 then
+        exit sub
+        'puts("not found... getting from list")
+        'iSel = SendMessage( g_hSearch , LB_GETCURSEL , 0 , 0 )               
+        'if iSel <> LB_ERR then iPart = SendMessage( g_hSearch , LB_GETITEMDATA , iSel , 0 )
       end if
+      if iPart >= 0 then
+        var sDesc = GetPartDescription( iPart )
+        'puts("'" & sDesc & "'")
+        for N as long = 0 to len(sDesc)-1
+           select case sDesc[N]
+           case asc("0") to asc("9"),asc("A") to asc("Z"),asc("a") to asc("z"): exit for
+           end select
+           sDesc[N]=asc(" ")
+        next N                  
+        if instr(sDesc,"hinge")=0 then
+          if instr(sDesc," plate") then 
+            sText += "P"                  
+          elseif instr(sDesc," brick") then
+            sText += "B"
+          end if
+        end if
+        'puts("'" & sText & "'")
+      end if
+    end if
    end with   
 end sub
 

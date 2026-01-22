@@ -161,17 +161,18 @@ function LoadPartNames() as long
    dim as ulong uPartNamesSize = sizeof(ulong)
    
    if open(exepath+"\PartCache.bin" for binary access read as #f) then   
-      'parts cache not found, so recreating the cache
+      puts("parts cache not found, so recreating the cache")
       if g_pPartsNames then deallocate(g_pPartsNames)
       g_pPartsNames = allocate(uPartNamesSize)
       
       for N as long = 1 to ubound(g_sPathList)
          var sPath = g_sPathList(N) & "\"
-         if instr(sPath,"\p\") then exit for 'exits when subparts/primatives start   
+         if lcase(right(sPath,7)) <> "\parts\" then continue for
+         'if instr(sPath,"\p\") then exit for 'exits when subparts/primatives start   
          var sName = dir( sPath & "*.dat")
          
          #ifdef DebugLoading
-            print "-- '" +sPath+"' --"
+            puts "-- '" +sPath+"' --"
          #endif
          
          var iLen = len(sName), sDesc = ""
@@ -202,7 +203,7 @@ function LoadPartNames() as long
             loop         
             close #f
             if iGotComment=0 then
-               print "WARNING: couldnt obtain comment for '"+sName+"'"
+               puts "WARNING: couldnt obtain comment for '"+sName+"'"
             end if                        
             
             'hashing the partID without extension
@@ -215,7 +216,7 @@ function LoadPartNames() as long
             var iSize = ((offsetof(SearchPartStruct,zName)+iLen+1) or 3)+1      
             g_pPartsNames = reallocate( g_pPartsNames , uPartNamesSize+iSize )
             if g_pPartsNames = NULL then
-               print "Failed reallocate"
+               puts "Failed reallocate"
                GiveUp(2)
             end if
             
@@ -239,7 +240,7 @@ function LoadPartNames() as long
       qsort( @g_lPartIndex(0) , g_lPartCount , sizeof(long) , @CompareIndexedPartName )
             
       if open(exepath+"\PartCache.bin" for binary access write as #f) then
-         print "ERROR: failed to open file to write cache file"
+         puts "ERROR: failed to open file to write cache file"
       else
          put #f,,g_lPartCount
          put #f,,uPartNamesSize
@@ -256,15 +257,15 @@ function LoadPartNames() as long
       get #f,,g_lHashList()
       get #f,,g_lPartIndex(0),g_lPartCount
       g_pPartsNames = allocate(uPartNamesSize)
-      if g_pPartsNames=0 then print "ERROR: Failed to allocate memory for parts cache"
+      if g_pPartsNames=0 then puts "ERROR: Failed to allocate memory for parts cache"
       get #f,,*cptr(ubyte ptr,g_pPartsNames),uPartNamesSize
       close #f
    end if
       
    #ifdef DebugLoading
-      print "Parts: "; g_lPartCount
-      print "Name sizes: ";uPartNamesSize\1024;"kb"
-   #endif
+      puts "Parts: " &  g_lPartCount
+      puts "Name sizes: " & uPartNamesSize\1024 & "kb"
+    #endif
    return true
 end function
 

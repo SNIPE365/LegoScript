@@ -616,7 +616,9 @@ sub Code_ToggleSidePanel()
   SendMessage( CTL(wcBtnSide) , BM_CLICK , 0,0 )
   if g_tCfg.bShowSolutions  then iToggledState or= MFS_CHECKED  
   Menu.MenuState( g_hCurMenu,g_CurItemID,iToggledState )  
-end sub      
+end sub
+
+
 
 static shared as FINDREPLACE g_tFindRep
 static shared as long g_FindRepMsg

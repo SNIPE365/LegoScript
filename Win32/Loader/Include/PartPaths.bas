@@ -13,12 +13,13 @@ const NULL = 0
 static shared as long g_iExtraPathCount = 0
 redim shared as string g_sExtraPathList()
 
+const cUnnofficialPathIndex = 4
 static shared as zstring ptr g_pzPaths(...) = { _
   NULL            , _   
   @"1:\unoff\p\48"  , _
   @"2:\unoff\p"     , _   
   @"3:\unoff\p\8"   , _
-  @"0:\unoff\parts" , _   
+  @"0:\unoff\parts" , _ '4
   @"1:\p\8"         , _   
   @"2:\p"           , _
   @"3:\p\48"        , _         
