@@ -21,6 +21,7 @@ AddButtonA ( wcButton    , _NextCol  , _SameRow  , cMarginR , cRow(1.25) , "Buil
 AddTabsA   ( wcSidePanel , _Num(0)   , _NextRow0  , _Num(1) , cEm(2) , cEm(2) ) ', TBSTYLE_WRAPABLE )
 'search combo controls in the side panel
 AddFieldA( wcSearchEdit , _Num(0)  , _NextRow0 , _NextCol0 , cEm(1.2) , 0 )
+AddFieldA( wcFilterEdit , _Num(0)  , _NextRow0 , _NextCol0 , cEm(1.2) , 0 )
 AddListW ( wcSearchList , _SameCol , _NextRow0 , _NextCol0 , _BottomE(-1.15) , LBS_NOTIFY or WS_VSCROLL )
 
 AddSplitter( wcSideSplit , _Rtn(wcSidePanel,0) , _SameRow  , _pct(0.5)  , _NextRow0 )

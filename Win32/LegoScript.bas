@@ -33,6 +33,8 @@
 ' !!! some pieces have unmatched studs vs clutch (and i suspect that's their design problem) !!!
 ' !!! because when using ldraw it does not matter the order, so they never enforced that     !!!
 
+'TODO (25/01/26): filters should be changed to be a dialog
+'TODO (25/01/26): invert filter logic, debug if filtering is actually working
 'TODO (12/01/26): add option for rotate on cursor pos instead of model center
 'TODO (21/12/25): make the buttons smaller / change colors
 'TODO (21/12/25): the gray parts should now be very dark gray / buttons should be yellow
@@ -41,7 +43,6 @@
 'TODO (30/06/25): continue fixing/improving the row counter
 'TODO (13/06/25): fix LS2LDR showing wrong error line numbers with #defines
 'TODO (19/05/25): fix LS2LDR parsing bugs (prevent part that is connected from moving)
-'TODO (17/05/25): investigate crash when building before opening graphics window
 'TODO (16/05/25): clutches [slide=true] are real clutches??
 'TODO (13/05/25): Add Menu entries for the Query window/buttons 
 'TODO (16/05/25): TAB structure must keep the selection position
@@ -60,6 +61,7 @@ enum WindowControls
   wcButton  
   wcSidePanel
   'Side Panel search tab
+  wcFilterEdit
   wcSearchEdit
   wcSearchList  
   wcSideSplit  
@@ -677,10 +679,18 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
   case WM_CTLCOLOREDIT
     var hDC = cast(HDC,wParam), hCtl = cast(HWND,lParam)
     select case hCtl
-    case CTL(wcSearchEdit)
+    case CTL(wcSearchEdit),CTL(wcFilterEdit)
       if GetWindowTextLength(hCtl)=0 then
-        SetTextColor( hDC , &hCCCCCC )
-        TextOut( hDC , 0 , 0 , "Search..." , 9 )
+        dim as zstring ptr pzText
+        select case hCtl
+        case CTL(wcSearchEdit) : pzText = @"Search..."
+        case CTL(wcFilterEdit) : pzText = @"Filter..."
+        end select
+        dim as RECT tRC = any : GetClientRect(hCtl,@tRC)
+        var iC = ((GetSysColor( COLOR_GRAYTEXT ) and &hFEFEFE) shr 1)+&h808080
+        SetTextColor( hDC , iC )
+        SetBkColor( hDC , GetSysColor(COLOR_WINDOW) )
+        ExtTextOut( hDC , tRc.left , tRc.top , ETO_CLIPPED or ETO_OPAQUE , @tRc , pzText , 9  , NULL )
         return cast(LRESULT,GetStockObject(NULL_BRUSH))
       end if
     end select
@@ -818,16 +828,40 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
     case wcSearchEdit
       #ifdef SearchIsInPanel
         select case wNotifyCode 
-        case EN_UPDATE
-          dim as string sText
-          scope
-            dim as zstring*1024 zText = any : zText[0]=0
-            GetWindowText( hwndCTL , @zText , 1023 )
-            sText = zText
-          end scope
+        case EN_UPDATE          
+          var sText = GetControlText( wID )
           UpdateSearch(sText)
         end select
       #endif
+    case wcFilterEdit
+      select case wNotifyCode
+      case EN_UPDATE
+        var sText = GetControlText( wID )
+        dim zFilter as zstring*64 = any 
+        dim as long iPos=-1 , iFilterSz=0 , iInclude=0
+        dim zFullFilter as zstring*1024 = any : zFullFilter[0] = 0
+        #macro ShowFilter()
+          zFilter[iPos] = 0 : iPos = -1
+          iFilterSz += sprintf(@zFullFilter,"(%s %s) ",iif(iInclude,@"include",@"exclude"),zFilter)
+        #endmacro
+        for I as long = 0 to len(sText)
+          select case sText[I]
+          case asc("-")
+            if iPos >=0 then : ShowFilter() : end if
+            iPos = 0 : iInclude = 0
+          case asc("+")
+            if iPos >=0 then : ShowFilter() : end if
+            iPos = 0 : iInclude = 1
+          case asc("a") to asc("z")            
+            if iPos >=0 then zFilter[iPos] = sText[I] : iPos += 1
+          case asc("A") to asc("Z")
+            if iPos >=0 then zFilter[iPos] = sText[I]+32 : iPos += 1
+          case else
+            if iPos >=0 then : ShowFilter() : end if
+          end select
+        next I
+        puts(zFullFilter)
+      end select
     case wcSearchList      
       select case wNotifyCode 
       case LBN_SELCHANGE        

@@ -41,6 +41,13 @@ function MsgBox cdecl ( pwText as wstring ptr , pwCaption as wstring ptr  = _u("
 
 End function
 
+function GetControlText( iID as long ) as string
+  var hwnd = CTL(iID)
+  dim as string sText = space( GetWindowTextLength( hwnd ) )
+  GetWindowText( hwnd , strptr(sText) , len(sText) )
+  return sText
+end function
+
 sub NotifySelChange( iID as long )   
    var hCTL = CTL( iID ), hParent = GetParent(hCTL)
    dim as SELCHANGE tSelChange           
