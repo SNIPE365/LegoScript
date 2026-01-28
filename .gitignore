@@ -1,0 +1,2 @@
+git rm --cached Win32\LegoScript.exe
+git rm --cached Win32\Loader\ViewModel.exe
