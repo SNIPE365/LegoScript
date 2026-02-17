@@ -118,10 +118,11 @@ namespace gfx
       end if
       return 0' // Must return 0 to indicate the WM_INPUT message has been processed
     case WM_MOUSEMOVE      
-      var xPos = cshort(LOWORD(lParam)),yPos = cshort(HIWORD(lParam))      
+      var xPos = cshort(LOWORD(lParam)),yPos = cshort(HIWORD(lParam))            
       dim as rect fbcli = any: GetClientRect(hwnd,@fbcli)            
-      xPos = cshort((xPos*g_iScrWid)\fbcli.Right)
-      yPos = cshort((yPos*g_iScrHei)\fbcli.Bottom)
+      'xPos = cshort((xPos*g_iScrWid)\fbcli.Right)
+      'yPos = cshort((yPos*g_iScrHei)\fbcli.Bottom)
+      'printf(!"{%i,%i}\n",xPos,yPos)
       lParam = MAKELONG(cushort(xPos),cushort(yPos))      
     case WM_NCHITTEST,WM_NCMOUSEMOVE,12,174,32            
       return DefWindowProc(hwnd,imsg,wparam,lparam)    
@@ -187,7 +188,7 @@ namespace gfx
       lOrgFbProc = SetWindowLong(fbWnd,GWL_WNDPROC,clng(@FbSubClass))                    
     end if   
         
-    var iStyle   = GetWindowLong(fbwnd,GWL_STYLE)
+    var iStyle   = GetWindowLong(fbwnd,GWL_STYLE)    
     if iResizable then iStyle or= WS_SIZEBOX else iStyle and= (not WS_THICKFRAME)    
     g_temp=1
     SetWindowLong(fbWnd,GWL_STYLE,iStyle)        

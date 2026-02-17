@@ -44,7 +44,7 @@ End function
 function GetControlText( iID as long ) as string
   var hwnd = CTL(iID)
   dim as string sText = space( GetWindowTextLength( hwnd ) )
-  GetWindowText( hwnd , strptr(sText) , len(sText) )
+  GetWindowText( hwnd , strptr(sText) , len(sText)+1 )
   return sText
 end function
 

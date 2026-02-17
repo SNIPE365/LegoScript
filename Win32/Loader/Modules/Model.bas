@@ -291,276 +291,276 @@ end function
   #ifdef UseVBO
     'simple VBO
     #if 0
-    function GetModelVertexCount( pPart as DATFile ptr , iBorders as long , lDrawPart as long = -1 , byref lCurPos as long = 0 ) as ulong
+      function GetModelVertexCount( pPart as DATFile ptr , iBorders as long , lDrawPart as long = -1 , byref lCurPos as long = 0 ) as ulong
+                          
+         with *pPart
+            for N as long = 0 to .iPartCount-1                           
+               dim as byte bDoDraw = (lDrawPart<0 orelse lDrawPart=N)         
+               with .tParts(N)            
+                  select case .bType
+                  case 1               
+                     var T1 = ._1
+                     with T1
+                        if bDoDraw then
+                           var pSubPart = g_tModels(.lModelIndex).pModel                     
+                           GetModelVertexCount( pSubPart , iBorders , iif(lDrawPart=-2,-2,-1) , lCurPos )
+                        end if                  
+                     end with               
+                  case 2               
+                     if iBorders=0 andalso lDrawPart <> N then continue for               
+                     lCurPos += 2               
+                  case 3
+                     if iBorders orelse bDoDraw=0 then continue for                                 
+                     lCurPos += 3
+                  case 4               
+                     if iBorders orelse bDoDraw=0 then continue for
+                     lCurPos += 6
+                  case 5               
+                     if iBorders=0 orelse bDoDraw=0 then continue for               
+                     lCurPos += 2
+                  end select
+               end with
+            next N                  
+         end with
+            
+         return lCurPos
+         
+      end function
+      function GenArrayModel( pPart as DATFile ptr , aVertex() as VertexStruct , iBorders as long , uCurrentColor as ulong = &h70605040 , lDrawPart as long = -1 , byref lCurPos as long = -1 , uCurrentEdge as ulong = 0 DebugPrimParm ) as ulong
+         if uCurrentColor = &h70605040 then uCurrentColor = g_Colours(c_Blue) : uCurrentEdge = g_EdgeColours(c_Blue)
+         
+         const cBlockCnt = 1 shl 21
+         
+         dim as boolean bMain = false
+         if lCurPos < 0 then 
+            var uVtx = GetModelVertexCount( pPart , iBorders )
+            redim aVertex( uVtx-1 ) : lCurPos = 0 : bMain = true
+            var iSz = ((uVtx*sizeof(aVertex(0)))\1024)
+            if iSz > 2047 then
+               puts("Sz: " & (iSz+1023)\1024 & "mb")
+            else
+               puts("Sz: " & iSz & "kb")
+            end if
+         end if
+         
+         
+         var uEdge = uCurrentEdge
+         static as integer iOnce   
+                 
+         with *pPart      
+            'for M as long = 0 to 1
+            for N as long = 0 to .iPartCount-1
+                                 
+               dim as byte bDoDraw = (lDrawPart<0 orelse lDrawPart=N)
+               dim as ulong uColor', uEdge = any
+               with .tParts(N)
+                  #ifdef DebugPrimitive
+                     'printf sIdent+"(" & .bType & ") Color=" & .wColour & " (Current=" & hex(uCurrentColor,8) & ")"
+                     'sle ep
+                  #endif
+                              
+                  if .wColour = c_Main_Colour then 'inherit
+                     uColor = uCurrentColor ': uEdge = uCurrentEdge
+                  elseif .wColour <> c_Edge_Colour then
+                     if .wColour > ubound(g_Colours) then
+                        #ifdef PrimitiveWarnings
+                          puts("Bad Color: " & .wColour)
+                        #endif
+                     end if
+                     uColor = g_Colours(.wColour)
+                     'uEdge  = g_EdgeColours(.wColour)
+                     'uEdge = ((uColor and &hFEFEFE) shr 1) or (uColor and &hFF000000)
+                     'if .wColour = c_Trans_Yellow then
+                     '   puts "Trans Yellow"
+                     'end if
+                  end if            
+                  
+                  'if M=0 then
+                  '   if .bType=1 or .bType=5 then continue for
+                  'else
+                  '   if .bType<>2 and .bType<>5 then continue for
+                  'end if
+                  select case .bType
+                  case 1
+                     'continue for
+                     'uEdge = rgb(rnd*255,rnd*255,rnd*255)
+                     uEdge = ((uColor and &hFEFEFE) shr 1) or (uColor and &hFF000000)
+                     'g_EdgeColours(.wColour)
+                     var T1 = ._1
+                     with T1
+                        if bDoDraw then
+                           var pSubPart = g_tModels(.lModelIndex).pModel
+                           #ifdef DebugPrimitive
+                              var sName = *cptr(zstring ptr,strptr(g_sFilenames)+g_tModels(.lModelIndex).iFilenameOffset+6)
+                              Puts _
+                                 " fX:" & .fX & " fY:" & .fY & " fZ:" & .fZ & _
+                                 " fA:" & .fA & " fB:" & .fB & " fC:" & .fC & _
+                                 " fD:" & .fD & " fE:" & .fE & " fF:" & .fF & _
+                                 " fG:" & .fG & " fH:" & .fH & " fI:" & .fI & " '" & sName & "'"                     
+                           #endif
+                                             
+                           'MultiplyMatrixVector( @.fX ) 
                         
-       with *pPart
-          for N as long = 0 to .iPartCount-1                           
-             dim as byte bDoDraw = (lDrawPart<0 orelse lDrawPart=N)         
-             with .tParts(N)            
-                select case .bType
-                case 1               
-                   var T1 = ._1
-                   with T1
-                      if bDoDraw then
-                         var pSubPart = g_tModels(.lModelIndex).pModel                     
-                         GetModelVertexCount( pSubPart , iBorders , iif(lDrawPart=-2,-2,-1) , lCurPos )
-                      end if                  
-                   end with               
-                case 2               
-                   if iBorders=0 andalso lDrawPart <> N then continue for               
-                   lCurPos += 2               
-                case 3
-                   if iBorders orelse bDoDraw=0 then continue for                                 
-                   lCurPos += 3
-                case 4               
-                   if iBorders orelse bDoDraw=0 then continue for
-                   lCurPos += 6
-                case 5               
-                   if iBorders=0 orelse bDoDraw=0 then continue for               
-                   lCurPos += 2
-                end select
-             end with
-          next N                  
-       end with
-          
-       return lCurPos
-       
-    end function
-    function GenArrayModel( pPart as DATFile ptr , aVertex() as VertexStruct , iBorders as long , uCurrentColor as ulong = &h70605040 , lDrawPart as long = -1 , byref lCurPos as long = -1 , uCurrentEdge as ulong = 0 DebugPrimParm ) as ulong
-       if uCurrentColor = &h70605040 then uCurrentColor = g_Colours(c_Blue) : uCurrentEdge = g_EdgeColours(c_Blue)
-       
-       const cBlockCnt = 1 shl 21
-       
-       dim as boolean bMain = false
-       if lCurPos < 0 then 
-          var uVtx = GetModelVertexCount( pPart , iBorders )
-          redim aVertex( uVtx-1 ) : lCurPos = 0 : bMain = true
-          var iSz = ((uVtx*sizeof(aVertex(0)))\1024)
-          if iSz > 2047 then
-             puts("Sz: " & (iSz+1023)\1024 & "mb")
-          else
-             puts("Sz: " & iSz & "kb")
-          end if
-       end if
-       
-       
-       var uEdge = uCurrentEdge
-       static as integer iOnce   
-               
-       with *pPart      
-          'for M as long = 0 to 1
-          for N as long = 0 to .iPartCount-1
-                               
-             dim as byte bDoDraw = (lDrawPart<0 orelse lDrawPart=N)
-             dim as ulong uColor', uEdge = any
-             with .tParts(N)
-                #ifdef DebugPrimitive
-                   'printf sIdent+"(" & .bType & ") Color=" & .wColour & " (Current=" & hex(uCurrentColor,8) & ")"
-                   'sle ep
-                #endif
-                            
-                if .wColour = c_Main_Colour then 'inherit
-                   uColor = uCurrentColor ': uEdge = uCurrentEdge
-                elseif .wColour <> c_Edge_Colour then
-                   if .wColour > ubound(g_Colours) then
-                      #ifdef PrimitiveWarnings
-                        puts("Bad Color: " & .wColour)
-                      #endif
-                   end if
-                   uColor = g_Colours(.wColour)
-                   'uEdge  = g_EdgeColours(.wColour)
-                   'uEdge = ((uColor and &hFEFEFE) shr 1) or (uColor and &hFF000000)
-                   'if .wColour = c_Trans_Yellow then
-                   '   puts "Trans Yellow"
-                   'end if
-                end if            
-                
-                'if M=0 then
-                '   if .bType=1 or .bType=5 then continue for
-                'else
-                '   if .bType<>2 and .bType<>5 then continue for
-                'end if
-                select case .bType
-                case 1
-                   'continue for
-                   'uEdge = rgb(rnd*255,rnd*255,rnd*255)
-                   uEdge = ((uColor and &hFEFEFE) shr 1) or (uColor and &hFF000000)
-                   'g_EdgeColours(.wColour)
-                   var T1 = ._1
-                   with T1
-                      if bDoDraw then
-                         var pSubPart = g_tModels(.lModelIndex).pModel
-                         #ifdef DebugPrimitive
-                            var sName = *cptr(zstring ptr,strptr(g_sFilenames)+g_tModels(.lModelIndex).iFilenameOffset+6)
-                            Puts _
-                               " fX:" & .fX & " fY:" & .fY & " fZ:" & .fZ & _
-                               " fA:" & .fA & " fB:" & .fB & " fC:" & .fC & _
-                               " fD:" & .fD & " fE:" & .fE & " fF:" & .fF & _
-                               " fG:" & .fG & " fH:" & .fH & " fI:" & .fI & " '" & sName & "'"                     
-                         #endif
-                                           
-                         'MultiplyMatrixVector( @.fX ) 
-                      
-                         dim as single fMatrix(15) = { _
-                           .fA , .fD , .fG , 0 , _ 'X scale ,    ?    ,    ?    
-                           .fB , .fE , .fH , 0 , _ '  ?     , Y Scale ,    ?    
-                           .fC , .fF , .fI , 0 , _ '  ?     ,    ?    , Z Scale 
-                           .fX , .fY , .fZ , 1 }   ' X Pos  ,  Y Pos  ,  Z Pos  
-                         
-                         'if sName = "axle.dat" then fMatrix(4) *= 2
-                         PushAndMultMatrix( @fMatrix(0) )
-                         
-                         #ifdef ColorizePrimatives
-                         if iBorders=0 then
-                            select case GetSubPartType( sName )
-                            case spStud   : uColor = &hFF4488FF                        
-                            case spClutch : uColor = &hFF1122FF
-                            case spAxle   : uColor = &hFF44FF88
-                            end select
-                         end if
-                         #endif                     
-                         GenArrayModel( pSubPart , aVertex() , iBorders , uColor , iif(lDrawPart=-2,-2,-1) , lCurPos , uEdge DebugPrimIdent )
-                         PopMatrix()
-                      end if                  
-                   end with               
-                case 2               
-                   if iBorders=0 andalso lDrawPart <> N then continue for
-                   'glPushMatrix() : glMultMatrixf( @fMatrix(0) )
-                   
-                   var T2 = ._2               
-                   MultiplyMatrixVector( @T2.fX1 )
-                   MultiplyMatrixVector( @T2.fX2 )
-                   SetLineNormal( T2 , @aVertex(lCurPos).tNormal )
-                                                 
-                   with T2
-                      #ifdef DebugPrimitive
-                      puts _
-                         " fX1:" & .fX1 & " fY1:" & .fY1 & " fZ1:" & .fZ1 & _
-                         " fX2:" & .fX2 & " fY2:" & .fY2 & " fZ2:" & .fZ2
-                      #endif
-                      
-                      aVertex(lCurPos).uColor = ((uEdge shr iif(lDrawPart=-2,2,0)) and &hFF000000) or (uEdge and &hFFFFFF)                                                      
-                      aVertex(lCurPos  ).tPos    = type(.fX1,.fY1,.fZ1)
-                      aVertex(lCurPos+1).tPos    = type(.fX2,.fY2,.fZ2)
-                      aVertex(lCurPos+1).tNormal = aVertex(lCurPos).tNormal
-                      aVertex(lCurPos+1).uColor  = aVertex(lCurPos).uColor
-                      
-                      lCurPos += 2
-                      
-                   end with
-                case 3
-                   if iBorders orelse bDoDraw=0 then continue for
-                   var T3 = ._3               
-                   MultiplyMatrixVector( @T3.fX1 ) 
-                   MultiplyMatrixVector( @T3.fX2 )
-                   MultiplyMatrixVector( @T3.fX3 )
-                   SetTrigNormal( T3 , @aVertex(lCurPos).tNormal )
-                   with T3
-                      #ifdef DebugPrimitive
-                         puts _
-                            " fX1:" & .fX1 & " fY1:" & .fY1 & " fZ1:" & .fZ1 & _
-                            " fX2:" & .fX2 & " fY2:" & .fY2 & " fZ2:" & .fZ2 & _
-                            " fX3:" & .fX3 & " fY3:" & .fY3 & " fZ3:" & .fZ3
-                      #endif
-                      
-                      aVertex(lCurPos).uColor = uColor
-                      aVertex(lCurPos  ).tPos    = type(.fX1,.fY1,.fZ1)
-                      aVertex(lCurPos+1).tPos    = type(.fX2,.fY2,.fZ2)
-                      aVertex(lCurPos+1).tNormal = aVertex(lCurPos).tNormal
-                      aVertex(lCurPos+1).uColor  = aVertex(lCurPos).uColor                  
-                      aVertex(lCurPos+2).tPos    = type(.fX3,.fY3,.fZ3)
-                      aVertex(lCurPos+2).tNormal = aVertex(lCurPos).tNormal
-                      aVertex(lCurPos+2).uColor  = aVertex(lCurPos).uColor                  
-                      
-                      lCurPos += 3
-                      
-                   end with
-                case 4               
-                   if iBorders orelse bDoDraw=0 then continue for
-                   var T4 = ._4
-                   
-                   MultiplyMatrixVector( @T4.fX1 ) 
-                   MultiplyMatrixVector( @T4.fX2 )
-                   MultiplyMatrixVector( @T4.fX3 )
-                   MultiplyMatrixVector( @T4.fX4 )               
-                   SetQuadNormal( T4 , @aVertex(lCurPos).tNormal )
-                   'SetTrigNormal( *cptr( typeof(._3) ptr , @T4 ) ) 'just need the line
-                   with T4
-                      #ifdef DebugPrimitive
-                         puts _
-                            " fX1:" & .fX1 & " fY1:" & .fY1 & " fZ1:" & .fZ1 & _
-                            " fX2:" & .fX2 & " fY2:" & .fY2 & " fZ2:" & .fZ2 & _
-                            " fX3:" & .fX3 & " fY3:" & .fY3 & " fZ3:" & .fZ3 & _
-                            " fX4:" & .fX4 & " fY4:" & .fY4 & " fZ4:" & .fZ4
-                      #endif
-                      
-                      aVertex(lCurPos  ).uColor = uColor
-                      aVertex(lCurPos  ).tPos    = type(.fX1,.fY1,.fZ1)
-                      aVertex(lCurPos+1).tPos    = type(.fX2,.fY2,.fZ2)
-                      aVertex(lCurPos+1).tNormal = aVertex(lCurPos).tNormal
-                      aVertex(lCurPos+1).uColor  = aVertex(lCurPos).uColor                  
-                      aVertex(lCurPos+2).tPos    = type(.fX3,.fY3,.fZ3)
-                      aVertex(lCurPos+2).tNormal = aVertex(lCurPos).tNormal
-                      aVertex(lCurPos+2).uColor  = aVertex(lCurPos).uColor                  
-                      aVertex(lCurPos+3).tPos    = type(.fX1,.fY1,.fZ1)                  
-                      aVertex(lCurPos+3).tNormal = aVertex(lCurPos).tNormal
-                      aVertex(lCurPos+3).uColor  = aVertex(lCurPos).uColor                  
-                      aVertex(lCurPos+4).tPos    = type(.fX3,.fY3,.fZ3)
-                      aVertex(lCurPos+4).tNormal = aVertex(lCurPos).tNormal
-                      aVertex(lCurPos+4).uColor  = aVertex(lCurPos).uColor                  
-                      aVertex(lCurPos+5).tPos    = type(.fX4,.fY4,.fZ4)
-                      aVertex(lCurPos+5).tNormal = aVertex(lCurPos).tNormal
-                      aVertex(lCurPos+5).uColor  = aVertex(lCurPos).uColor                  
-                      
-                      lCurPos += 6                  
-                      
-                   end with
-                case 5
-                   'continue for
-                   if iBorders=0 orelse bDoDraw=0 then continue for
-                   var T5 = ._5               
-                   MultiplyMatrixVector( @T5.fX1 ) 
-                   MultiplyMatrixVector( @T5.fX2 )               
-                   SetLineNormal( *cptr( typeof(._2) ptr , @T5 ) ) 'just need the line
-                   with T5
-                      #ifdef DebugPrimitive
-                         puts _
-                            " fX1:" & .fX1 & " fY1:" & .fY1 & " fZ1:" & .fZ1 & _
-                            " fX2:" & .fX2 & " fY2:" & .fY2 & " fZ2:" & .fZ2 & _
-                            " fXA:" & .fX3 & " fYA:" & .fY3 & " fZA:" & .fZ3 & _
-                            " fXB:" & .fX4 & " fYB:" & .fY4 & " fZB:" & .fZ4
-                      #endif
-                      
-                      'glColor4ubv( cast(ubyte ptr,@uEdge) )
-                      #ifdef RenderOptionals
-                         
-                         aVertex(lCurPos  ).uColor  = rgb(0,255,0,85)
-                         aVertex(lCurPos  ).tPos    = type(.fX1*cScale,.fY1*cScale,.fZ1*cScale)
-                         aVertex(lCurPos+1).tPos    = type(.fX2*cScale,.fY2*cScale,.fZ2*cScale)
-                         aVertex(lCurPos+1).tNormal = aVertex(lCurPos).tNormal
-                         aVertex(lCurPos+1).uColor  = aVertex(lCurPos).uColor
-                      
-                         lCurPos += 2                     
-                         
-                      #endif
-                   end with
-                end select
-             end with
-          next N      
-          'next M
-          iOnce = 1
-       end with
-       
-       if bMain then 
-         if (lCurPos-1) > ubound(aVertex) then
-           puts("BUFFER OVERFLOW!")
-           getchar():system
-          end if
-         'redim preserve aVertex(lCurPos-1)   
-       end if
-       return lCurPos
-       
-    end function
+                           dim as single fMatrix(15) = { _
+                             .fA , .fD , .fG , 0 , _ 'X scale ,    ?    ,    ?    
+                             .fB , .fE , .fH , 0 , _ '  ?     , Y Scale ,    ?    
+                             .fC , .fF , .fI , 0 , _ '  ?     ,    ?    , Z Scale 
+                             .fX , .fY , .fZ , 1 }   ' X Pos  ,  Y Pos  ,  Z Pos  
+                           
+                           'if sName = "axle.dat" then fMatrix(4) *= 2
+                           PushAndMultMatrix( @fMatrix(0) )
+                           
+                           #ifdef ColorizePrimatives
+                           if iBorders=0 then
+                              select case GetSubPartType( sName )
+                              case spStud   : uColor = &hFF4488FF                        
+                              case spClutch : uColor = &hFF1122FF
+                              case spAxle   : uColor = &hFF44FF88
+                              end select
+                           end if
+                           #endif                     
+                           GenArrayModel( pSubPart , aVertex() , iBorders , uColor , iif(lDrawPart=-2,-2,-1) , lCurPos , uEdge DebugPrimIdent )
+                           PopMatrix()
+                        end if                  
+                     end with               
+                  case 2               
+                     if iBorders=0 andalso lDrawPart <> N then continue for
+                     'glPushMatrix() : glMultMatrixf( @fMatrix(0) )
+                     
+                     var T2 = ._2               
+                     MultiplyMatrixVector( @T2.fX1 )
+                     MultiplyMatrixVector( @T2.fX2 )
+                     SetLineNormal( T2 , @aVertex(lCurPos).tNormal )
+                                                   
+                     with T2
+                        #ifdef DebugPrimitive
+                        puts _
+                           " fX1:" & .fX1 & " fY1:" & .fY1 & " fZ1:" & .fZ1 & _
+                           " fX2:" & .fX2 & " fY2:" & .fY2 & " fZ2:" & .fZ2
+                        #endif
+                        
+                        aVertex(lCurPos).uColor = ((uEdge shr iif(lDrawPart=-2,2,0)) and &hFF000000) or (uEdge and &hFFFFFF)                                                      
+                        aVertex(lCurPos  ).tPos    = type(.fX1,.fY1,.fZ1)
+                        aVertex(lCurPos+1).tPos    = type(.fX2,.fY2,.fZ2)
+                        aVertex(lCurPos+1).tNormal = aVertex(lCurPos).tNormal
+                        aVertex(lCurPos+1).uColor  = aVertex(lCurPos).uColor
+                        
+                        lCurPos += 2
+                        
+                     end with
+                  case 3
+                     if iBorders orelse bDoDraw=0 then continue for
+                     var T3 = ._3               
+                     MultiplyMatrixVector( @T3.fX1 ) 
+                     MultiplyMatrixVector( @T3.fX2 )
+                     MultiplyMatrixVector( @T3.fX3 )
+                     SetTrigNormal( T3 , @aVertex(lCurPos).tNormal )
+                     with T3
+                        #ifdef DebugPrimitive
+                           puts _
+                              " fX1:" & .fX1 & " fY1:" & .fY1 & " fZ1:" & .fZ1 & _
+                              " fX2:" & .fX2 & " fY2:" & .fY2 & " fZ2:" & .fZ2 & _
+                              " fX3:" & .fX3 & " fY3:" & .fY3 & " fZ3:" & .fZ3
+                        #endif
+                        
+                        aVertex(lCurPos).uColor = uColor
+                        aVertex(lCurPos  ).tPos    = type(.fX1,.fY1,.fZ1)
+                        aVertex(lCurPos+1).tPos    = type(.fX2,.fY2,.fZ2)
+                        aVertex(lCurPos+1).tNormal = aVertex(lCurPos).tNormal
+                        aVertex(lCurPos+1).uColor  = aVertex(lCurPos).uColor                  
+                        aVertex(lCurPos+2).tPos    = type(.fX3,.fY3,.fZ3)
+                        aVertex(lCurPos+2).tNormal = aVertex(lCurPos).tNormal
+                        aVertex(lCurPos+2).uColor  = aVertex(lCurPos).uColor                  
+                        
+                        lCurPos += 3
+                        
+                     end with
+                  case 4               
+                     if iBorders orelse bDoDraw=0 then continue for
+                     var T4 = ._4
+                     
+                     MultiplyMatrixVector( @T4.fX1 ) 
+                     MultiplyMatrixVector( @T4.fX2 )
+                     MultiplyMatrixVector( @T4.fX3 )
+                     MultiplyMatrixVector( @T4.fX4 )               
+                     SetQuadNormal( T4 , @aVertex(lCurPos).tNormal )
+                     'SetTrigNormal( *cptr( typeof(._3) ptr , @T4 ) ) 'just need the line
+                     with T4
+                        #ifdef DebugPrimitive
+                           puts _
+                              " fX1:" & .fX1 & " fY1:" & .fY1 & " fZ1:" & .fZ1 & _
+                              " fX2:" & .fX2 & " fY2:" & .fY2 & " fZ2:" & .fZ2 & _
+                              " fX3:" & .fX3 & " fY3:" & .fY3 & " fZ3:" & .fZ3 & _
+                              " fX4:" & .fX4 & " fY4:" & .fY4 & " fZ4:" & .fZ4
+                        #endif
+                        
+                        aVertex(lCurPos  ).uColor = uColor
+                        aVertex(lCurPos  ).tPos    = type(.fX1,.fY1,.fZ1)
+                        aVertex(lCurPos+1).tPos    = type(.fX2,.fY2,.fZ2)
+                        aVertex(lCurPos+1).tNormal = aVertex(lCurPos).tNormal
+                        aVertex(lCurPos+1).uColor  = aVertex(lCurPos).uColor                  
+                        aVertex(lCurPos+2).tPos    = type(.fX3,.fY3,.fZ3)
+                        aVertex(lCurPos+2).tNormal = aVertex(lCurPos).tNormal
+                        aVertex(lCurPos+2).uColor  = aVertex(lCurPos).uColor                  
+                        aVertex(lCurPos+3).tPos    = type(.fX1,.fY1,.fZ1)                  
+                        aVertex(lCurPos+3).tNormal = aVertex(lCurPos).tNormal
+                        aVertex(lCurPos+3).uColor  = aVertex(lCurPos).uColor                  
+                        aVertex(lCurPos+4).tPos    = type(.fX3,.fY3,.fZ3)
+                        aVertex(lCurPos+4).tNormal = aVertex(lCurPos).tNormal
+                        aVertex(lCurPos+4).uColor  = aVertex(lCurPos).uColor                  
+                        aVertex(lCurPos+5).tPos    = type(.fX4,.fY4,.fZ4)
+                        aVertex(lCurPos+5).tNormal = aVertex(lCurPos).tNormal
+                        aVertex(lCurPos+5).uColor  = aVertex(lCurPos).uColor                  
+                        
+                        lCurPos += 6                  
+                        
+                     end with
+                  case 5
+                     'continue for
+                     if iBorders=0 orelse bDoDraw=0 then continue for
+                     var T5 = ._5               
+                     MultiplyMatrixVector( @T5.fX1 ) 
+                     MultiplyMatrixVector( @T5.fX2 )               
+                     SetLineNormal( *cptr( typeof(._2) ptr , @T5 ) ) 'just need the line
+                     with T5
+                        #ifdef DebugPrimitive
+                           puts _
+                              " fX1:" & .fX1 & " fY1:" & .fY1 & " fZ1:" & .fZ1 & _
+                              " fX2:" & .fX2 & " fY2:" & .fY2 & " fZ2:" & .fZ2 & _
+                              " fXA:" & .fX3 & " fYA:" & .fY3 & " fZA:" & .fZ3 & _
+                              " fXB:" & .fX4 & " fYB:" & .fY4 & " fZB:" & .fZ4
+                        #endif
+                        
+                        'glColor4ubv( cast(ubyte ptr,@uEdge) )
+                        #ifdef RenderOptionals
+                           
+                           aVertex(lCurPos  ).uColor  = rgb(0,255,0,85)
+                           aVertex(lCurPos  ).tPos    = type(.fX1*cScale,.fY1*cScale,.fZ1*cScale)
+                           aVertex(lCurPos+1).tPos    = type(.fX2*cScale,.fY2*cScale,.fZ2*cScale)
+                           aVertex(lCurPos+1).tNormal = aVertex(lCurPos).tNormal
+                           aVertex(lCurPos+1).uColor  = aVertex(lCurPos).uColor
+                        
+                           lCurPos += 2                     
+                           
+                        #endif
+                     end with
+                  end select
+               end with
+            next N      
+            'next M
+            iOnce = 1
+         end with
+         
+         if bMain then 
+           if (lCurPos-1) > ubound(aVertex) then
+             puts("BUFFER OVERFLOW!")
+             getchar():system
+            end if
+           'redim preserve aVertex(lCurPos-1)   
+         end if
+         return lCurPos
+         
+      end function
     #endif
     'Per PART (.dat) VBO
     function AllocateModelDrawArrays( pPart as DATFile ptr , tDraw as ModelDrawArrays , bFlags as byte = 1 ) as boolean
@@ -1529,7 +1529,6 @@ function AreSnapEqual( tLeft as SnapPV , tRight as SnapPV ) as boolean
   end with
   return true
 end function
-
 sub SnapAddStud( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0) )   
   with tSnap      
     for N as long = 0 to iCnt-1
@@ -1573,7 +1572,6 @@ sub SnapAddAxleHole( tSnap as PartSnap , iCnt as long , byval tPV as SnapPV = (0
     next N
   end with
 end sub
-
 #ifndef __NoRender
    static shared as ulong MaleStipple(32-1), FemaleStipple(32-1)
    for iY as long = 0 to 31         
@@ -2844,10 +2842,10 @@ end sub
       glVertexPointer(3, GL_FLOAT        , cVtxSz, cast(any ptr,offsetof(VertexStructNoColor,tPos   )) )
       glNormalPointer(   GL_FLOAT        , cVtxSz, cast(any ptr,offsetof(VertexStructNoColor,tNormal)) )                    
     #endif                                                            
-    for N as long = 0 to .lPieceCount-1
+    for N as long = iStart to iEnd
       with .pPieces[N]                        
         '.pModel is assumed always valid by pre-step (before the macro)
-        if .bDisplay=0 orelse .pModel=0 orelse .pModel->tVBO.l##_name##Cnt=0 then continue for 
+        if (.bDisplay xor bDrawFixedColor)=0 orelse .pModel=0 orelse .pModel->tVBO.l##_name##Cnt=0 then continue for 
         #if #_name = "Triangle"
           #if _Transparency
             if (.lBaseColor and &hFF000000) = &hFF000000 then continue for
@@ -2861,13 +2859,29 @@ end sub
           'var lColor = ((.lBaseColor shr 2) and &hFF000000) or (.lBaseColor and &hFFFFFF)                          
           if uLastColor <> .lBaseEdge then 
             uLastColor = .lBaseEdge
-            glColor4ubv( cast(ubyte ptr,@.lBaseEdge) )
+            if bDrawFixedColor then                            
+              var uTemp = iif(dwFixedColor,dwFixedColor,(uLastColor and &hFFFFFF) or &h1F000000)              
+              glColor4ubv( cast(ubyte ptr,@uTemp) )
+            else
+              glColor4ubv( cast(ubyte ptr,@.lBaseEdge) )
+            end if
           end if
         #else
           if .bSkipBody then continue for
           if uLastColor <> .lBaseColor then 
             uLastColor = .lBaseColor
-            glColor4ubv( cast(ubyte ptr,@.lBaseColor) )
+            if bDrawFixedColor then
+              dim as ulong uTemp=any
+              if dwFixedColor=1 then
+                uTemp = (((N shr 0) and 63) shl 2) + (((N shr 6) and 63) shl 10) + (((N shr 12) and 63) shl 18)
+                uLastColor = -1
+              else
+                uTemp = iif(dwFixedColor,dwFixedColor,(uLastColor and &hFFFFFF) or &h1F000000)
+              end if
+              glColor4ubv( cast(ubyte ptr,@uTemp) )
+            else
+              glColor4ubv( cast(ubyte ptr,@.lBaseColor) )
+            end if
           end if
         #endif
         glLoadMatrixf( @.tMatView.m(0) )

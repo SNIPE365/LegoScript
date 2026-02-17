@@ -67,21 +67,31 @@ function HashName( sName as string ) as ushort
       I += 1
    loop   
 end function
-function ComparePartNames( pbA as ubyte ptr , pBB as ubyte ptr ) as long
-   do
-      var iA = *pbA or 32 , iB = *pbB or 32
-      if iA <> iB then return clng(iA)-clng(iB)
-      if *pbA = 0 then return 0
-      pbA += 1 : pbB += 1
-   loop
+function ComparePartNames( pbA as ubyte ptr , pbB as ubyte ptr ) as long    
+  if pbA=0 orelse pbB=0 then
+    if pbA=0 andalso pbB=0 then return 0
+    if pbA=0 then return -1
+    return 1
+  end if
+  do
+    var iA = *pbA or 32 , iB = *pbB or 32
+    if iA <> iB then return clng(iA)-clng(iB)
+    if *pbA = 0 then return 0
+    pbA += 1 : pbB += 1
+  loop
 end function   
-function ComparePartialNames( pbA as ubyte ptr , pBB as ubyte ptr ) as long
-   do
-      var iA = *pbA or 32 , iB = *pbB or 32      
-      if *pbA = 0 then return 0
-      if iA <> iB then return clng(iA)-clng(iB)      
-      pbA += 1 : pbB += 1
-   loop
+function ComparePartialNames( pbA as ubyte ptr , pbB as ubyte ptr ) as long
+  if pbA=0 orelse pbB=0 then
+    if pbA=0 andalso pbB=0 then return 0
+    if pbA=0 then return -1
+    return 1
+  end if   
+  do
+    var iA = *pbA or 32 , iB = *pbB or 32      
+    if *pbA = 0 then return 0
+    if iA <> iB then return clng(iA)-clng(iB)      
+    pbA += 1 : pbB += 1
+  loop
 end function   
 function FindPart( sName as string ) as SearchPartStruct ptr
    var iHash = HashName( sName )   
@@ -123,11 +133,13 @@ function FindPartIndex( sName as string ) as long
 end function
 function SearchPart( sName as string , iPrev as long = -1 ) as long
    dim as long uFirst=0,uLast=g_lPartCount-1,uMid=any ',uPrevMid
+   if len(sName)=0 then return -1
    var sNameL = sName , pName = cptr(ubyte ptr,strptr(sNameL))
+   'printf(!"{First=%i Last=%i} Name='%s' Prev=%i\n",uFirst,uLast,sName,iPrev)
    if iPrev < 0 then
       do 
          uMid = (uFirst+uLast)\2      
-         var pbB = cptr(ubyte ptr, @( PartStructFromIndex(uMid)  )->zName)            
+         var pbB = cptr(ubyte ptr, @( PartStructFromIndex(uMid)  )->zName)
          var uCmp = ComparePartialNames( pName , pbB )
          'print *cptr(zstring ptr,pName),*cptr(zstring ptr,pbB),uCmp
          if uCmp=0 then exit do 
@@ -136,6 +148,7 @@ function SearchPart( sName as string , iPrev as long = -1 ) as long
          if uFirst > uLast then return -1
       loop
       'get first that matches
+      'printf(!"First=%i Mid=%i Last=%i\n",uFirst,uLast,uMid)
       while uMid > 0 andalso ComparePartialNames( pName , cptr(ubyte ptr, @( PartStructFromIndex(uMid-1)  )->zName) )=0
          uMid -= 1
       wend

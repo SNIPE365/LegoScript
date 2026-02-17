@@ -15,11 +15,11 @@ redim shared as string g_sExtraPathList()
 
 const cUnnofficialPathIndex = 4
 static shared as zstring ptr g_pzPaths(...) = { _
-  NULL            , _   
-  @"1:\unoff\p\48"  , _
-  @"2:\unoff\p"     , _   
-  @"3:\unoff\p\8"   , _
-  @"0:\unoff\parts" , _ '4
+  NULL        , _   
+  @"1:\p\48"  , _ '\unoff
+  @"2:\p"     , _ '\unoff 
+  @"3:\p\8"   , _ '\unoff
+  @"0:\parts" , _ '\unoff '4
   @"1:\p\8"         , _   
   @"2:\p"           , _
   @"3:\p\48"        , _         
@@ -33,7 +33,7 @@ rem ------------------------------
 
 static shared as string g_sPathList( ubound(g_pzPaths) )
 static shared as byte g_bPathQuality( ubound(g_pzPaths) )
-static shared as string g_sCfgFile
+static shared as string g_sCfgFile , g_sPathLDRAW
 
 function OpenFolder( sTitle as string , sInit as string , sOutput as string ) as boolean
   
@@ -84,6 +84,7 @@ end function
 
 sub CheckPathLDRAW( byref sPath as string )        
   #define chk(_s) ((GetFileAttributes(sPath+_s) and (&h80000000 or FILE_ATTRIBUTE_DIRECTORY))=FILE_ATTRIBUTE_DIRECTORY)
+  #define chkExist(_s) (GetFileAttributes(sPath+_s)<>&hFFFFFFFF)
   #define IsPath(_s) (mid(_s,2,2)=":\")
   'orelse left(_s,2)=".\")
   
@@ -94,17 +95,47 @@ sub CheckPathLDRAW( byref sPath as string )
   'puts(sPath+"\p" & " || " & GetFileAttributes(sPath+"\p"))
   'puts(sPath+"\part" & " || " & GetFileAttributes(sPath+"\part"))
   do
-    if IsPath(sPath) andalso chk("") andalso chk("\unoff") andalso chk("\p") andalso chk("\parts") then exit do
+    if IsPath(sPath) andalso chk("") andalso chkExist("LDConfig.ldr") andalso chk("\p") andalso chk("\parts") then exit do
     if OpenFolder("Locate LDRAW folder","ldraw",sPath)=false then end
   loop
     
-  g_sPathList(0) = ".\" : g_bPathQuality( 0 ) = 0  
-  'var sPath = "G:\Jogos\LDCad-1-7-Beta-1-Win\LDRAW"
-  for N as long = 1 to ubound(g_pzPaths)
+  g_sPathList(0) = ".\" : g_bPathQuality( 0 ) = 0    
+  for N as long = 5 to 8 'official
     g_bPathQuality( N ) = valint(*g_pzPaths(N))
     g_sPathList(N) = sPath + mid(*g_pzPaths(N),3)
   next N  
+  
+  g_sPathLDRAW = sPath
+  
 end sub
+
+sub CheckPathUNOFF( byref sPath as string )        
+  #define chk(_s) ((GetFileAttributes(sPath+_s) and (&h80000000 or FILE_ATTRIBUTE_DIRECTORY))=FILE_ATTRIBUTE_DIRECTORY)
+  #define chkExist(_s) (GetFileAttributes(sPath+_s)<>&hFFFFFFFF)
+  #define IsPath(_s) (mid(_s,2,2)=":\")
+  'orelse left(_s,2)=".\")
+  
+  if IsPath(sPath)=0 then sPath = g_sCfgFile+"\"+sPath
+  
+  'puts(sPath & " || " & GetFileAttributes(sPath)) & " || " & FILE_ATTRIBUTE_DIRECTORY
+  'puts(sPath+"\unoff" & " || " & GetFileAttributes(sPath+"\unoff"))
+  'puts(sPath+"\p" & " || " & GetFileAttributes(sPath+"\p"))
+  'puts(sPath+"\part" & " || " & GetFileAttributes(sPath+"\part"))
+  static as ubyte bOnce
+  do
+    if IsPath(sPath) andalso chk("") andalso (chk("\unoff")=0) andalso chk("\p") andalso chk("\parts") then exit do
+    if bOnce=0 then bOnce=1 : sPath = g_sPathLDRAW+"\unoff" : continue do
+    if OpenFolder("Locate UNOFFICIAL LDRAW folder","ldraw",sPath)=false then end    
+  loop
+    
+  g_sPathList(0) = ".\" : g_bPathQuality( 0 ) = 0    
+  for N as long = 1 to 4 'official
+    g_bPathQuality( N ) = valint(*g_pzPaths(N))
+    g_sPathList(N) = sPath + mid(*g_pzPaths(N),3)
+  next N
+  
+end sub
+
 #undef g_pzPaths
 
 static shared as zstring ptr g_pzShadowPaths(...) = { _
@@ -136,9 +167,9 @@ end sub
 
 #macro ForEachPathSetting( _do )  
   _do( sPathLDRAW        , "Path"      , string   , ""                 , CheckPathLDRAW , _cfgVarName )
+  _do( sPathUNOFF        , "Path"      , string   , ""                 , CheckPathUNOFF , _cfgVarName )
   _do( sPathSHADOW       , "Path"      , string   , ""                 , CheckPathSHADOW , _cfgVarName )
 #endmacro
-
 g_sCfgFile = exepath()
 
 #if __Main <> "LegoScript"

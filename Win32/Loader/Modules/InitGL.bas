@@ -41,10 +41,23 @@
 'const ScrWid=640,ScrHei=480
 
 #macro ForEachExtensionGL(_do)
-   _do( glGenBuffers )
-   _do( glBindBuffer )
-   _do( glBufferData )
-   _do( wglSwapIntervalEXT )
+  _do( glGenBuffers )
+  _do( glBindBuffer )
+  _do( glBufferData )   
+  _do( wglSwapIntervalEXT )
+  #ifdef UseFBO
+    _do( glGenFramebuffers )
+    _do( glBindFramebuffer )
+    _do( glFramebufferTexture2D )
+    _do( glGenRenderbuffers )
+    _do( glBindRenderbuffer )
+    _do( glRenderbufferStorage )
+    _do( glFramebufferRenderbuffer)
+    _do( glCheckFramebufferStatus )
+    _do( glDeleteRenderbuffers )
+    _do( glDeleteFramebuffers )
+    _do( glBlitFramebuffer )
+  #endif   
 #endmacro
 
 type PFNWGLSWAPINTERVALEXTPROC as function (as long) as winbool
@@ -195,7 +208,7 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
   'screencontrol( fb.SET_GL_DEPTH_BITS , 24 )
   'screencontrol( fb.SET_GL_COLOR_BITS , 32 )
   
-  screenres 1,4096,32,,fb.GFX_OPENGL' or fb.GFX_MULTISAMPLE      
+  screenres 1,4096,32,,fb.GFX_OPENGL or fb.GFX_NO_FRAME' or fb.GFX_MULTISAMPLE      
   Gfx.Resize(ScrWid,ScrHei)   
   dim as HWND hwndGFX
   screencontrol fb.GET_WINDOW_HANDLE , *cptr(uinteger ptr,@hwndGFX)   

@@ -3,6 +3,10 @@
 #cmdline "res\LS.rc -gen gcc -O 2 -Wl '--large-address-aware'"
 '#cmdline "res\LS.rc -Wl '--large-address-aware'"
 
+'0x0043839D > StartExceptions+0x3376D G:\JOGOS\LEGOSCRIPT\WIN32\LOADER\PARTSEARCH.BAS:80
+'0x004387D1 > StartExceptions+0x33BA1 G:\JOGOS\LEGOSCRIPT\WIN32\LOADER\PARTSEARCH.BAS:144 [FBIDETEMP.exe:#1]
+'0x0043A278 > StartExceptions+0x35648 G:\JOGOS\LEGOSCRIPT\WIN32\LSMODULES\COMBOBOX.BAS:356 [FBIDETEMP.exe:#1]
+
 '-O 1
 
 #define __Main "LegoScript"
@@ -836,15 +840,15 @@ function WndProc ( hWnd as HWND, message as UINT, wParam as WPARAM, lParam as LP
     case wcFilterEdit
       select case wNotifyCode
       case EN_UPDATE
-        var sText = GetControlText( wID )
+        var sText = GetControlText( wID ), iLen = len(sText)        
         dim zFilter as zstring*64 = any 
         dim as long iPos=-1 , iFilterSz=0 , iInclude=0
         dim zFullFilter as zstring*1024 = any : zFullFilter[0] = 0
         #macro ShowFilter()
           zFilter[iPos] = 0 : iPos = -1
           iFilterSz += sprintf(@zFullFilter,"(%s %s) ",iif(iInclude,@"include",@"exclude"),zFilter)
-        #endmacro
-        for I as long = 0 to len(sText)
+        #endmacro        
+        for I as long = 0 to iif(iLen,iLen,-1)
           select case sText[I]
           case asc("-")
             if iPos >=0 then : ShowFilter() : end if

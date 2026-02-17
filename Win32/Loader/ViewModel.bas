@@ -23,6 +23,7 @@
 '#define DebugLoading
 '#define PrimitiveWarnings
 
+#define UseFBO
 #define UseVBO
 
 '#ifndef __NoRender
@@ -255,7 +256,7 @@ scope
  'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\LDraw\models\car.ldr"
  'sFile = "C:\Users\greg\Desktop\LDCAD\examples\cube10x10x10.ldr"
  'sFile = "C:\Users\greg\Desktop\LS\TLG_Map\TrainStationEntranceA.ldr"
- sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map0\Build\Blocks\B1\Eldon Square.ldr"   
+ 'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map0\Build\Blocks\B1\Eldon Square.ldr"   
  'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\TestMap2.ldr"
  'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\Blocks\10190-1 Market Street.ldr"   
  'sFile = "G:\Jogos\LegoScript-Main\examples\TLG_Map\Blocks\10232 - Palace Cinema.mpd"
@@ -281,13 +282,13 @@ scope
   #endif
   
 end scope
-scope 
+scope
    #if 0
-   "77844.dat" 'failed to detect as plate
-   "122.dat","122c01.dat","122c01.dat","122c02.dat" 'not enough shadow data to discard as slab
-   "24326.dat" 'recessed, so not a slab
-   "15587.dat" '?????   
-   "15625.dat" "18870.dat" 'probabily slab
+     "77844.dat" 'failed to detect as plate
+     "122.dat","122c01.dat","122c01.dat","122c02.dat" 'not enough shadow data to discard as slab
+     "24326.dat" 'recessed, so not a slab
+     "15587.dat" '?????   
+     "15625.dat" "18870.dat" 'probabily slab
    #endif
    'sFile = "3819.dat"
    'sFile = "2356.dat" '"4070.dat"
@@ -315,7 +316,7 @@ function DropFilesHandler( hDrop as HANDLE ) as LRESULT
   DragFinish( hDrop )
   return TRUE
 end function
-sub UpdateCameraVectors()
+sub UpdateCameraVectors()  
     
     dim as single fRadYaw = g_fYaw * cPI180 , fRadPitch = g_fPitch * cPI180
 
@@ -356,17 +357,173 @@ dim shared as boolean bLeftPressed,bRightPressed,bWheelPressed
 dim shared as hwnd hGfxWnd
 dim shared as boolean g_FreeCam = false  
 dim shared as long iOldCliWid , iOldCliHei, OldDraw = -2
+dim shared as long g_iMouseX , g_iMouseY
 dim shared as Matrix4x4 tCur=any, tProj=any, tMat=any
 dim shared as PartSize g_tSz
 dim shared as PartSnap tSnapID  
 
 #ifdef UseVBO
-static shared as ModelDrawArrays g_tModelArrays
-static shared as GLuint iTriangleVBO=-1,iColorTriVBO=-1,iTrColTriVBO=-1,iBorderVBO=-1,iColorBrdVBO=-1,iCubemapVBO=-1
-static shared as GLuint iCubemapIdxVBO=-1, iBorderIdxVBO=-1, iTriangleIdxVBO=-1
-static shared as long g_uDrawParts , g_uDrawBoxes
+  static shared as ModelDrawArrays g_tModelArrays
+  static shared as GLuint iTriangleVBO=-1,iColorTriVBO=-1,iTrColTriVBO=-1,iBorderVBO=-1,iColorBrdVBO=-1,iCubemapVBO=-1
+  static shared as GLuint iCubemapIdxVBO=-1, iBorderIdxVBO=-1, iTriangleIdxVBO=-1
+  static shared as long g_uDrawParts , g_uDrawBoxes
 #else
-static shared as long g_iModels , g_iBorders
+  static shared as long g_iModels , g_iBorders
+#endif
+
+'glDisable(GL_DITHER)
+
+dim shared as glInt pickingFBO , pickingTexture , pickingDepthBuffer
+Sub InitPickingFBO(w As Integer, h As Integer)
+  
+  If pickingTexture     <> 0 Then glDeleteTextures(1, @pickingTexture):pickingTexture=0
+  If pickingDepthBuffer <> 0 Then glDeleteRenderbuffers(1, @pickingDepthBuffer):pickingDepthBuffer=0
+  If pickingFBO         <> 0 Then glDeleteFramebuffers(1, @pickingFBO):pickingFBO=0
+  
+  '' 1. Create Framebuffer
+  glGenFramebuffers(1, @pickingFBO)
+  glBindFramebuffer(GL_FRAMEBUFFER, pickingFBO)
+
+  '' 2. Create Texture (The color buffer)
+  glGenTextures(1, @pickingTexture)
+  glBindTexture(GL_TEXTURE_2D, pickingTexture)
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, 0)
+  
+  '' IMPORTANT: No filtering! We need exact pixels.
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pickingTexture, 0)
+
+  '' 3. Create Renderbuffer (The depth buffer)
+  glGenRenderbuffers(1, @pickingDepthBuffer)
+  glBindRenderbuffer(GL_RENDERBUFFER, pickingDepthBuffer)
+  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, w, h)
+  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, pickingDepthBuffer)
+
+  '' 4. Verify
+  If glCheckFramebufferStatus(GL_FRAMEBUFFER) <> GL_FRAMEBUFFER_COMPLETE Then
+      Print "Error: Picking FBO not complete!"
+  End If
+  
+  glBindFramebuffer(GL_FRAMEBUFFER, 0)   '' Unbind to return to normal rendering
+  glBindTexture(GL_TEXTURE_2D, 0)        '' Unbind Texture
+  glBindRenderbuffer(GL_RENDERBUFFER, 0) '' Unbind Renderbuffer
+  
+End Sub
+
+#ifdef UseVBO
+function PickPart(iMouseX as long , iMouseY as long) as long
+  
+  glPushAttrib(GL_ALL_ATTRIB_BITS)
+  
+  '' 1. Bind our off-screen FBO
+  glBindFramebuffer(GL_FRAMEBUFFER, pickingFBO)
+  
+  '' 2. Clear it (Use White or Black as "No Object")
+  glClearColor(1.0, 1.0, 1.0, 1.0) '' White = ID -1 (or max int)
+  glClear(GL_COLOR_BUFFER_BIT Or GL_DEPTH_BUFFER_BIT)
+
+  g_uDrawParts=0 : g_uDrawBoxes=0
+  
+  glDisable( GL_LIGHTING )  
+  glEnable( GL_DEPTH_TEST ) 
+  glDisable( GL_BLEND )
+  
+  'render whole model    
+  dim as ulong uLastColor = 0
+  with g_tModelArrays
+    
+    scope
+      glEnableClientState(GL_VERTEX_ARRAY)
+      'glEnableClientState(GL_NORMAL_ARRAY)
+      glLoadMatrixf( @tCur.m(0) )
+      glBindBuffer(GL_ARRAY_BUFFER, iCubemapVBO )
+      #ifdef iCubemapIdxVBO            
+      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, iCubemapIdxVBO )
+      #endif
+      const cVtxSz = sizeof(VertexCubeMap)
+      glVertexPointer(3, GL_FLOAT        , cVtxSz, cast(any ptr,offsetof(VertexCubeMap,tPos   )) )
+      'glNormalPointer(   GL_FLOAT        , cVtxSz, cast(any ptr,offsetof(VertexCubeMap,tNormal)) )
+    end scope
+    
+    var iStart = 0 , iEnd = .lPieceCount-1 , bDrawFixedColor = cbyte(0)
+    var dwFixedColor = 1 'rgb(255,255,255)
+    'if g_CurDraw >= 0 then iStart = g_CurDraw : iEnd = g_CurDraw
+    
+    #if 1
+      for I as long = iStart to iEnd
+        with .pPieces[I]
+          if .pModel=0 then continue for
+          MultMatrix4x4( .tMatView , tCur , .tMatrix )
+          .bFlags=0 ': .bDisplay = 0          
+        end with
+      next I
+      bDrawFixedColor = 1 : dwFixedColor = 1
+    #else        
+      for I as long = iStart to iEnd           
+        with .pPieces[I]
+          .bFlags=0 : '.bDisplay=0:.bSkipBorder=0:.bSkipBody=0
+          if .pModel=0 then continue for
+          MultMatrix4x4( .tMatView , tCur , .tMatrix )            
+          dim as ulong uC = (((I shr 0) and 63) shl 2) + (((I shr 6) and 63) shl 10) + (((I shr 12) and 63) shl 18)
+          glColor4ubv( cast(ubyte ptr,@uC) )
+          #ifdef iCubemapIdxVBO
+            glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, cast(any ptr,I*36*sizeof(long)) )
+          #else
+            glDrawArrays( GL_TRIANGLES, I*36 , 36 )
+          #endif
+        end with
+      next I
+    #endif
+    
+        
+    glDisableClientState(GL_NORMAL_ARRAY)
+    glDisableClientState(GL_COLOR_ARRAY)
+    
+    if bDrawFixedColor then
+      DrawPieces( Triangle , Triangle , GL_TRIANGLES , false )
+      DrawPieces( ColorTri , ColorTri , GL_TRIANGLES , false )    
+      DrawPieces( TransTri , TransTri , GL_TRIANGLES , false )
+      DrawPieces( TrColTri , TrColTri , GL_TRIANGLES , false )
+    end if
+    
+    glDisableClientState(GL_VERTEX_ARRAY)
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
+    glBindBuffer(GL_ARRAY_BUFFER, 0 )
+    
+  end with  
+  
+  var glY = gfx.g_iCliHei - iMouseY  
+  dim as ulong uC 
+  
+  'dim as fb.image ptr pTemp = ImageCreate(gfx.g_iCliWid,gfx.g_iCliHei,-1,32)
+  'pTemp->Pitch = pTemp->Width*pTemp->Bpp
+  'glReadPixels( 0 , 0 , gfx.g_iCliWid , gfx.g_iCliHei , GL_RGBA, GL_UNSIGNED_BYTE, pTemp+1 )
+  'bsave "click.bmp",pTemp
+  'ImageDestroy(pTemp)
+  
+  glReadPixels(iMouseX, glY, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, @uC)  
+  glBindFramebuffer(GL_FRAMEBUFFER, 0)
+  glPopAttrib()  
+  
+  if (uC and &hC0C0C0) = &hC0C0C0 then return -1
+  'printf(!"%i %i (%ix%i) %i\n",iMouseX,iMouseY,gfx.g_iCliWid,gfx.g_iCliHei,uC)
+  return ((uC shr 2) and 63) + (((uC shr 10) and 63) shl 6) + (((uC shr 18) and 63) shl 12)  
+  
+end function
+sub DisplayFBO( iFBO as ulong )
+  '' 1. Bind the FBO as the SOURCE
+  glBindFramebuffer(GL_READ_FRAMEBUFFER, iFBO )
+  '' 2. Bind the Screen (0) as the DRAW destination
+  glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0)
+  '' 3. Copy the pixels (Blit)
+  '' Parameters: srcX1, srcY1, srcX2, srcY2, dstX1, dstY1, dstX2, dstY2, Mask, Filter
+  var scrW = gfx.g_iCliWid , scrH = gfx.g_iCliHei
+  glBlitFramebuffer(0, 0, scrW, scrH, 0, 0, scrW, scrH, GL_COLOR_BUFFER_BIT, GL_NEAREST)
+  '' 4. Unbind
+  glBindFramebuffer(GL_FRAMEBUFFER, 0)
+end sub
 #endif
 
 sub RenderScenery()
@@ -377,39 +534,59 @@ sub RenderScenery()
   
   'glDisable( GL_LIGHTING )
   glEnable( GL_DEPTH_TEST )
-  if g_CurDraw < 0 then
-    'render whole model
-    #ifdef UseVBO      
-      dim as ulong uLastColor = 0
-      with g_tModelArrays
-        
-        glDisable( GL_BLEND )
-        scope
-          glEnableClientState(GL_VERTEX_ARRAY)
-          glEnableClientState(GL_NORMAL_ARRAY)
-          'glColor4ub(255,255,255,255)
-          glLoadMatrixf( @tCur.m(0) )
-          glBindBuffer(GL_ARRAY_BUFFER, iCubemapVBO )
-          #ifdef iCubemapIdxVBO            
-          glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, iCubemapIdxVBO )
-          #endif
-          const cVtxSz = sizeof(VertexCubeMap)
-          glVertexPointer(3, GL_FLOAT        , cVtxSz, cast(any ptr,offsetof(VertexCubeMap,tPos   )) )
-          glNormalPointer(   GL_FLOAT        , cVtxSz, cast(any ptr,offsetof(VertexCubeMap,tNormal)) )
-        end scope
-        
-        'glPushAttrib(GL_ENABLE_BIT)
-        'glEnable( GL_CULL_FACE )
-        
-        for I as long = 0 to .lPieceCount-1
+  
+  #ifndef useVBO
+    if g_CurDraw < 0 then
+      glCallList(	g_iModels )
+    else
+      RenderModel( g_pModel , 0 , , g_CurDraw )
+    end if
+    if bBorderMode then
+      glCallList(	g_iBorders-(g_CurDraw>=0) )
+    end if
+  #else    
+    'render whole model    
+    dim as ulong uLastColor = 0
+    with g_tModelArrays
+      
+      scope
+        glEnableClientState(GL_VERTEX_ARRAY)
+        glEnableClientState(GL_NORMAL_ARRAY)
+        'glColor4ub(255,255,255,255)
+        glLoadMatrixf( @tCur.m(0) )
+        glBindBuffer(GL_ARRAY_BUFFER, iCubemapVBO )
+        #ifdef iCubemapIdxVBO            
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, iCubemapIdxVBO )
+        #endif
+        const cVtxSz = sizeof(VertexCubeMap)
+        glVertexPointer(3, GL_FLOAT        , cVtxSz, cast(any ptr,offsetof(VertexCubeMap,tPos   )) )
+        glNormalPointer(   GL_FLOAT        , cVtxSz, cast(any ptr,offsetof(VertexCubeMap,tNormal)) )
+      end scope
+      
+      'glPushAttrib(GL_ENABLE_BIT)
+      'glEnable( GL_CULL_FACE )
+      
+      var iStart = 0 , iEnd = .lPieceCount-1 , bDrawFixedColor = cbyte(0)
+      var dwFixedColor = rgb(255,255,255)
+      'if g_CurDraw >= 0 then iStart = g_CurDraw : iEnd = g_CurDraw
+      
+      glDisable( GL_BLEND )
+      if g_CurDraw >= 0 then
+        for I as long = iStart to iEnd
+          with .pPieces[I]
+            MultMatrix4x4( .tMatView , tCur , .tMatrix )
+            .bFlags=0 : .bDisplay = 0          
+          end with
+        next I
+        .pPieces[g_CurDraw].bDisplay=1 
+      else         
+        for I as long = iStart to iEnd           
           with .pPieces[I]
             .bFlags=0 : '.bDisplay=0:.bSkipBorder=0:.bSkipBody=0
             if .pModel=0 then continue for
             MultMatrix4x4( .tMatView , tCur , .tMatrix )
             'printf(!"Z = %1.1f Rad=%1.1f \r",.tMatView.fPosZ,.pModel->tSize.fRad)
-            if .tMatView.fPosZ > (.pModel->tSize.fRad) then continue for
-            
-            #if 1
+            if .tMatView.fPosZ > (.pModel->tSize.fRad) then continue for            
             if .tMatView.fPosZ < -70 then                                   
               glColor4ubv( cast(ubyte ptr,@.lBaseColor) ) : g_uDrawBoxes += 1
               #ifdef iCubemapIdxVBO
@@ -418,58 +595,72 @@ sub RenderScenery()
                 glDrawArrays( GL_TRIANGLES, I*36 , 36 )
               #endif              
               continue for
-            end if
-            #endif
+            end if          
             if bCulling=0 then .bSkipBorder = 1
             'if .tMatView.fPosZ < -50 then .bSkipBorder=1
             .bDisplay=1 : g_uDrawParts += 1
           end with
-        next I              
-        
-        'glPopAttrib()
-        
-        #if 1          
+        next I
+      end if
+      
+      if g_CurDraw >= 0 then
+        glDisable( GL_BLEND )
+        iStart = g_CurDraw : iEnd = g_CurDraw
         DrawPieces( Triangle , Triangle , GL_TRIANGLES , false )
         DrawPieces( ColorTri , ColorTri , GL_TRIANGLES , true  )
         glEnable( GL_BLEND )
         if bBorderMode > 0 then           
           glDisableClientState(GL_NORMAL_ARRAY)
           #ifdef iBorderIdxVBO
-          DrawPieces( Border   , Triangle , GL_LINES   , false )
+            DrawPieces( Border   , Triangle , GL_LINES   , false )
           #else
-          DrawPieces( Border   , Border , GL_LINES   , false )
+            DrawPieces( Border   , Border , GL_LINES   , false )
+          #endif
+          DrawPieces( ColorBrd , ColorBrd , GL_LINES   , true  )
+          glEnableClientState(GL_NORMAL_ARRAY)
+        end if          
+        DrawPieces( TransTri , TransTri , GL_TRIANGLES , false )
+        DrawPieces( TrColTri , TrColTri , GL_TRIANGLES , true  )        
+        bDrawFixedColor = 1 : uLastColor = 0
+        iStart = 0 : iEnd = .lPieceCount-1
+      end if
+      
+      'glPopAttrib()
+      
+      #if 1          
+        DrawPieces( Triangle , Triangle , GL_TRIANGLES , false )
+        DrawPieces( ColorTri , ColorTri , GL_TRIANGLES , true  )
+        glEnable( GL_BLEND )
+        if bBorderMode > 0 then           
+          glDisableClientState(GL_NORMAL_ARRAY)
+          #ifdef iBorderIdxVBO
+            DrawPieces( Border   , Triangle , GL_LINES   , false )
+          #else
+            DrawPieces( Border   , Border , GL_LINES   , false )
           #endif
           DrawPieces( ColorBrd , ColorBrd , GL_LINES   , true  )
           glEnableClientState(GL_NORMAL_ARRAY)
         end if          
         DrawPieces( TransTri , TransTri , GL_TRIANGLES , false )
         DrawPieces( TrColTri , TrColTri , GL_TRIANGLES , true  )
-        glDisableClientState(GL_COLOR_ARRAY)
-        glDisableClientState(GL_NORMAL_ARRAY)
-        glDisableClientState(GL_VERTEX_ARRAY)
-        #endif
-        
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
-        glBindBuffer(GL_ARRAY_BUFFER, 0 )
-        
-      end with
-    #else
-       glCallList(	g_iModels )
-    #endif
-  else
-    'render single part
-    RenderModel( g_pModel , 0 , , g_CurDraw )
-  end if
-  #ifndef UseVBO
-    if bBorderMode then
-      'if g_CurDraw<0 then
-      'else
-      'end if
-      glCallList(	g_iBorders-(g_CurDraw>=0) )
-    end if
+      #endif
+      
+      glDisableClientState(GL_COLOR_ARRAY)
+      glDisableClientState(GL_NORMAL_ARRAY)
+      glDisableClientState(GL_VERTEX_ARRAY)
+      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
+      glBindBuffer(GL_ARRAY_BUFFER, 0 )
+      
+    end with
+    
   #endif
+  
 end sub
 sub RenderOverlay()
+  
+  #ifdef UseVBO
+  exit sub
+  #endif  
   
   glPushAttrib(GL_ENABLE_BIT)
   glDisable( GL_CULL_FACE )
@@ -571,6 +762,7 @@ sub RenderOverlay()
        'glDrawText( sText , .tPos.X,.tPos.Y+(_YOff),.tPos.Z , 8/len(sText),8 , true )
     end if
   #endmacro
+    
   if g_CurDraw <> -1 orelse bEditMode then      
     glPushMatrix()
     if g_CurDraw <> -1 then
@@ -599,7 +791,7 @@ sub RenderOverlay()
     end with
     OldDraw = g_CurDraw
     glPopMatrix()
-  end if
+  end if  
   
   'glClear GL_DEPTH_BUFFER_BIT                 
   #define DrawMarker( _X , _Y , _Z ) DrawLimitsCube( (_X)-2,(_X)+2 , (_Y)-2,(_Y)+2 , (_Z)-2,(_Z)+2 )
@@ -715,6 +907,9 @@ do
   
   dLoadTIme = timer
   #ifdef UseVBO           
+    
+    'deallocate previous VBO/Vertex arrays if they were loaded.
+    
     with g_tModelArrays
       'if iTriangleVBO then ,iColorTriVBO,iTrColTriVBO,iBorderVBO,iColorBrdVBO,iCubemapVBO
       'static shared as GLuint iCubemapIdxVBO, iBorderIdxVBO, iTriangleIdxVBO
@@ -723,7 +918,7 @@ do
       if .pColorTriVtx then MyDeallocVertex( .pColorTriVtx )
       if .pTrColTriVtx then MyDeallocVertex( .pTrColTriVtx )
       if .pColorBrdVtx then MyDeallocVertex( .pColorBrdVtx )
-      if .pCubemapVtx  then MyDeallocVertex( .pCubemapVtx  )      
+      if .pCubemapVtx  then MyDeallocVertex( .pCubemapVtx  )
       if .pCubeMapIdx  then MyDeallocIndex ( .pCubeMapIdx  )
       if .pTriangleIdx then MyDeallocIndex ( .pTriangleIdx )
       if .pBorderIdx   then MyDeallocIndex ( .pBorderIdx   )
@@ -889,10 +1084,10 @@ do
           end if        
           if .pModel->bHasSize=0 then
             #if 0
-            with .pModel->tSize
-              printf(!"%5i: xMin=%1.1f , yMin=%1.1f , zMin=%1.1f , xMax=%1.1f , yMax=%1.1f , zMax=%1.1f\n" , _
-              lUnique , .xMin , .yMin , .zMin , .xMax , .yMax , .zMax )
-            end with
+              with .pModel->tSize
+                printf(!"%5i: xMin=%1.1f , yMin=%1.1f , zMin=%1.1f , xMax=%1.1f , yMax=%1.1f , zMax=%1.1f\n" , _
+                lUnique , .xMin , .yMin , .zMin , .xMax , .yMax , .zMax )
+              end with
             #endif
             .pModel->bHasSize=1 : SizeModel( .pModel , .pModel->tSize )
             
@@ -1039,6 +1234,7 @@ do
       if iOldCliWid <> iCliWid orelse iOldCliHei <> iCliHei then          
         iOldCliWid = iCliWid : iOldCliHei = iCliHei         
         ResizeOpengGL( iCliWid, iCliHei )         
+        InitPickingFBO( iCliWid , iCliHei )
       end if
     end if
     
@@ -1094,6 +1290,19 @@ do
       select case e.scancode
       case fb.SC_F5     : exit do 'reload
       end select
+    #endmacro
+    #macro _ButtonPress()
+      #ifdef UseVBO
+        'printf(!"Clicked on part: %i\n",PickPart(g_iMouseX,g_iMouseX))
+        if e.button = fb.BUTTON_LEFT then
+          g_CurDraw = PickPart(g_iMouseX,g_iMouseY)        
+          do
+            dim as long MX,MY,MB : getmouse MX,MY,,MB          
+            if (MB and 2)=0 then exit do
+            DisplayFBO( pickingFBO ) : flip
+          loop
+        end if
+      #endif
     #endmacro
     
     if g_FreeCam then
@@ -1255,9 +1464,12 @@ do
 
       while (ScreenEvent(@e))
         Select Case e.type         
+        case fb.EVENT_MOUSE_MOVE
+          g_iMouseX = e.x : g_iMouseX = e.y
         case fb.EVENT_MOUSE_BUTTON_PRESS
            dim as long lDX=any,lDY=any : GetMouseDelta( lDX, lDY )            
            g_bLocked = true : setmouse ,,,g_bLocked
+           _ButtonPress()
         case fb.EVENT_MOUSE_BUTTON_RELEASE
            g_bLocked = false : setmouse ,,,g_bLocked
         case fb.EVENT_KEY_PRESS
@@ -1298,6 +1510,7 @@ do
        
     else
       
+      #ifndef UseVBO
       if g_CurDraw <> -1 then
         if OldDraw <> g_CurDraw then
           var pSubPart = g_tModels( g_pModel->tParts(g_CurDraw)._1.lModelIndex ).pModel
@@ -1309,16 +1522,17 @@ do
           SnapModel( g_pModel , tSnapID )
           SortSnap( tSnapID )
         end if
-      end if
+      end if      
+      #endif
       
       '// Set light position (0, 0, 0)
       dim as GLfloat lightPos(...) = {0,0,0, 1f}'; // (x, y, z, w), w=1 for positional light
       glLightfv(GL_LIGHT0, GL_POSITION, @lightPos(0))
       
       #ifdef UseVBO
-        Matrix4x4Translate( tCur , -fPositionX , fPositionY , fPositionZ*(fZoom+4) )
+        Matrix4x4Translate( tCur , -fPositionX , fPositionY , fPositionZ*(fZoom+4) )        
         Matrix4x4RotateX( tCur , tCur , fRotationY*-cPI180 )
-        Matrix4x4RotateY( tCur , tCur , fRotationX*-cPI180 )
+        Matrix4x4RotateY( tCur , tCur , fRotationX*-cPI180 )        
       #else
         glTranslatef( -fPositionX , fPositionY , fPositionZ*(fZoom+4) ) '*(fZoom+4) ) '80*fZoom ) '/-5)
         ''glTranslatef( 0 , 0 , -80*(fZoom+4) )
@@ -1332,7 +1546,8 @@ do
       dim e as fb.EVENT = any
       while (ScreenEvent(@e))
         Select Case e.type
-        Case fb.EVENT_MOUSE_MOVE         
+        Case fb.EVENT_MOUSE_MOVE                   
+          g_iMouseX = e.x : g_iMouseY = e.y          
            var fX = iif( fZoom<0 , e.dx/((fZoom*fZoom)+1) , e.dx*((fZoom*fzoom)+1) )
            var fY = iif( fZoom<0 , e.dy/((fZoom*fZoom)+1) , e.dy*((fZoom*fZoom)+1) )
            if bLeftPressed  then fRotationX += e.dx*2/sqr(g_zFar) : fRotationY += e.dy*2/sqr(g_zFar)
@@ -1348,6 +1563,7 @@ do
            end if
            if e.button = fb.BUTTON_LEFT   then bLeftPressed  = true
            if e.button = fb.BUTTON_RIGHT  then bRightPressed = true
+           _ButtonPress()
         case fb.EVENT_MOUSE_BUTTON_RELEASE
            if e.button = fb.BUTTON_LEFT   then bLeftPressed  = false
            if e.button = fb.BUTTON_RIGHT  then bRightPressed = false      

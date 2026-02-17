@@ -106,6 +106,12 @@ SetDoubleBuffer( CTL(wcQuery) )
 
 WaitForSingleObject( hEventGfxReady , INFINITE )    
 CloseHandle( hEventGfxReady )
+
+'var hParent = GetParent( CTL(wcQuery) )
+'ShowWindow(CTL(wcQuery),SW_HIDE)
+'CTL(wcQuery) = g_GfxHwnd
+'SetParent( g_GfxHwnd , hParent )
+
 if g_GfxHwnd = 0 then return -1 'failed
 
 'SetWindowPos( g_hContainer , 0 , 0,0,100,100 , SWP_NOZORDER or SWP_SHOWWINDOW or SWP_NOMOVE )
