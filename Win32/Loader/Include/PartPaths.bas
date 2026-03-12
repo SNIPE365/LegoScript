@@ -95,7 +95,7 @@ sub CheckPathLDRAW( byref sPath as string )
   'puts(sPath+"\p" & " || " & GetFileAttributes(sPath+"\p"))
   'puts(sPath+"\part" & " || " & GetFileAttributes(sPath+"\part"))
   do
-    if IsPath(sPath) andalso chk("") andalso chkExist("LDConfig.ldr") andalso chk("\p") andalso chk("\parts") then exit do
+    if IsPath(sPath) andalso chk("") andalso chkExist("\LDConfig.ldr") andalso chk("\p") andalso chk("\parts") then exit do
     if OpenFolder("Locate LDRAW folder","ldraw",sPath)=false then end
   loop
     
@@ -172,7 +172,7 @@ end sub
 #endmacro
 g_sCfgFile = exepath()
 
-#if __Main <> "LegoScript"
+#if __Main <> "LegoScript" andalso __Main <> "LegoCAD"
   
   #define   AddMember( _Name , __Section ,  _Type , __Default , __InitFunc... ) _Name as _Type  
   #define InitDefault( _Name , __Section , __Type ,  _Default , __InitFunc... ) g_tCfg._Name = _Default

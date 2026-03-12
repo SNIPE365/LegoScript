@@ -49,7 +49,7 @@ namespace gfx
         dim as RECT tRc : GetClientRect(hWnd,@tRc)
         if g_iCliWid <> tRc.right orelse g_iCliHei <> tRc.bottom then
           g_iCliWid = tRc.right : g_iCliHei = tRc.bottom                  
-          #if __Main = "LegoScript"          
+          #if __Main = "LegoScript" orelse __Main = "LegoCAD"
           if CTL(wcMain) andalso IsWindowVisible(CTL(wcMain)) then 
              'puts("size")
              SendMessage( CTL(wcMain) , WM_USER+1 , 0,0 )
@@ -170,6 +170,7 @@ namespace gfx
       #ifdef DropFilesHandler
       return DropFilesHandler( hDrop )
       #endif        
+      return 0
     case else
       'printf "%i(%x) ",iMsg,iMsg
       'return DefWindowProc(hwnd,imsg,wparam,lparam)
@@ -233,21 +234,23 @@ end namespace
 
 #define BeforeScreenRes PreResize
 
-sub _screenres(iWid as long,iHei as long,depth as long=8,num_pages as long=1,flags as long=0,refresh_rate as long=0)  
-  'if gfx.PreDetour then
-    gfx.lScreenflags = flags : gfx.g_lFirstSize = 1 : gfx.g_BorderColor = 0 : gfx.g_Fullscreen = 0
-    Flags = (flags and (not fb.gfx_fullscreen)) or fb.gfx_No_Switch
-  'else
-  '  gfx.lScreenflags=0
-  'end if
-  gfx.g_iCliWid = 0: gfx.g_iCliHei=0   
-  if (flags and fb.gfx_shaped_window) then screencontrol(fb.SET_DRIVER_NAME,"GDI")    
-  screenres iWid,iHei,depth,num_pages,flags,refresh_rate  
-  if (flags and fb.gfx_shaped_window) then screencontrol(fb.SET_DRIVER_NAME,"")    
-  screencontrol(fb.GET_DRIVER_NAME,gfx.g_sGfxDriver)
-end sub
-#undef screenres
-#define screenres _screenres
+#if __Main <> "LegoCAD"
+  sub _screenres(iWid as long,iHei as long,depth as long=8,num_pages as long=1,flags as long=0,refresh_rate as long=0)  
+    'if gfx.PreDetour then
+      gfx.lScreenflags = flags : gfx.g_lFirstSize = 1 : gfx.g_BorderColor = 0 : gfx.g_Fullscreen = 0
+      Flags = (flags and (not fb.gfx_fullscreen)) or fb.gfx_No_Switch
+    'else
+    '  gfx.lScreenflags=0
+    'end if
+    gfx.g_iCliWid = 0: gfx.g_iCliHei=0   
+    if (flags and fb.gfx_shaped_window) then screencontrol(fb.SET_DRIVER_NAME,"GDI")    
+    screenres iWid,iHei,depth,num_pages,flags,refresh_rate  
+    if (flags and fb.gfx_shaped_window) then screencontrol(fb.SET_DRIVER_NAME,"")    
+    screencontrol(fb.GET_DRIVER_NAME,gfx.g_sGfxDriver)
+  end sub
+  #undef screenres
+  #define screenres _screenres
+#endif
 
 #define _UNUSED -32768
 function _SetMouse( x As long = _UNUSED, y As long = _UNUSED, visibility As long = _UNUSED, clip As long = _UNUSED ) As long

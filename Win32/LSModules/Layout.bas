@@ -64,8 +64,9 @@ type FontStruct
   as string sName
   as ubyte  bCurWid , bCurHei
   as ubyte  bSize
-  as byte   bBOld  :1
-  as byte   bItalic:1
+  as byte   bRelative :1
+  as byte   bBOld     :1
+  as byte   bItalic   :1
 end type
 
 'type ControlStruct as ControlStruct ptr
@@ -220,8 +221,10 @@ sub ResizeLayout( hWnd as HWND , tForm as FormStruct , iWidth as long , iHeight 
     dim as HFONT hOldFont(.iFntCnt-1)
     for N as integer = 0 to .iFntCnt-1
       with .pFnt[N]
+        if .hFont andalso .bRelative=0 then continue for
         hOldFont(N) = .hFont
-        var nHeight = -MulDiv(.bSize, iLogY, iDPI) 'calculate size matching DPI
+        var iDPI2 = iif(.bRelative,iDPI,72)
+        var nHeight = -MulDiv(.bSize, iLogY, iDPI2) 'calculate size matching DPI
         var cWeight = iif(.bBold, FW_BOLD , FW_NORMAL ) 
         const cQuality = DRAFT_QUALITY or ANTIALIASED_QUALITY        
         .hFont = CreateFont(nHeight,0,0,0,cWeight,.bItalic,0,0,DEFAULT_CHARSET,0,0,cQuality,0,.sName)    
@@ -301,8 +304,9 @@ sub LayoutFreeResources( tForm as FormStruct )
     next N
   end with
 end sub
-sub _SetFont( byref hFnt as FontStruct , sName as string , iSize as ubyte , bBold as byte = 0 , bItalic as byte = 0 )
+sub _SetFont( byref hFnt as FontStruct , sName as string , iSize as long , bBold as byte = 0 , bItalic as byte = 0 )
   with hFnt
+    if iSize < 0 then iSize = -iSize else .bRelative = 1
     .sName = sName : .bSize = iSize : .bBold = bBold : .bItalic = bItalic
   end with
 end sub

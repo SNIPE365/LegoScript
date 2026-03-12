@@ -21,6 +21,7 @@
 '#define ColorizePrimatives
 '#define RenderOptionals //broken
 '#define DebugLoading
+#define DebugFBO
 '#define PrimitiveWarnings
 
 #define UseFBO
@@ -249,9 +250,10 @@ scope
  'sFile = sPath+"LDraw\models\pyramid.ldr"
  'sFile = sPath+"\examples\8891-towTruck.mpd"
  'sFile = "C:\Users\greg\Desktop\LDCAD\examples\5510.mpd"
- 'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\examples\5510.mpd" '5521,5533,5540,5541,5542
+ sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\examples\5510.mpd" '5521,5533,5540,5541,5542
  'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\examples\5542.mpd" 
  'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\examples\8851.mpd"
+ 'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\examples\8860.mpd"
  'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\LDraw\models\pyramid.ldr"
  'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\LDraw\models\car.ldr"
  'sFile = "C:\Users\greg\Desktop\LDCAD\examples\cube10x10x10.ldr"
@@ -373,6 +375,7 @@ dim shared as PartSnap tSnapID
 
 'glDisable(GL_DITHER)
 
+#ifdef UseFBO
 dim shared as glInt pickingFBO , pickingTexture , pickingDepthBuffer
 Sub InitPickingFBO(w As Integer, h As Integer)
   
@@ -411,8 +414,9 @@ Sub InitPickingFBO(w As Integer, h As Integer)
   glBindRenderbuffer(GL_RENDERBUFFER, 0) '' Unbind Renderbuffer
   
 End Sub
+#endif
 
-#ifdef UseVBO
+#ifdef UseFBO
 function PickPart(iMouseX as long , iMouseY as long) as long
   
   glPushAttrib(GL_ALL_ATTRIB_BITS)
@@ -519,7 +523,7 @@ sub DisplayFBO( iFBO as ulong )
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0)
   '' 3. Copy the pixels (Blit)
   '' Parameters: srcX1, srcY1, srcX2, srcY2, dstX1, dstY1, dstX2, dstY2, Mask, Filter
-  var scrW = gfx.g_iCliWid , scrH = gfx.g_iCliHei
+  var scrW = gfx.g_iCliWid , scrH = gfx.g_iCliHei  
   glBlitFramebuffer(0, 0, scrW, scrH, 0, 0, scrW, scrH, GL_COLOR_BUFFER_BIT, GL_NEAREST)
   '' 4. Unbind
   glBindFramebuffer(GL_FRAMEBUFFER, 0)
@@ -1234,7 +1238,9 @@ do
       if iOldCliWid <> iCliWid orelse iOldCliHei <> iCliHei then          
         iOldCliWid = iCliWid : iOldCliHei = iCliHei         
         ResizeOpengGL( iCliWid, iCliHei )         
+        #ifdef UseFBO
         InitPickingFBO( iCliWid , iCliHei )
+        #endif
       end if
     end if
     
@@ -1292,14 +1298,14 @@ do
       end select
     #endmacro
     #macro _ButtonPress()
-      #ifdef UseVBO
+      #ifdef UseFBO
         'printf(!"Clicked on part: %i\n",PickPart(g_iMouseX,g_iMouseX))
         if e.button = fb.BUTTON_LEFT then
           g_CurDraw = PickPart(g_iMouseX,g_iMouseY)        
           do
             dim as long MX,MY,MB : getmouse MX,MY,,MB          
             if (MB and 2)=0 then exit do
-            DisplayFBO( pickingFBO ) : flip
+            DisplayFBO( pickingFBO ) : flip            
           loop
         end if
       #endif

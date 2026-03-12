@@ -208,13 +208,24 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
   'screencontrol( fb.SET_GL_DEPTH_BITS , 24 )
   'screencontrol( fb.SET_GL_COLOR_BITS , 32 )
   
-  screenres 1,4096,32,,fb.GFX_OPENGL or fb.GFX_NO_FRAME' or fb.GFX_MULTISAMPLE      
-  Gfx.Resize(ScrWid,ScrHei)   
-  dim as HWND hwndGFX
-  screencontrol fb.GET_WINDOW_HANDLE , *cptr(uinteger ptr,@hwndGFX)   
-  InitRawInput( hwndGFX )  
-  DragAcceptFiles( hwndGFX , TRUE )
-
+  '#if __Main = "LegoScript" orelse __Main = "LegoCAD"
+    
+  #if __Main = "LegoCAD"
+    dim as HWND hwndGFX = screenres(800,600,32,,fb.GFX_OPENGL)    
+    'screencontrol fb.GET_WINDOW_HANDLE , *cptr(uinteger ptr,@hwndGFX)   
+    'Gfx.Resize(ScrWid,ScrHei)
+  #else
+    puts("Before")
+    screenres 1,4096,32,,fb.GFX_OPENGL 'or fb.GFX_NO_FRAME' or fb.GFX_MULTISAMPLE      
+    puts("After")
+    Gfx.Resize(ScrWid,ScrHei)   
+    dim as HWND hwndGFX 
+    screencontrol fb.GET_WINDOW_HANDLE , *cptr(uinteger ptr,@hwndGFX)   
+  #endif
+    
+  'InitRawInput( hwndGFX )  
+  'DragAcceptFiles( hwndGFX , TRUE )  
+    
   'sFile
   
   #macro _InitExtension(_NAME) 
@@ -227,16 +238,17 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
   #endmacro
   ForEachExtensionGL( _InitExtension )
   #undef _InitExtension
-  
-       
-  'var lCurStyle = GetWindowLong(hwndGFX,GWL_STYLE) and (not (WS_MINIMIZEBOX or WS_MAXIMIZEBOX))   
-  var lCurStyle = GetWindowLong(hwndGFX,GWL_STYLE) or WS_MAXIMIZEBOX
-  var lCurStyleEx = GetWindowLong(hwndGFX,GWL_EXSTYLE)
-  if (lCurStyle and WS_SIZEBOX)=0 then
-  SetWindowLong( hwndGFX , GWL_STYLE , lCurStyle or WS_SIZEBOX )
-  'SetWindowLong( hwndGFX , GWL_EXSTYLE , lCurStyleEx or WS_EX_TOOLWINDOW )
-  SetWindowPos( hwndGFX , NULL , 0,0 , 0,0 , SWP_NOMOVE or SWP_NOSIZE or SWP_NOZORDER or SWP_FRAMECHANGED )
-  end if
+      
+  #if __Main <> "LegoCAD"
+    'var lCurStyle = GetWindowLong(hwndGFX,GWL_STYLE) and (not (WS_MINIMIZEBOX or WS_MAXIMIZEBOX))   
+    var lCurStyle = GetWindowLong(hwndGFX,GWL_STYLE) or WS_MAXIMIZEBOX
+    var lCurStyleEx = GetWindowLong(hwndGFX,GWL_EXSTYLE)
+    if (lCurStyle and WS_SIZEBOX)=0 then
+      SetWindowLong( hwndGFX , GWL_STYLE , lCurStyle or WS_SIZEBOX )
+      'SetWindowLong( hwndGFX , GWL_EXSTYLE , lCurStyleEx or WS_EX_TOOLWINDOW )
+      SetWindowPos( hwndGFX , NULL , 0,0 , 0,0 , SWP_NOMOVE or SWP_NOSIZE or SWP_NOZORDER or SWP_FRAMECHANGED )
+    end if
+  #endif
   
   '' ReSizeGLScene
   ResizeOpengGL( ScrWid , ScrHei )   
@@ -258,7 +270,7 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
   glEnable(GL_TEXTURE_2D)
     
   glDisable(GL_LINE_SMOOTH)
-  #if __Main = "LegoScript"
+  #if __Main = "LegoScript" orelse __Main = "LegoCAD"
     glEnable(GL_LINE_SMOOTH)
     glLineWidth(2.25)
   #endif
@@ -310,7 +322,7 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
   glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE)
   
   glInitFont()
-      
+  
   return hwndGFX
 
 end function
