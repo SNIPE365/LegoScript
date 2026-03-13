@@ -1,4 +1,6 @@
 '******************************************************************
+redim shared as PartCollisionBox g_Viewer_atCollision()
+
 namespace Viewer
   '#define UseVBO
   
@@ -97,6 +99,21 @@ namespace Viewer
     FlushInstructionCache(GetCurrentProcess(),pPtr,8)
   end sub
   
+  dim shared as any ptr g_pCollisionThread
+  dim shared as long g_iCollisions
+  sub CollisionThread( pbRedraw as any ptr )    
+    SetThreadPriority( GetCurrentThread() , THREAD_PRIORITY_BELOW_NORMAL )
+    var dTmr = timer : g_iCollisions = 0
+    CheckCollisionModel( g_pLoadedModel , g_Viewer_atCollision() , @g_LoadFile )
+    printf(!"Collision check took %ims\n",cint((timer-dTmr)*1000))
+    #ifdef ViewerShowInfo
+       printf(!"Parts: %i , Collisions: %i \n",g_PartCount,ubound(g_Viewer_atCollision)\2)
+    #endif
+    if g_LoadFile>0 then exit sub
+    g_iCollisions = ubound(g_Viewer_atCollision)
+    if g_iCollisions > 0 then InterlockedIncrement( pbRedraw )
+  end sub
+  
   sub MainThread( hReadyEvent as any ptr )
     
     g_Mutex = MutexCreate()
@@ -152,9 +169,7 @@ namespace Viewer
     dim as single fPositionX , fPositionY , fPositionZ , fZoom = -3
     dim as long iWheel , iPrevWheel
     dim as long g_DrawCount , g_CurDraw = -1
-    var bRedraw = 1
-    
-    redim as PartCollisionBox atCollision()
+    dim as long bRedraw = 1
     
     do until g_DoQuit 
     
@@ -283,9 +298,8 @@ namespace Viewer
            #endif
         end select
       wend   
-      
-      var iCollisions = ubound(atCollision)
-      if bShowCollision andalso iCollisions<>0 andalso instr(g_sFileName,".dat")=0 then
+            
+      if bShowCollision andalso g_iCollisions<>0 andalso instr(g_sFileName,".dat")=0 then
         static as double dLastTime : if abs(timer-dLastTime) > .25 then dLastTime = timer : if bRedraw=0 then bRedraw=1
       end if
       
@@ -313,6 +327,7 @@ namespace Viewer
       var bLoaded = false
       MutexLock( g_Mutex )
       if g_LoadFile > 0 then
+        if g_pCollisionThread then ThreadWait(g_pCollisionThread):g_pCollisionThread=0
         puts("Loading file")
         Try()
            do            
@@ -390,11 +405,9 @@ namespace Viewer
                     fPositionZ = sqr(fPositionZ)*-40
                  end if
               end with
-                             
-              CheckCollisionModel( g_pLoadedModel , atCollision() )
-              #ifdef ViewerShowInfo
-                 printf(!"Parts: %i , Collisions: %i \n",g_PartCount,ubound(atCollision)\2)
-              #endif
+              
+              g_iCollisions = 0
+              g_pCollisionThread = ThreadCreate( @CollisionThread , @bRedraw )
               
               bLoaded = true
               exit do 'loaded fine
@@ -569,7 +582,7 @@ namespace Viewer
         end with
       end if
       
-      if bShowCollision andalso iCollisions<>0 andalso instr(g_sFileName,".dat")=0 then
+      if bShowCollision andalso g_iCollisions<>0 andalso instr(g_sFileName,".dat")=0 then
         glEnable( GL_POLYGON_STIPPLE )      
         static as ulong aStipple(32-1)
         dim as long iMove = (timer*8) and 7
@@ -579,8 +592,8 @@ namespace Viewer
         next iY
         glPolygonStipple(	cptr(glbyte ptr,@aStipple(0)) )
         if (iMove and 2) then glColor4f(1,0,0,1) else glColor4f(0,0,0,1)
-        for I as long = 0 to iCollisions-1   
-           with atCollision(I)
+        for I as long = 0 to g_iCollisions-1   
+           with g_Viewer_atCollision(I)
               DrawLimitsCube( .xMin-1,.xMax+1 , .yMin-1,.yMax+1 , .zMin-1,.zMax+1 )
            end with
         next I

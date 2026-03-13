@@ -1,7 +1,7 @@
 '#cmdline "Res\LS.rc  -gen gcc -O 3 -g"
-'#cmdline "Res\LS.rc  -gen gcc -O 3  -Wl '--large-address-aware' "
+#cmdline "Res\LS.rc  -gen gcc -O 3 -fpu sse  -Wl '--large-address-aware' -Wc '-Ofast -march=native -mavx' "
 '#cmdline "res\LS.rc -gen gcc -O 2 -Wl '--large-address-aware'"
-#cmdline "res\LS.rc -Wl '--large-address-aware'"
+'#cmdline "res\LS.rc -Wl '--large-address-aware'"
 
 '0x0043839D > StartExceptions+0x3376D G:\JOGOS\LEGOSCRIPT\WIN32\LOADER\PARTSEARCH.BAS:80
 '0x004387D1 > StartExceptions+0x33BA1 G:\JOGOS\LEGOSCRIPT\WIN32\LOADER\PARTSEARCH.BAS:144 [FBIDETEMP.exe:#1]
@@ -36,6 +36,9 @@
 
 ' !!! some pieces have unmatched studs vs clutch (and i suspect that's their design problem) !!!
 ' !!! because when using ldraw it does not matter the order, so they never enforced that     !!!
+
+'TODO (13/03/26): make the collision checker only initiate the check if collision display is enabled
+'TODO (13/03/26): check how much we can go for the tolerance amount to have existing models not collide
 
 'TODO (25/01/26): filters should be changed to be a dialog
 'TODO (25/01/26): invert filter logic, debug if filtering is actually working

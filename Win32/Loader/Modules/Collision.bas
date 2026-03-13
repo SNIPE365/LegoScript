@@ -31,12 +31,34 @@ End Function
 Function vec3_Dot(v1 As Vector3, v2 As Vector3) As Single
     Return (v1.x * v2.x + v1.y * v2.y + v1.z * v2.z)
 End Function
+Function vec3_Mag(v As Vector3) As Single
+    Return Sqr(v.x * v.x + v.y * v.y + v.z * v.z)
+End Function
 
 ' -----------------------------------------------------------------------------
 ' MID-PHASE: Triangle vs AABB bounding box check
 ' -----------------------------------------------------------------------------
+#if 1
 Function CheckTriangleBox(tV0 As Vector3, tV1 As Vector3, tV2 As Vector3, box As PartCollisionBox) As Byte
     Dim As Single triMin, triMax
+    Dim As Single fPad = 0.5 ' Give the box some breathing room for float noise
+    
+    #macro _Check(_A)    
+      triMin = tV0._A : triMax = tV0._A
+      If tV1._A < triMin Then triMin = tV1._A
+      If tV1._A > triMax Then triMax = tV1._A
+      If tV2._A < triMin Then triMin = tV2._A
+      If tV2._A > triMax Then triMax = tV2._A
+      If triMax < (box._A##Min - fPad) OrElse triMin > (box._A##Max + fPad) Then Return 0
+    #endmacro
+    _Check(x)
+    _Check(y)
+    _Check(z)
+    
+    Return 1
+end function
+#else
+Function CheckTriangleBox(tV0 As Vector3, tV1 As Vector3, tV2 As Vector3, box As PartCollisionBox) As Byte
     
     triMin = tV0.x : triMax = tV0.x
     If tV1.x < triMin Then triMin = tV1.x : If tV1.x > triMax Then triMax = tV1.x
@@ -55,16 +77,17 @@ Function CheckTriangleBox(tV0 As Vector3, tV1 As Vector3, tV2 As Vector3, box As
     
     Return 1
 End Function
+#endif
 
 ' -----------------------------------------------------------------------------
-' NARROW-PHASE: Robust Ray-Triangle Segment Pierce Test
+' NARROW-PHASE: Robust Ray-Triangle Segment Pierce Test (Absolute Units)
 ' -----------------------------------------------------------------------------
 Function CheckRayTriangleRobust(RayOrigin As Vector3, RayEnd As Vector3, TriV0 As Vector3, TriV1 As Vector3, TriV2 As Vector3, fEpsilon As Single) As Byte
     Dim As Vector3 e1, e2, h, s, q, rayDir
-    Dim As Single a, f, u, v, t, rayLen
+    Dim As Single a, f, u, v, w, t, rayLen
     
     rayDir = vec3_Sub(RayEnd, RayOrigin)
-    rayLen = Sqr(vec3_Dot(rayDir, rayDir))
+    rayLen = vec3_Mag(rayDir)
     If rayLen < fEpsilon Then Return 0 
     
     e1 = vec3_Sub(TriV1, TriV0)
@@ -78,18 +101,37 @@ Function CheckRayTriangleRobust(RayOrigin As Vector3, RayEnd As Vector3, TriV0 A
     s = vec3_Sub(RayOrigin, TriV0)
     u = f * vec3_Dot(s, h)
     
-    ' Shrink the target surface slightly (e.g., 2% of its area) 
-    ' to ignore grazing edge touches
-    Dim As Single uvTol = 0.25 
-    If u < uvTol OrElse u > (1.0 - uvTol) Then Return 0
+    ' Standard bounds check first
+    If u < 0.0 OrElse u > 1.0 Then Return 0
     
     q = vec3_Cross(s, e1)
     v = f * vec3_Dot(rayDir, q)
     
-    If v < uvTol OrElse (u + v) > (1.0 - uvTol) Then Return 0
+    If v < 0.0 OrElse (u + v) > 1.0 Then Return 0
     
+    ' --- ABSOLUTE EDGE DISTANCE CHECK ---
+    w = 1.0 - u - v
+    
+    ' doubleArea is the magnitude of the cross product of the two edges
+    Dim As Vector3 crossE1E2 = vec3_Cross(e1, e2)
+    Dim As Single doubleArea = vec3_Mag(crossE1E2)
+    
+    If doubleArea > 0.0001 Then 
+        ' Calculate absolute distance from the hit point to each of the 3 edges
+        Dim As Single distAC = u * (doubleArea / vec3_Mag(e2))
+        Dim As Single distAB = v * (doubleArea / vec3_Mag(e1))
+        Dim As Single distBC = w * (doubleArea / vec3_Mag(vec3_Sub(TriV2, TriV1)))
+        
+        ' This is your absolute tolerance in LDraw units. 
+        ' 1.5 to 2.0 is usually safe to ignore grazing edge touches.
+        Dim As Single absTol = 0.9
+        
+        If distAC < absTol OrElse distAB < absTol OrElse distBC < absTol Then Return 0
+    End If
+    ' ------------------------------------
+    
+    ' Check distance along the ray segment itself
     t = f * vec3_Dot(e2, q)
-    
     Dim As Single tTol = fEpsilon / rayLen
     If t > tTol AndAlso t < (1.0 - tTol) Then
         Return 1 
@@ -97,7 +139,6 @@ Function CheckRayTriangleRobust(RayOrigin As Vector3, RayEnd As Vector3, TriV0 A
     
     Return 0
 End Function
-
 Function CheckTriangleTriangle(v0 As Vector3, v1 As Vector3, v2 As Vector3, u0 As Vector3, u1 As Vector3, u2 As Vector3) As Byte
     Dim As Single fEpsilon = 0.5 ' Tolerance for LDraw units 
     
@@ -171,9 +212,10 @@ Dim Shared g_DebugTris() As CollisionTri
 ' -----------------------------------------------------------------------------
 ' MAIN ENTRANCE
 ' -----------------------------------------------------------------------------
-Sub CheckCollisionModel( pPart As DATFile Ptr , atCollision() As PartCollisionBox , pRoot As DATFile Ptr = NULL )
+Sub CheckCollisionModel( pPart As DATFile Ptr , atCollision() As PartCollisionBox , pbCancel as byte ptr , pRoot As DATFile Ptr = NULL )
    If pPart = 0 Then Exit Sub
    If pRoot = NULL Then pRoot = pPart
+   if *pbCancel > 0 then Exit sub
    
    Static As PartCollisionBox AtPartBound()
    Static As PartCollisionBox Ptr ptSize
@@ -214,7 +256,7 @@ Sub CheckCollisionModel( pPart As DATFile Ptr , atCollision() As PartCollisionBo
                   Var pSubPart = g_tModels(.lModelIndex).pModel
                   Dim As Single fMatrix(15) = { .fA , .fD , .fG , 0 , .fB , .fE , .fH , 0 , .fC , .fF , .fI , 0 , .fX , .fY , .fZ , 1 }
                   PushAndMultMatrix( @fMatrix(0) )
-                  CheckCollisionModel( pSubPart , atCollision() , pRoot )
+                  CheckCollisionModel( pSubPart , atCollision() , pbCancel , pRoot )
                   PopMatrix()                  
                End With                
             Case 2               
@@ -254,44 +296,55 @@ Sub CheckCollisionModel( pPart As DATFile Ptr , atCollision() As PartCollisionBo
    
    If pRoot = pPart Then 
       #if 1
-      For N As Long = 0 To pPart->iPartCount-1
-         If pPart->tParts(N).bType <> 1 Then Continue For
-         'adjust the box to ignore the negative part of the base height (Y)
-         Var fyMin = g_tModels(pPart->tParts(N)._1.lModelIndex).pModel->tSize.yMin
-         If ((fyMin-(-4)) < 0.0001) Then AtPartBound(N).yMin -= fyMin         
-         AtPartBound(N).xMin += .1 : AtPartBound(N).xMax -= .1
-         AtPartBound(N).yMin += .1 : AtPartBound(N).yMax -= .1         
-         AtPartBound(N).zMin += .1 : AtPartBound(N).zMax -= .1
-      Next N
+        For N As Long = 0 To pPart->iPartCount-1
+           If pPart->tParts(N).bType <> 1 Then Continue For
+           'adjust the box to ignore the negative part of the base height (Y)         
+           Var fyMin = g_tModels(pPart->tParts(N)._1.lModelIndex).pModel->tSize.yMin
+           If ((fyMin-(-4)) < 0.0001) Then AtPartBound(N).yMin -= fyMin         
+           AtPartBound(N).xMin += .1 : AtPartBound(N).xMax -= .1
+           AtPartBound(N).yMin += .1 : AtPartBound(N).yMax -= .1         
+           AtPartBound(N).zMin += .1 : AtPartBound(N).zMax -= .1
+        Next N
+      #endif
       
+      
+      #if 1
       For N As Long = 0 To pPart->iPartCount-1         
          If pPart->tParts(N).bType <> 1 Then Continue For
          For M As Long = N+1 To (pPart->iPartCount-1)
+            if *pbCancel > 0 then puts("Collision check cancelled"): Exit sub
             If pPart->tParts(M).bType <> 1 Then Continue For
             
             If CheckCollision( AtPartBound(N) , AtPartBound(M) ) Then
-               
-               ' --- BEGIN NARROW PHASE ---
-               Dim As CollisionTri aTrisN(), aTrisM()
-               
-               With pPart->tParts(N)._1
+              'puts("Found box collision")
+              Dim As Byte bExactHit = 1
+              
+              #define Chk(_E) Abs(AtPartBound(N)._E - AtPartBound(M)._E) > 0.1
+              #define chkA(_Axis) Chk(_Axis##Min) orelse Chk(_Axis##Max)
+              if ChkA(x) orelse chkA(y) orelse chkA(z) then                  
+                'puts("not identical checking more")
+                bExactHit = 0              
+                ' --- BEGIN NARROW PHASE ---
+                Dim As CollisionTri aTrisN(), aTrisM()
+                
+                With pPart->tParts(N)._1
                   Dim As Single fMatN(15) = { .fA, .fD, .fG, 0, .fB, .fE, .fH, 0, .fC, .fF, .fI, 0, .fX, .fY, .fZ, 1 }
                   PushAndMultMatrix( @fMatN(0) )
                   ExtractModelTriangles( g_tModels(.lModelIndex).pModel, aTrisN() )
                   PopMatrix()
-               End With
-
-               With pPart->tParts(M)._1
+                End With
+                
+                With pPart->tParts(M)._1
                   Dim As Single fMatM(15) = { .fA, .fD, .fG, 0, .fB, .fE, .fH, 0, .fC, .fF, .fI, 0, .fX, .fY, .fZ, 1 }
                   PushAndMultMatrix( @fMatM(0) )
                   ExtractModelTriangles( g_tModels(.lModelIndex).pModel, aTrisM() )
                   PopMatrix()
-               End With
-               
-               Dim As Byte bExactHit = 0
-               If UBound(aTrisN) >= 0 AndAlso UBound(aTrisM) >= 0 Then
+                End With                
+                
+                If UBound(aTrisN) >= 0 AndAlso UBound(aTrisM) >= 0 Then
                    For iN As Long = 0 To UBound(aTrisN)
                        If CheckTriangleBox(aTrisN(iN).v1, aTrisN(iN).v2, aTrisN(iN).v3, AtPartBound(M)) Then
+                           'puts("got triangle box collision!")
                            For iM As Long = 0 To UBound(aTrisM)
                                If CheckTriangleTriangle(aTrisN(iN).v1, aTrisN(iN).v2, aTrisN(iN).v3, _
                                                         aTrisM(iM).v1, aTrisM(iM).v2, aTrisM(iM).v3) Then
@@ -308,21 +361,26 @@ Sub CheckCollisionModel( pPart As DATFile Ptr , atCollision() As PartCollisionBo
                                    Exit For, For
                                End If
                            Next iM
+                           'puts("didnt match the triangle triangle collision")
                        End If
                    Next iN
-               End If
+                End If
+              else
+                puts("same position, so collide!")
+              end if
                
-               If bExactHit Then
-                   #if 0
-                      Var iI = UBound(atCollision) : ReDim Preserve atCollision(iI+1)                  
-                      GetCollisionBoundaries( atCollision(iI) , AtPartBound(N) , AtPartBound(M) )
-                   #else
-                      Var iI = UBound(atCollision) : ReDim Preserve atCollision(iI+2)                  
-                      atCollision(iI) = AtPartBound(N)
-                      atCollision(iI+1) = AtPartBound(M)
-                   #endif
-               End If
-               ' --- END NARROW PHASE ---
+              If bExactHit Then
+                puts("Collision!")
+                 #if 0
+                    Var iI = UBound(atCollision) : ReDim Preserve atCollision(iI+1)                  
+                    GetCollisionBoundaries( atCollision(iI) , AtPartBound(N) , AtPartBound(M) )
+                 #else
+                    Var iI = UBound(atCollision) : ReDim Preserve atCollision(iI+2)                  
+                    atCollision(iI) = AtPartBound(N)
+                    atCollision(iI+1) = AtPartBound(M)
+                 #endif
+              End If
+              ' --- END NARROW PHASE ---
 
             End If
          Next M
@@ -331,11 +389,12 @@ Sub CheckCollisionModel( pPart As DATFile Ptr , atCollision() As PartCollisionBo
       
       Erase AtPartBound 
       PopMatrix() 
-   End If
+      if UBound(g_DebugTris) < 0 then puts("No collisions found!")
+   End If   
 End Sub
 
 Sub DrawCollisionDebug()
-    If UBound(g_DebugTris) < 0 Then puts("no collision"): Exit Sub
+    If UBound(g_DebugTris) < 0 Then Exit Sub
     
     ' Disable depth testing so the collision triangles render ON TOP of the bricks
     'glDisable(GL_DEPTH_TEST)
