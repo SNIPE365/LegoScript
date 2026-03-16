@@ -858,8 +858,8 @@ function LoadModel( pFile as ubyte ptr , sFilename as string = "" , iModelIndex 
             NextFloat( .fH , "H (float) as twelth"     , " " )
             NextFloat( .fI , "I (float) as thirteenth" , " " )
             '.fY = -.fY : .fH = -.fH
-            dim as string sFile
-            iResu = ReadFilename( pFile , sFile )             
+            dim as string sFile            
+            iResu = ReadFilename( pFile , sFile )
             CheckError( "Expected filename as fourteenth parameter" ) 'failed to read the line type string?
             pFile += iResu
             'var sFileL = lcase(sFile)+chr(0)

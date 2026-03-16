@@ -135,6 +135,7 @@ function ReadFilename( pFile as ubyte ptr , byref sString as string ) as long
    pzStart[iSize] = 0 'set as string terminator for the zstring
    sString = *pzStart 'creating the return string from the zstring
    pzStart[iSize] = bPrevious 'restore previous character
+   if iSize=0 then iRead=0
    return iRead
 end function
 function ReadToken( pFile as ubyte ptr , byref sString as string ) as long
