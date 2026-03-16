@@ -1,5 +1,6 @@
 '******************************************************************
 redim shared as PartCollisionBox g_Viewer_atCollision()
+'declare sub View_ToggleKey()
 
 namespace Viewer
   '#define UseVBO
@@ -8,7 +9,7 @@ namespace Viewer
   dim shared as string g_sGfxFile , g_sFileName
   dim shared as any ptr g_Mutex
   dim shared as DATFile ptr g_pLoadedModel
-  dim shared as boolean bShowCollision = true
+  dim shared as boolean bShowCollision' = true
   common shared as DWORD Viewer_dwThisThread
   
   sub ReloadFile()
@@ -101,6 +102,7 @@ namespace Viewer
   
   dim shared as any ptr g_pCollisionThread
   dim shared as long g_iCollisions
+  
   sub CollisionThread( pbRedraw as any ptr )    
     SetThreadPriority( GetCurrentThread() , THREAD_PRIORITY_BELOW_NORMAL )
     var dTmr = timer : g_iCollisions = 0
@@ -125,24 +127,26 @@ namespace Viewer
     g_GfxHwnd = InitOpenGL(ScrWid,ScrHei)      
     
     #if __Main <> "LegoCAD"
-    PreventWindowBlink(1) 
-    ShowWIndow( g_GfxHwnd , SW_HIDE )
-    SetWindowLong( g_GfxHwnd , GWL_EXSTYLE ,  GetWindowLong( g_GfxHwnd , GWL_EXSTYLE ) and (not WS_EX_LAYERED) )
+      PreventWindowBlink(1) 
+      ShowWIndow( g_GfxHwnd , SW_HIDE )
+      SetWindowLong( g_GfxHwnd , GWL_EXSTYLE ,  GetWindowLong( g_GfxHwnd , GWL_EXSTYLE ) and (not WS_EX_LAYERED) )      
+      'if bShowCollision then bShowCollision = false : View_ToggleKey()
     #endif
     
     scope
-    dim as RECT tRcWnd = any , tRcCli = any
-    GetWindowRect( g_GfxHwnd , @tRcWnd ): GetClientRect( g_GfxHwnd , @tRcCli )
-    tRcWnd.right -= tRcWnd.left : tRcWnd.bottom -= tRcWnd.top
-    tRcWnd.right -= tRcCli.right : tRcWnd.bottom -= tRcCli.Bottom
-    #if __Main <> "LegoCAD"         
-    SetWindowPos( g_GfxHwnd , NULL , g_tCfg.lGfxX,g_tCfg.lGfxY , _
-      tRcWnd.right+g_tCfg.lGfxWid , tRcWnd.bottom+g_tCfg.lGfxHei , _
-      SWP_NOMOVE or SWP_NOZORDER or SWP_NOACTIVATE )
-    #endif
-    end scope
+      dim as RECT tRcWnd = any , tRcCli = any
+      GetWindowRect( g_GfxHwnd , @tRcWnd ): GetClientRect( g_GfxHwnd , @tRcCli )
+      tRcWnd.right -= tRcWnd.left : tRcWnd.bottom -= tRcWnd.top
+      tRcWnd.right -= tRcCli.right : tRcWnd.bottom -= tRcCli.Bottom
+      #if __Main <> "LegoCAD"         
+      SetWindowPos( g_GfxHwnd , NULL , g_tCfg.lGfxX,g_tCfg.lGfxY , _
+        tRcWnd.right+g_tCfg.lGfxWid , tRcWnd.bottom+g_tCfg.lGfxHei , _
+        SWP_NOMOVE or SWP_NOZORDER or SWP_NOACTIVATE )
+      #else
+        ShowWindow( g_GfxHwnd , SW_SHOW )
+      #endif
+    end scope    
     
-    ShowWindow( g_GfxHwnd , SW_SHOW )
     if hReadyEvent then SetEvent( hReadyEvent )
     SetEvent( g_hResizeEvent )
     
@@ -166,7 +170,8 @@ namespace Viewer
     dim as byte bShiftPressed
     dim as long iFps
     dim as single fRotationX = 120 , fRotationY = 20
-    dim as single fPositionX , fPositionY , fPositionZ , fZoom = -3
+    dim as single fPositionX , fPositionY , fPositionZ , fZoom
+    dim as single fCenterX , fCenterY , fCenterZ
     dim as long iWheel , iPrevWheel
     dim as long g_DrawCount , g_CurDraw = -1
     dim as long bRedraw = 1
@@ -182,23 +187,25 @@ namespace Viewer
       if WaitForSingleObject( g_hResizeEvent , 0 )=0 then
         dim as RECT tRc : GetClientRect(g_GfxHwnd,@tRc)
         gfx.g_iCliWid = tRc.right : gfx.g_iCliHei = tRc.bottom
-        ResizeOpengGL( gfx.g_iCliWid, gfx.g_iCliHei )            
+        ResizeOpengGL( gfx.g_iCliWid, gfx.g_iCliHei ) : bRedraw or= 1
       end if
       
       Dim e as fb.EVENT = any
       while (ScreenEvent(@e))
         Select Case e.type
-        Case fb.EVENT_MOUSE_MOVE
-           var fX = iif( fZoom<0 , e.dx/((fZoom*fZoom)+1) , e.dx*((fZoom*fzoom)+1) )
-           var fY = iif( fZoom<0 , e.dy/((fZoom*fZoom)+1) , e.dy*((fZoom*fZoom)+1) )
+        Case fb.EVENT_MOUSE_MOVE           
+           var fZoomAcc = 1+(sqr(abs(fZoom)+1)/100) : fZoomAcc *= (fZoomAcc/2)
+           var fX = e.dx*fZoomAcc , fY = e.dy*fZoomAcc
            if bLeftPressed  then fRotationX += (e.dx/8) : fRotationY += (e.dy/8) : bRedraw or= 1
-           if bRightPressed then fPositionX += (fX) * g_zFar/100 : fPositionY += (fY) * g_zFar/100 : bRedraw or= 1
+           'if bRightPressed then fPositionX += (fX) * g_zFar/100 : fPositionY += (fY) * g_zFar/100 : bRedraw or= 1
+           if bRightPressed then fPositionX += fX : fPositionY += fY : bRedraw or= 1
         case fb.EVENT_MOUSE_WHEEL
-           iWheel = e.z-iPrevWheel
-           fZoom = -3+(-iWheel/64) : bRedraw or= 1
+           bRedraw or= 1 : iWheel = e.z-iPrevWheel 
+           fZoom = 2^(-iWheel/8) : if fZoom < 1 then fZoom = -iWheel
+           'puts(">> " & fZoom)
         case fb.EVENT_MOUSE_BUTTON_PRESS
            if e.button = fb.BUTTON_MIDDLE then 
-              iPrevWheel = iWheel : fZoom = -3
+              iPrevWheel = iWheel : fZoom = 0
               fRotationX = 120 : fRotationY = 20
               fPositionX = 0 : fPositionY = 0 : bRedraw += 1
            end if
@@ -208,85 +215,90 @@ namespace Viewer
            if e.button = fb.BUTTON_LEFT   then bLeftPressed  = false
            if e.button = fb.BUTTON_RIGHT  then bRightPressed = false      
         case fb.EVENT_KEY_PRESS           
-           select case e.ascii
-           case 8
-              bRedraw or= 1
-              if bShiftPressed then
-                 g_CurPart = -1 
-                 printf(!"g_CurPart = %i    \r",g_CurPart)
-                 dim as PartSize tSzTemp
-                 SizeModel( g_pLoadedModel , tSzTemp , g_CurPart )
-                 tSz = tSzTemp
-              else
-                 g_CurDraw = -1
-                 printf(!"g_CurDraw = %i    \r",g_CurDraw)
-              end if               
-           case asc("="),asc("+")
-              bRedraw or= 1
-              if bShiftPressed then
-                 g_CurPart = ((g_CurPart+2) mod (g_PartCount+1))-1 
-                 printf(!"g_CurPart = %i    \r",g_CurPart)
-                 dim as PartSize tSzTemp
-                 SizeModel( g_pLoadedModel , tSzTemp , g_CurPart )
-                 tSz = tSzTemp
-              else
-                 g_CurDraw = ((g_CurDraw+2) mod (g_DrawCount+1))-1
-                 printf(!"g_CurDraw = %i    \r",g_CurDraw)                     
-              end if
-           case asc("-"),asc("_")
-              bRedraw or= 1
-              if bShiftPressed then
-                 g_CurPart = ((g_CurPart+g_PartCount+1) mod (g_PartCount+1))-1 
-                 printf(!"g_CurPart = %i    \r",g_CurPart)
-                 dim as PartSize tSzTemp
-                 SizeModel( g_pLoadedModel , tSzTemp , g_CurPart )
-                 tSz = tSzTemp
-              else
-                 g_CurDraw = ((g_CurDraw+g_DrawCount+1) mod (g_DrawCount+1))-1
-                 printf(!"g_CurDraw = %i    \r",g_CurDraw)
-              end if               
-           case asc("S")-asc("@") 'ctrl+S 'shadow
-              if g_CurDraw >=0 then
-                 'FindFile(
-                 'FindShadowFile(
-                 with g_pLoadedModel->tParts(g_CurDraw)
-                    if .bType=1 then                              
-                       var sFile = GetPartNameByIndex(._1.lModelIndex)
-                       if FindShadowFile(sFile) then 
-                          shell "start notepad "+sFile
-                       else
-                          MessageBox( g_GfxHwnd , sFile , "Shadow file not found" , MB_ICONWARNING )
-                       end if
-                    end if
-                 end with
-              end if
-           case asc("M")-asc("@") 'ctrl+M 'Model
-              if g_CurDraw >=0 then                     
-                 with g_pLoadedModel->tParts(g_CurDraw)
-                    if .bType=1 then                              
-                       var sFile = GetPartNameByIndex(._1.lModelIndex)
-                       if FindFile(sFile) then 
-                          shell "start notepad "+sFile
-                       else
-                          MessageBox( g_GfxHwnd , sFile , "Model file not found" , MB_ICONWARNING )
-                       end if
-                    end if
-                 end with
-              end if
-           end select
-           select case e.scancode
-           case fb.SC_F5     : if g_LoadFile = -2 then LoadFile( g_sFileName ) : bRedraw or= 1
-           case fb.SC_LSHIFT : bShiftPressed or= 1
-           case fb.SC_RSHIFT : bShiftPressed or= 2
-           case fb.SC_TAB    : bBoundingBox = not bBoundingBox : bRedraw or= 1
-           case fb.SC_SPACE  : bShowCollision = not bShowCollision : bRedraw or= 1
-           case fb.SC_DELETE
-              if bShiftPressed then
-                 iPrevWheel = iWheel : fZoom = -3
-                 fRotationX = 120 : fRotationY = 20
-                 fPositionX = 0 : fPositionY = 0  : bRedraw += 1
-              end if
-           end select
+        select case e.ascii
+        case 8
+          bRedraw or= 1
+          if bShiftPressed then
+             g_CurPart = -1 
+             printf(!"g_CurPart = %i    \r",g_CurPart)
+             dim as PartSize tSzTemp
+             SizeModel( g_pLoadedModel , tSzTemp , g_CurPart )
+             tSz = tSzTemp
+          else
+             g_CurDraw = -1
+             printf(!"g_CurDraw = %i    \r",g_CurDraw)
+          end if               
+        case asc("="),asc("+")
+          bRedraw or= 1
+          if bShiftPressed then
+             g_CurPart = ((g_CurPart+2) mod (g_PartCount+1))-1 
+             printf(!"g_CurPart = %i    \r",g_CurPart)
+             dim as PartSize tSzTemp
+             SizeModel( g_pLoadedModel , tSzTemp , g_CurPart )
+             tSz = tSzTemp
+          else
+             g_CurDraw = ((g_CurDraw+2) mod (g_DrawCount+1))-1
+             printf(!"g_CurDraw = %i    \r",g_CurDraw)                     
+          end if
+        case asc("-"),asc("_")
+          bRedraw or= 1
+          if bShiftPressed then
+             g_CurPart = ((g_CurPart+g_PartCount+1) mod (g_PartCount+1))-1 
+             printf(!"g_CurPart = %i    \r",g_CurPart)
+             dim as PartSize tSzTemp
+             SizeModel( g_pLoadedModel , tSzTemp , g_CurPart )
+             tSz = tSzTemp
+          else
+             g_CurDraw = ((g_CurDraw+g_DrawCount+1) mod (g_DrawCount+1))-1
+             printf(!"g_CurDraw = %i    \r",g_CurDraw)
+          end if               
+        case asc("S")-asc("@") 'ctrl+S 'shadow
+          if g_CurDraw >=0 then
+             'FindFile(
+             'FindShadowFile(
+             with g_pLoadedModel->tParts(g_CurDraw)
+                if .bType=1 then                              
+                   var sFile = GetPartNameByIndex(._1.lModelIndex)
+                   if FindShadowFile(sFile) then 
+                      shell "start notepad "+sFile
+                   else
+                      MessageBox( g_GfxHwnd , sFile , "Shadow file not found" , MB_ICONWARNING )
+                   end if
+                end if
+             end with
+          end if
+        case asc("M")-asc("@") 'ctrl+M 'Model
+          if g_CurDraw >=0 then                     
+             with g_pLoadedModel->tParts(g_CurDraw)
+                if .bType=1 then                              
+                   var sFile = GetPartNameByIndex(._1.lModelIndex)
+                   if FindFile(sFile) then 
+                      shell "start notepad "+sFile
+                   else
+                      MessageBox( g_GfxHwnd , sFile , "Model file not found" , MB_ICONWARNING )
+                   end if
+                end if
+             end with
+          end if
+        end select
+        select case e.scancode
+        case fb.SC_F5     : if g_LoadFile = -2 then LoadFile( g_sFileName ) : bRedraw or= 1
+        case fb.SC_LSHIFT : bShiftPressed or= 1
+        case fb.SC_RSHIFT : bShiftPressed or= 2
+        case fb.SC_TAB    : bBoundingBox = not bBoundingBox : bRedraw or= 1
+        case fb.SC_SPACE  
+          bShowCollision = not bShowCollision : bRedraw or= 1
+          #ifdef meView_ShowCollision
+            Menu.MenuState( g_WndMenu,meView_ShowCollision, iif(Viewer.bShowCollision,MFS_CHECKED,0) )
+            g_tCfg.bGfxCollision = (Viewer.bShowCollision<>0)
+          #endif
+        case fb.SC_DELETE
+          if bShiftPressed then
+            iPrevWheel = iWheel : fZoom = 0
+            fRotationX = 120 : fRotationY = 20
+            fPositionX = 0 : fPositionY = 0  : bRedraw += 1
+          end if
+        end select
         case fb.EVENT_KEY_RELEASE
            select case e.scancode
            case fb.SC_LSHIFT : bShiftPressed and= (not 1)
@@ -307,22 +319,7 @@ namespace Viewer
         screencontrol fb.POLL_EVENTS : sleep 1,1 : continue do
       end if
         
-      #if 0      
-        static as double dLimitFps
-        if abs(timer-dLimitFps) > 1 then dLimitFps = timer
-        while (timer-dLimitFps) < 1/30
-          sleep 1,1
-        wend
-        dLimitFps += 1/30
-        
-        static as double dFps : iFps += 1   
-        if abs(timer-dFps)>1 then
-          dFps = timer
-          WindowTitle(g_sFileName & " - Fps: " & iFps): iFps = 0         
-        else
-          sleep 1,1
-        end if
-      #endif
+      'WindowTitle(g_sFileName & " - Fps: " & iFps): iFps = 0
        
       var bLoaded = false
       MutexLock( g_Mutex )
@@ -369,7 +366,7 @@ namespace Viewer
                                                   
               var bResetAttributes = sPrevFilename <> g_sFileName
               if bResetAttributes then
-                 fZoom = -3 : fRotationX = 120 : fRotationY = 20
+                 fZoom = 0 : fRotationX = 120 : fRotationY = 20
                  iWheel = 0 : iPrevWheel = 0 
                  sPrevFilename = g_sFileName
               end if
@@ -378,32 +375,37 @@ namespace Viewer
               g_CurPart = -1 : g_CurDraw = -1
               SizeModel( g_pLoadedModel , tSz , , g_PartCount )
               with tSz
-                 xMid = (.xMin+.xMax)/2
-                 yMid = (.yMin+.yMax)/2
-                 zMid = (.zMin+.zMax)/2
-                 if abs(xMid-.xMin) > g_zFar then g_zFar = abs(xMid-.xMin)  
-                 if abs(yMid-.yMin) > g_zFar then g_zFar = abs(yMid-.yMin)  
-                 if abs(zMid-.zMin) > g_zFar then g_zFar = abs(zMid-.zMin)  
-                 if abs(xMid-.xMax) > g_zFar then g_zFar = abs(xMid-.xMax)  
-                 if abs(yMid-.yMax) > g_zFar then g_zFar = abs(yMid-.yMax)  
-                 if abs(zMid-.zMax) > g_zFar then g_zFar = abs(zMid-.zMax)
-                 #ifdef ViewerShowInfo
+                xMid = (.xMin+.xMax)/2 : yMid = (.yMin+.yMax)/2 : zMid = (.zMin+.zMax)/2
+                g_zFar = abs(xMid-.xMin)  
+                #define Chk(_Axis,_Suffix) if abs(_Axis##Mid-._Axis##_Suffix) > g_zFar then g_zFar = abs(_Axis##Mid-._Axis##_Suffix)
+                #macro Chk2(_Axis)
+                  Chk(_Axis,Min)
+                  Chk(_Axis,Max)
+                #endmacro 
+                Chk(x,Max)
+                Chk2(y)
+                Chk2(z)
+                g_zFar *= 3+((1/sqr(g_zFar)*3))
+                if g_zFar < 400 then g_zFar = 400
+                
+                #if 1 'def ViewerShowInfo
                     printf(!"X %f > %f (%g ldu)\n",.xMin,.xMax,(.xMax-.xMin))
                     printf(!"Y %f > %f (%g ldu)\n",.yMin,.yMax,(.yMax-.yMin))
                     printf(!"Z %f > %f (%g ldu)\n",.zMin,.zMax,(.zMax-.zMin))
+                    printf(!"Far = %f\n",g_zFar)
                     printf(!"Lines: %i - Optis: %i - Trigs: %i - Quads: %i - Verts: %i\n", _
                        g_TotalLines , g_TotalOptis , g_TotalTrigs , g_TotalQuads , _
                        g_TotalLines*2+g_TotalOptis*2+g_TotalTrigs*3+g_TotalQuads*4 _
                     )
-                 #endif
-                 if bResetAttributes then
-                    'fPositionX = 0 '((.xMin + .xMax)\-2)-.xMin
-                    'fPositionY = (.yMin + .yMax)\-2
-                    fPositionX = ((.xMax+.xMin)\-2) '-.xMin
-                    fPositionY = ((.yMax+.yMin)\2) '+.yMin
-                    fPositionZ = (.zMax-.zMin) 'abs(.zMax)-abs(.zMin)
-                    fPositionZ = sqr(fPositionZ)*-40
-                 end if
+                #endif
+                if bResetAttributes then
+                  'fPositionX = 0 '((.xMin + .xMax)\-2)-.xMin
+                  'fPositionY = (.yMin + .yMax)\-2
+                  fPositionX = 0 '((.xMax+.xMin)\-2) '-.xMin
+                  fPositionY = 0 '((.yMax+.yMin)\2) '+.yMin
+                  fPositionZ = -10 '(.zMax-.zMin) 'abs(.zMax)-abs(.zMin)
+                  'fPositionZ = sqr(fPositionZ)*-40
+                end if
               end with
               
               g_iCollisions = 0
@@ -418,6 +420,7 @@ namespace Viewer
         EndCatch()
         EndTry()            
         puts("File loaded")
+        WindowTitle( g_sFileName )
       end if
       MutexUnlock( g_Mutex )  
        
@@ -432,10 +435,13 @@ namespace Viewer
         
       '// Set light position (0, 0, 0)
       dim as GLfloat lightPos(...) = {0,0,0, 1.0f}'; // (x, y, z, w), w=1 for positional light
-      glLightfv(GL_LIGHT0, GL_POSITION, @lightPos(0))            
-      glTranslatef( -fPositionX , fPositionY , fPositionZ*(fZoom+4) )      
+      glLightfv(GL_LIGHT0, GL_POSITION, @lightPos(0))      
+      'printf(!"%f\r",fZoom)
+      glTranslatef( -fPositionX , fPositionY , fPositionZ*fZoom )
+      glTranslatef( xMid , yMid , -g_zFar )      
       glRotatef fRotationY , -1.0 , 0.0 , 0
       glRotatef fRotationX , 0   , -1.0 , 0      
+      
                        
       'glPushMatrix()
       

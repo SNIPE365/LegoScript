@@ -229,7 +229,7 @@ namespace gfx
     end if
     
   end sub
-      
+
 end namespace
 
 #define BeforeScreenRes PreResize

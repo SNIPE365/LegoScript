@@ -215,16 +215,16 @@ function InitOpenGL(ScrWid as long=640,ScrHei as long=480 ) as hwnd
     'screencontrol fb.GET_WINDOW_HANDLE , *cptr(uinteger ptr,@hwndGFX)   
     'Gfx.Resize(ScrWid,ScrHei)
   #else
-    puts("Before")
+    'puts("Before")
     screenres 1,4096,32,,fb.GFX_OPENGL 'or fb.GFX_NO_FRAME' or fb.GFX_MULTISAMPLE      
-    puts("After")
+    'puts("After")
     Gfx.Resize(ScrWid,ScrHei)   
     dim as HWND hwndGFX 
     screencontrol fb.GET_WINDOW_HANDLE , *cptr(uinteger ptr,@hwndGFX)   
-  #endif
     
-  'InitRawInput( hwndGFX )  
-  'DragAcceptFiles( hwndGFX , TRUE )  
+    InitRawInput( hwndGFX )  
+    DragAcceptFiles( hwndGFX , TRUE )  
+  #endif
     
   'sFile
   

@@ -1,5 +1,5 @@
 '#cmdline "Res\LS.rc  -gen gcc -O 3 -g"
-#cmdline "Res\LS.rc  -gen gcc -O 3 -fpu sse  -Wl '--large-address-aware' -Wc '-Ofast -march=native -mavx' "
+#cmdline "Res\LS.rc  -gen gcc -O 3 -fpu sse  -Wl '--large-address-aware' -Wc '-Ofast -march=native' " '-mavx
 '#cmdline "res\LS.rc -gen gcc -O 2 -Wl '--large-address-aware'"
 '#cmdline "res\LS.rc -Wl '--large-address-aware'"
 
@@ -153,6 +153,9 @@ declare sub RichEdit_Replace( hCtl as HWND , iStart as long , iEnd as long , sTe
 #define GiveUp(_N) return false
 
 declare sub ChangeToTabByFile( sFullPath as string , iLine as long = -1 )
+declare function CreateMainMenu() as HMENU
+
+g_WndMenu = CreateMainMenu()
 
 #include "Loader\Modules\Matrix.bas"
 #include "Loader\LoadLDR.bas"
@@ -1154,8 +1157,8 @@ sub WinMain ()
     MessageBox( null, "Failed to register wcls!", sAppName, MB_ICONINFORMATION )
     exit sub
   end if
-  
-  var hMenu = CreateMainMenu()
+    
+  var hMenu = g_WndMenu  
   var hAcceleratos = CreateMainAccelerators()
 
   const cStyleEx = WS_EX_ACCEPTFILES or WS_EX_LAYERED 'or WS_EX_COMPOSITED

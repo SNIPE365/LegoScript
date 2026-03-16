@@ -156,6 +156,13 @@ sub ChangeToTab( iNewTab as long , bForce as boolean = false )
       UpdateTabCloseButton()
       SendMessage( hWndOld , EM_SETMODIFY , iModifyOld , 0 )
       SendMessage( .hEdit , EM_SETMODIFY , iModifyNew , 0 )
+      var sTemp = lcase(right(g_CurrentFilePath,3))
+      select case sTemp
+      case "mpd","ldr" : sTemp = "show"
+      case ".ls"       : sTemp = "build"
+      case else        : sTemp = "build"
+      end select
+      SetWindowText( CTL(wcButton) , sTemp )
    end with   
    'puts("new tab: " & iNewTab & " Tabs: " & g_iTabCount & " ? " & TabCtrl_GetItemCount( CTL(wcTabs) ) )
    if g_iTabCount <> TabCtrl_GetItemCount( CTL(wcTabs) ) then puts("{{Tab count mismatch!!!}}")
@@ -268,13 +275,13 @@ function NewTab( sNewFile as string , iLinked as long = -1 , iReplaceTab as long
    InvalidateRect( CTL(wcTabs) , NULL , true )   
    return iNewTab
 end function
-sub LoadScript( sFile as string )   
+sub LoadScript( sFile as string , bDisplayIfModel as boolean = false )   
    var sFileL = lcase(sFile)
    
-   if right(sFileL,4)=".ldr" then
+   if bDisplayIfModel andalso right(sFileL,4)=".ldr" orelse right(sFileL,4)=".mpd" then
       if g_Show3D=0 then Menu.Trigger( meView_ToggleGW )
       Viewer.LoadFile(sFile)
-      exit sub
+      'exit sub
    end if
    
    for N as long = 0 to g_iTabCount-1
@@ -331,9 +338,9 @@ sub File_Open()
          .lStructSize = sizeof(tOpen)
          .hwndOwner = CTL(wcMain)
          .lpstrFilter = @ _
-            !"Supported Files (LS LDR)\0*.ls;*.ldr\0" _
+            !"Supported Files (LS LDR)\0*.ls;*.ldr;*.mpd\0" _
             !"LegoScript Files\0*.ls\0" _
-            !"LDraw Files\0*.ldr\0" _
+            !"LDraw Files\0*.ldr;*.mpd\0" _
             !"All Files\0*.*\0\0"
          .nFilterIndex = 0 'Supported 
          .nFileExtension = 0
@@ -345,14 +352,14 @@ sub File_Open()
          .Flags = OFN_FILEMUSTEXIST or OFN_PATHMUSTEXIST or OFN_NOCHANGEDIR or OFN_ALLOWMULTISELECT or OFN_EXPLORER
          if GetOpenFileName( @tOpen ) = 0 then exit do         
          if .nFileExtension = 0 then 'loading multiples
-            var sPath = *.lpstrFile+"\", pzFile = .lpstrFile+.nFileOffset
+            var sPath = *.lpstrFile+"\", pzFile = .lpstrFile+.nFileOffset , bLoadModel = true
             do
                var sFile = *pzFile : pzFile += len(sFile)+1
                if len(sFile)=0 then exit do               
-               LoadScript(sPath+sFile)
+               LoadScript(sPath+sFile,bLoadModel) : bLoadModel = false
             loop            
          else            
-            LoadScript(*.lpstrFile)            
+            LoadScript(*.lpstrFile,true)
          end if
          exit do
       end with
@@ -499,19 +506,23 @@ sub SetColoredOutput( sColoredText as string )
 end sub 
 
 sub Do_Compile( bDoLock as boolean = true )   
-   SetWindowText( CTL(wcStatus) , "Building..." )   
-   var iMaxLen = GetWindowTextLength( CTL(wcEdit) )
-   var sScript = space(iMaxLen)
-   if GetWindowText( CTL(wcEdit) , strptr(sScript) , iMaxLen+1 )<>iMaxLen then 
-      puts("Failed to retrieve text content...")
-      SetWindowText( CTL(wcStatus) , "Build failed." )
-      exit sub  
-   end if
-   dim as string sOutput, sError, sFilePath = g_CurrentFilePath
-   if len(sFilePath)=0 then sFilePath = "*"+GetTabName( g_iCurTab )
-   sOutput = LegoScriptToLDraw( sScript , sError , sFilePath )   
-   SetColoredOutput( iif(len(sError)=0,sOutput,sError) )   
-   if len(sOutput) orelse len(sError)=0 then
+  SetWindowText( CTL(wcStatus) , "Building..." )   
+  var iMaxLen = GetWindowTextLength( CTL(wcEdit) )
+  var sScript = space(iMaxLen)
+  if GetWindowText( CTL(wcEdit) , strptr(sScript) , iMaxLen+1 )<>iMaxLen then 
+    puts("Failed to retrieve text content...")
+    SetWindowText( CTL(wcStatus) , "Build failed." )
+    exit sub  
+  end if
+  dim as string sOutput, sError, sFilePath = g_CurrentFilePath
+  if len(sFilePath)=0 then sFilePath = "*"+GetTabName( g_iCurTab )   
+  var sExt = lcase(right(g_CurrentFilePath,4))
+  if sExt = ".mpd" orelse sExt = ".ldr" then
+    Viewer.LoadMemory( sScript , GetTabName( g_iCurTab ) , bDoLock )
+  else
+    sOutput = LegoScriptToLDraw( sScript , sError , sFilePath )   
+    SetColoredOutput( iif(len(sError)=0,sOutput,sError) )
+    if len(sOutput) orelse len(sError)=0 then
       Viewer.LoadMemory( sOutput , GetTabName( g_iCurTab ) , bDoLock )
       #if 0
          if lcase(right(g_CurrentFilePath,3)) = ".ls" then
@@ -523,7 +534,8 @@ sub Do_Compile( bDoLock as boolean = true )
    end if
    if len(sError) then SendMessage( CTL(wcRadOutput) , BM_CLICK , 0,0 )
    SetWindowText( CTL(wcStatus) , iif(len(sOutput),"Ready.",iif(len(sError),"Script error.","No output generated!")))
-   SetFocus( CTL(wcEdit) )
+  end if
+  SetFocus( CTL(wcEdit) )
 end sub
 sub Button_Compile()
    Try()
@@ -885,7 +897,7 @@ sub View_ToggleGW()
       end if
    end if   
    Menu.MenuState( g_hCurMenu,g_CurItemID, iToggledState )
-   for N as long = meView_ShowCollision to meView_PrevBoxPart 'View.*
+   for N as long = meView_ResetView to meView_PrevBoxPart 'View.*
       EnableMenuItem( g_hCurMenu , N , iif( iToggledState and MFS_CHECKED , MF_ENABLED , MF_GRAYED ) )
    next N
 end sub
@@ -901,7 +913,9 @@ sub View_ToggleKey()
    
    select case g_CurItemID
    case meView_ShowCollision 
-      Menu.MenuState( g_WndMenu,meView_ShowCollision, iif(Viewer.bShowCollision=0,MFS_CHECKED,0) )
+      var iState = g_CurItemState and not (MFS_CHECKED)
+      Menu.MenuState( g_WndMenu,meView_ShowCollision, iState or iif(Viewer.bShowCollision=0,MFS_CHECKED,0) )
+      g_tCfg.bGfxCollision = (Viewer.bShowCollision=0)
       vk = VK_SPACE
    case else : puts("bad View_ToggleKey()"): exit sub
    end select
