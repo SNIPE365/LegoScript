@@ -1,7 +1,7 @@
 '#cmdline "Res\LS.rc  -gen gcc -O 3 -g"
 '#cmdline "Res\LS.rc  -gen gcc -O 3 -fpu sse  -Wl '--large-address-aware' -Wc '-Ofast -march=native' " '-mavx
-'#cmdline "res\LS.rc -gen gcc -O 2 -Wl '--large-address-aware'"
-#cmdline "res\LS.rc -Wl '--large-address-aware'"
+#cmdline "res\LS.rc -gen gcc -O 2 -Wl '--large-address-aware'"
+'#cmdline "res\LS.rc -Wl '--large-address-aware'"
 
 '0x0043839D > StartExceptions+0x3376D G:\JOGOS\LEGOSCRIPT\WIN32\LOADER\PARTSEARCH.BAS:80
 '0x004387D1 > StartExceptions+0x33BA1 G:\JOGOS\LEGOSCRIPT\WIN32\LOADER\PARTSEARCH.BAS:144 [FBIDETEMP.exe:#1]
