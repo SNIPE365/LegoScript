@@ -194,7 +194,7 @@ namespace Viewer
       while (ScreenEvent(@e))
         Select Case e.type
         Case fb.EVENT_MOUSE_MOVE           
-           var fZoomAcc = 1+(sqr(abs(fZoom)+1)/100) : fZoomAcc *= (fZoomAcc/2)
+           var fZoomAcc = 1/-40 '1+(sqr(abs(fZoom)+1)/100) : fZoomAcc *= (fZoomAcc/2)
            var fX = e.dx*fZoomAcc , fY = e.dy*fZoomAcc
            if bLeftPressed  then fRotationX += (e.dx/8) : fRotationY += (e.dy/8) : bRedraw or= 1
            'if bRightPressed then fPositionX += (fX) * g_zFar/100 : fPositionY += (fY) * g_zFar/100 : bRedraw or= 1
@@ -375,18 +375,28 @@ namespace Viewer
               g_CurPart = -1 : g_CurDraw = -1
               SizeModel( g_pLoadedModel , tSz , , g_PartCount )
               with tSz
-                xMid = (.xMin+.xMax)/2 : yMid = (.yMin+.yMax)/2 : zMid = (.zMin+.zMax)/2
-                g_zFar = abs(xMid-.xMin)  
-                #define Chk(_Axis,_Suffix) if abs(_Axis##Mid-._Axis##_Suffix) > g_zFar then g_zFar = abs(_Axis##Mid-._Axis##_Suffix)
-                #macro Chk2(_Axis)
-                  Chk(_Axis,Min)
-                  Chk(_Axis,Max)
-                #endmacro 
-                Chk(x,Max)
-                Chk2(y)
-                Chk2(z)
-                g_zFar *= 3+((1/sqr(g_zFar)*3))
-                if g_zFar < 400 then g_zFar = 400
+                xMid = (.xMin+.xMax)/2 : yMid = (.yMin+.yMax)/2 : zMid = (.zMin+.zMax)/2                
+                var dx = .xMax-xMid , dy = .yMax-yMid , dz = .zMax-zMid
+                var radius = Sqr(dx*dx + dy*dy + dz*dz)                
+                '' Adjust radius by your scale factor (1/20 = 0.05)
+                var scaledRadius = radius * 0.05 , fov = 45.0
+                '' Distance to fit the scaled model in a 45-degree FOV
+                g_zFar = scaledRadius / Sin((fov * 0.5) * (PI / 180.0))
+                if g_zFar < 20 then g_zFar = 20
+                
+                #if 0
+                  g_zFar = abs(xMid-.xMin)  
+                  #define Chk(_Axis,_Suffix) if abs(_Axis##Mid-._Axis##_Suffix) > g_zFar then g_zFar = abs(_Axis##Mid-._Axis##_Suffix)
+                  #macro Chk2(_Axis)
+                    Chk(_Axis,Min)
+                    Chk(_Axis,Max)
+                  #endmacro 
+                  Chk(x,Max)
+                  Chk2(y)
+                  Chk2(z)
+                  g_zFar *= 3+((1/sqr(g_zFar)*3))
+                  if g_zFar < 400 then g_zFar = 400
+                #endif
                 
                 #if 1 'def ViewerShowInfo
                     printf(!"X %f > %f (%g ldu)\n",.xMin,.xMax,(.xMax-.xMin))
@@ -403,7 +413,7 @@ namespace Viewer
                   'fPositionY = (.yMin + .yMax)\-2
                   fPositionX = 0 '((.xMax+.xMin)\-2) '-.xMin
                   fPositionY = 0 '((.yMax+.yMin)\2) '+.yMin
-                  fPositionZ = -10 '(.zMax-.zMin) 'abs(.zMax)-abs(.zMin)
+                  fPositionZ = -1 '(.zMax-.zMin) 'abs(.zMax)-abs(.zMin)
                   'fPositionZ = sqr(fPositionZ)*-40
                 end if
               end with
@@ -431,20 +441,19 @@ namespace Viewer
       
       if g_pLoadedModel=0 then flip: continue do
       
-      glScalef(1/-20, 1.0/-20, 1/20 )
-        
-      '// Set light position (0, 0, 0)
-      dim as GLfloat lightPos(...) = {0,0,0, 1.0f}'; // (x, y, z, w), w=1 for positional light
-      glLightfv(GL_LIGHT0, GL_POSITION, @lightPos(0))      
-      'printf(!"%f\r",fZoom)
-      glTranslatef( -fPositionX , fPositionY , fPositionZ*fZoom )
-      glTranslatef( xMid , yMid , -g_zFar )      
-      glRotatef fRotationY , -1.0 , 0.0 , 0
-      glRotatef fRotationX , 0   , -1.0 , 0      
-      
+      '' 2. "Zoom" - Move the camera back //'' Use the calculated autoZoomDist + your manual fZoom offset
+      glTranslatef(0, 0, -(g_zFar+fZoom))      
+      '' 3. User Panning (Optional)
+      glTranslatef(-fPositionX, fPositionY, fPositionZ)      
+      '' 4. Rotation (Now happens around the origin 0,0,0)
+      glRotatef(fRotationY, 1, 0, 0) 
+      glRotatef(fRotationX, 0, 1, 0)      
+      '' 5. Scale the model 
+      glScalef(1/-20, 1/-20, 1/20)      
+      '' 6. Center the model (Move its calculated center to 0,0,0)
+      glTranslatef(-xMid, -yMid, -zMid)      
                        
-      'glPushMatrix()
-      
+      'glPushMatrix()      
       'glDisable( GL_LIGHTING )
       
       static as long OldDraw = -1
