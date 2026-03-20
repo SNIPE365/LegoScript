@@ -178,13 +178,20 @@ function LegoScriptToLDraw( _sScript as string , sErrWarn as string = "" , sMain
    '#define DbgCrash() puts("" & __LINE__)
    #define DbgCrash()
    
-   #define DbgBuild(_s) puts("" & __LINE__ & ": " & _s)
-   '#define DbgBuild(_s)
+   #ifndef DbgBuild
+    #define DbgBuild(_s) puts("" & __LINE__ & ": " & _s)   
+    '#define DbgBuild(_s)
+   #endif
    
-   '#define Dbg_Printf  rem
-   #define Dbg_Printf printf
-   '#define Dbg_Puts rem
-   #define Dbg_Puts puts
+   #ifndef Dbg_Printf
+    '#define Dbg_Printf  rem
+    #define Dbg_Printf printf
+   #endif
+   
+   #ifndef Dbg_Puts
+    '#define Dbg_Puts rem
+    #define Dbg_Puts puts
+   #endif
    
    
    DbgBuild(!"\r"+string(60,"-"))
@@ -309,20 +316,20 @@ function LegoScriptToLDraw( _sScript as string , sErrWarn as string = "" , sMain
       for N as long = 0 to iTokCnt-1
          if iTokenLineNumber <> TokenLineNumber(N) then
             #ifdef __Standalone
-               errorf(!"\n")
+               Dbg_Printf(!"\n")
             #else
                'puts("")
             #endif
             iTokenLineNumber = TokenLineNumber(N)
          end if
          #ifdef __Standalone
-            errorf(!"{%s}",SafeText(sToken(N)))
+            Dbg_Printf(!"{%s}",SafeText(sToken(N)))
          #else
             'dbg_printf("{%s}",SafeText(sToken(N)))
          #endif
       next N
       #ifdef __Standalone
-         errorf(!"\n")
+         Dbg_Printf(!"\n")
       #else
          'puts("")
       #endif
@@ -918,7 +925,7 @@ function LegoScriptToLDraw( _sScript as string , sErrWarn as string = "" , sMain
    
 end function
 
-#ifdef __Standalone
+#ifndef __Main
    var isTerm = _isatty( _fileno(stdout) )
    dim as string sText,sScript
    var sCmd = command(), iDump=0

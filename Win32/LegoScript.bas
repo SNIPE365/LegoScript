@@ -11,6 +11,9 @@
 
 #define __Main "LegoScript"
 #define __DebugShadowLoad
+#define __DebugSettings
+#define __DebugSnap
+
 #define SearchIsInPanel
 
 #define _WIN32_WINNT &h0600

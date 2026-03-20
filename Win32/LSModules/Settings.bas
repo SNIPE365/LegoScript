@@ -112,7 +112,9 @@ sub LoadSettings()
   end if
   
   g_tCfg = tSettings 
+  #ifdef __DebugSettings
   puts("Settings Loaded")
+  #endif
   
 end sub
 sub SaveSettings()  
@@ -121,7 +123,10 @@ sub SaveSettings()
     with g_tCfg    
       ForEachSetting( CheckChanged )    
     end with
-    puts("settings didnt changed"): exit sub
+    #ifdef __DebugSettings
+    puts("settings didnt changed")
+    #endif
+    exit sub
   loop
   
   #if 0

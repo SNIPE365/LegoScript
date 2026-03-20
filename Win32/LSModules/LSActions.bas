@@ -193,6 +193,7 @@ sub UpdateTabName( iTab as long )
       else
          sFile = GetNewTabName()         
       end if
+      if len(sFile)>20 then sFile = !"\133"+right(sFile,20)
       sFile += space(cCloseLen)
       dim as TC_ITEM tItem = type( TCIF_TEXT , 0,0 , strptr(sFile) , 0,-1 , 0 ) 
       TabCtrl_SetItem( CTL(wcTabs) , iTab , @tItem )   
@@ -267,6 +268,7 @@ function NewTab( sNewFile as string , iLinked as long = -1 , iReplaceTab as long
          .sFilename = ""               
       end if
       if len(sFile) then
+         if len(sFile)>20 then sFile = !"\133"+right(sFile,20)
          sFile += space(cCloseLen)
          dim as TC_ITEM tItem = type( TCIF_TEXT , 0,0 , strptr(sFile) , 0,-1 , 0 ) 
          TabCtrl_SetItem( CTL(wcTabs) , iNewTab , @tItem )
@@ -894,6 +896,7 @@ sub View_ToggleGW()
       if g_Show3D then         
          SetWindowPos( g_GfxHwnd , HWND_TOPMOST , 0,0,0,0 , SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE)
          SetWindowPos( g_GfxHwnd , HWND_NOTOPMOST , 0,0,0,0 , SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE)         
+         PostMessage( g_GfxHwnd , WM_ACTIVATE , WA_ACTIVE , 0 )
       end if
    end if   
    Menu.MenuState( g_hCurMenu,g_CurItemID, iToggledState )

@@ -308,6 +308,8 @@ namespace Viewer
            #ifdef menu
            menu.Trigger( meView_ToggleGW ) 'hide GFX window
            #endif
+        case fb.EVENT_WINDOW_GOT_FOCUS
+          bRedraw or= 1
         end select
       wend   
             
@@ -606,11 +608,14 @@ namespace Viewer
            aStipple(iY) = iN shr ((iY+iMove) and 7)
         next iY
         glPolygonStipple(	cptr(glbyte ptr,@aStipple(0)) )
-        if (iMove and 2) then glColor4f(1,0,0,1) else glColor4f(0,0,0,1)
-        for I as long = 0 to g_iCollisions-1   
-           with g_Viewer_atCollision(I)
-              DrawLimitsCube( .xMin-1,.xMax+1 , .yMin-1,.yMax+1 , .zMin-1,.zMax+1 )
-           end with
+        if (iMove and 2) orelse g_iCollisions>=10 then glColor4f(1,0,0,1) else glColor4f(0,0,0,1)
+        static as long iStart
+        iStart += 10: if iStart >= g_iCollisions then iStart = 0
+        for I as long = 0 to 9 'g_iCollisions-1   
+          var iN = iStart+I : if iN >= g_iCollisions then exit for
+          with g_Viewer_atCollision(iN)
+            DrawLimitsCube( .xMin-1,.xMax+1 , .yMin-1,.yMax+1 , .zMin-1,.zMax+1 )
+          end with
         next I
         glDisable( GL_POLYGON_STIPPLE )      
       end if

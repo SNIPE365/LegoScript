@@ -182,7 +182,7 @@ function LoadPartModel( byref tPart as PartStructLS ) as long
          var pSnap = cptr(PartSnap ptr,pModel->pData)
          SnapModel( pModel , *pSnap )         
          SortSnap( *pSnap )
-         #if 1 'snap debug            
+         #ifdef __DebugSnap
             with *pSnap
               printf(!"Studs=%i Clutchs=%i Axles=%i Axlehs=%i Bars=%i Barhs=%i Pins=%i Pinhs=%i\n", _            
               .lStudCnt , .lClutchCnt , .lAxleCnt , .lAxleHoleCnt ,.lBarCnt , .lBarHoleCnt , .lPinCnt , .lPinHoleCnt )

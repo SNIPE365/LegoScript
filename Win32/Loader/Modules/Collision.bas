@@ -38,10 +38,13 @@ End Function
 ' -----------------------------------------------------------------------------
 ' MID-PHASE: Triangle vs AABB bounding box check
 ' -----------------------------------------------------------------------------
+
+const _CollisionTolerance = .75
+
 #if 1
 Function CheckTriangleBox(tV0 As Vector3, tV1 As Vector3, tV2 As Vector3, box As PartCollisionBox) As Byte
     Dim As Single triMin, triMax
-    Dim As Single fPad = 0.5 ' Give the box some breathing room for float noise
+    Dim As Single fPad = _CollisionTolerance '0.5 ' Give the box some breathing room for float noise
     
     #macro _Check(_A)    
       triMin = tV0._A : triMax = tV0._A
@@ -124,7 +127,7 @@ Function CheckRayTriangleRobust(RayOrigin As Vector3, RayEnd As Vector3, TriV0 A
         
         ' This is your absolute tolerance in LDraw units. 
         ' 1.5 to 2.0 is usually safe to ignore grazing edge touches.
-        Dim As Single absTol = 0.9
+        Dim As Single absTol = _CollisionTolerance*2 '0.9
         
         If distAC < absTol OrElse distAB < absTol OrElse distBC < absTol Then Return 0
     End If
@@ -140,7 +143,7 @@ Function CheckRayTriangleRobust(RayOrigin As Vector3, RayEnd As Vector3, TriV0 A
     Return 0
 End Function
 Function CheckTriangleTriangle(v0 As Vector3, v1 As Vector3, v2 As Vector3, u0 As Vector3, u1 As Vector3, u2 As Vector3) As Byte
-    Dim As Single fEpsilon = 0.5 ' Tolerance for LDraw units 
+    Dim As Single fEpsilon = _CollisionTolerance ' Tolerance for LDraw units 
     
     If CheckRayTriangleRobust(v0, v1, u0, u1, u2, fEpsilon) Then Return 1
     If CheckRayTriangleRobust(v1, v2, u0, u1, u2, fEpsilon) Then Return 1
@@ -366,11 +369,11 @@ Sub CheckCollisionModel( pPart As DATFile Ptr , atCollision() As PartCollisionBo
                    Next iN
                 End If
               else
-                puts("same position, so collide!")
+                'puts("same position, so collide!")
               end if
                
               If bExactHit Then
-                puts("Collision!")
+                'puts("Collision!")
                  #if 0
                     Var iI = UBound(atCollision) : ReDim Preserve atCollision(iI+1)                  
                     GetCollisionBoundaries( atCollision(iI) , AtPartBound(N) , AtPartBound(M) )
@@ -389,10 +392,11 @@ Sub CheckCollisionModel( pPart As DATFile Ptr , atCollision() As PartCollisionBo
       
       Erase AtPartBound 
       PopMatrix() 
-      if UBound(g_DebugTris) < 0 then puts("No collisions found!")
+      if UBound(atCollision) <= 0 then puts("No collisions found!")
    End If   
 End Sub
 
+#ifndef __NoRender
 Sub DrawCollisionDebug()
     If UBound(g_DebugTris) < 0 Then Exit Sub
     
@@ -430,3 +434,4 @@ Sub DrawCollisionDebug()
     glEnable(GL_LIGHTING)
     glEnable(GL_TEXTURE_2D)
 End Sub
+#endif

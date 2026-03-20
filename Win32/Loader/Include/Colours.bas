@@ -456,8 +456,10 @@ end scope
 do   'scope
   dim as string sColourFile = "..\LDConfig.ldr"
   if FindFile( sColourFile ) then
-    puts("settings (colour) file:")
-    puts(sColourFile )
+    #ifdef __DebugSettings
+      puts("settings (colour) file:")
+      puts(sColourFile )
+    #endif
     dim as string sColours , sNum
     if LoadFile( sColourFile , sColours , false ) = 0 then
       puts("Failed to load colours file..."): exit do
@@ -499,7 +501,9 @@ do   'scope
       
     loop
     
+    #ifdef __DebugSettings
     printf(!"%i colours added from file\n",iAdded)
+    #endif
       
     '0 !COLOUR Glow_In_Dark_Trans                                    CODE 294   VALUE #BDC6AD   EDGE #8D9D72   ALPHA 240   LUMINANCE 15
     
