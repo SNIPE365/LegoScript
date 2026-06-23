@@ -599,7 +599,7 @@ namespace Viewer
         end with
       end if
       
-      if bShowCollision andalso g_iCollisions<>0 andalso instr(g_sFileName,".dat")=0 then
+      if bShowCollision andalso g_iCollisions>0 andalso instr(g_sFileName,".dat")=0 then
         glEnable( GL_POLYGON_STIPPLE )      
         static as ulong aStipple(32-1)
         dim as long iMove = (timer*8) and 7

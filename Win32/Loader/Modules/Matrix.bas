@@ -535,9 +535,9 @@ Function Mat3_RotY(angle As Single) As Matrix3x3
 
     Return R
 End Function
-Function Mat3_RotZ(pi As Single) As Matrix3x3
+function Mat3_RotZ(fPI As Single) As Matrix3x3
     Dim As Matrix3x3 R
-    Dim As Single c = Cos(pi), s = Sin(pi)
+    Dim As Single c = Cos(fPI), s = sin(fPI)
 
     R.m(0)=c : R.m(1)=-s : R.m(2)=0
     R.m(3)=s : R.m(4)= c : R.m(5)=0

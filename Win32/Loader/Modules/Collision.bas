@@ -215,10 +215,10 @@ Dim Shared g_DebugTris() As CollisionTri
 ' -----------------------------------------------------------------------------
 ' MAIN ENTRANCE
 ' -----------------------------------------------------------------------------
-Sub CheckCollisionModel( pPart As DATFile Ptr , atCollision() As PartCollisionBox , pbCancel as byte ptr , pRoot As DATFile Ptr = NULL )
+Sub CheckCollisionModel( pPart As DATFile Ptr , atCollision() As PartCollisionBox , pbCancel as byte ptr = NULL , pRoot As DATFile Ptr = NULL )
    If pPart = 0 Then Exit Sub
    If pRoot = NULL Then pRoot = pPart
-   if *pbCancel > 0 then Exit sub
+   if pbCancel andalso *pbCancel > 0 then puts("Collision check cancelled"): Exit sub
    
    Static As PartCollisionBox AtPartBound()
    Static As PartCollisionBox Ptr ptSize
@@ -315,7 +315,7 @@ Sub CheckCollisionModel( pPart As DATFile Ptr , atCollision() As PartCollisionBo
       For N As Long = 0 To pPart->iPartCount-1         
          If pPart->tParts(N).bType <> 1 Then Continue For
          For M As Long = N+1 To (pPart->iPartCount-1)
-            if *pbCancel > 0 then puts("Collision check cancelled"): Exit sub
+            if pbCancel andalso *pbCancel > 0 then puts("Collision check cancelled"): Exit sub
             If pPart->tParts(M).bType <> 1 Then Continue For
             
             If CheckCollision( AtPartBound(N) , AtPartBound(M) ) Then

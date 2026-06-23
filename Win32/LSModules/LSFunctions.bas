@@ -147,8 +147,8 @@ function FindPartName( sName as string ) as long
    if len(sName) < 1 then return ErrInfo(ecNotFound)
    for N as long = 1 to g_iPartCount-1
       with g_tPart(N)
-        puts(.sName)
-         if .sName = sName then return N
+        'puts(.sName)
+        if .sName = sName then return N
       end with
    next N
    return ErrInfo(ecNotFound)
@@ -237,6 +237,7 @@ function AddPartName( sName as string , sPart as string ) as long
       redim preserve g_tPart( ubound(g_tPart)+_cPartMin+1 )
    end if
    
+   puts("'"+sPart+"'")
    var iIndex = FindModelIndex( sPart )
    memset( @g_tPart( g_iPartCount ) , 0 , sizeof(PartStructLS) )
    with g_tPart( g_iPartCount )
@@ -318,9 +319,9 @@ function LoadScriptFile( sFile as string , sOutString as string ) as boolean
    dim as string sData = space(lof(f))
    sOutString = space(lof(f)*3)   
    get #f,,sData : close #f
-      
-   dim as long iOut=0, iLen = len(sData)
-   for iN as long = 0 to iLen-1
+   dim as long iOut=0, iLen = len(sData)   
+   var iBom = iif( iLen>=3 andalso ((sData[0]=&hEF) and (sData[1]=&hBB) and (sData[2]=&hBF)) , 3 , 0 )
+   for iN as long = iBom to iLen-1
       dim as ubyte iChar = sData[iN]
       select case iChar
       case asc(";") 'implicit EOL

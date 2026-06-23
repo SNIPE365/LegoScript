@@ -250,7 +250,7 @@ scope
  'sFile = sPath+"LDraw\models\pyramid.ldr"
  'sFile = sPath+"\examples\8891-towTruck.mpd"
  'sFile = "C:\Users\greg\Desktop\LDCAD\examples\5510.mpd"
- sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\examples\5510.mpd" '5521,5533,5540,5541,5542
+ 'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\examples\5510.mpd" '5521,5533,5540,5541,5542
  'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\examples\5542.mpd" 
  'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\examples\8851.mpd"
  'sFile = "G:\Jogos\LDCad-1-7-Beta-1-Win\examples\8860.mpd"
@@ -857,7 +857,7 @@ do
              next N
           else 'if there isnt a model in the clipboard, then load this:
              sModel = _    
-             "1 1 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 3024.dat" EOL '60483 '39266p03.dat 
+             "1 1 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 3001.dat" EOL '60483 '39266p03.dat 
              
              'sModel = _    
              '"1 2 0.000000 0.000000 0.000000 1 0 0 0 1 0 0 0 1 NotFound.dat" EOL _
